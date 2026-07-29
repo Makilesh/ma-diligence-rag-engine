@@ -8,6 +8,8 @@ from src.data_processing.financial_table_converter import FinancialTableConverte
 from src.data_processing.excel_normalizer import TableNormalizationMeta
 
 
+
+
 @pytest.fixture
 def converter():
     return FinancialTableConverter()
