@@ -40,6 +40,10 @@ from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
+# Holds the open AsyncPostgresSaver context for the process lifetime.
+# None when the MemorySaver fallback is in use.
+_checkpointer_stack: AsyncExitStack | None = None
+
 
 async def insufficient_context_node(state: AgentState) -> dict:
     """
