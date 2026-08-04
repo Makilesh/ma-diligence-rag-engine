@@ -196,6 +196,7 @@ async def run_query(
     query: str,
     deal_id: str,
     session_id: str | None = None,
+    include_pii: bool = False,
 ) -> AgentState:
     """
     Executes a full query through the pipeline.
@@ -205,6 +206,9 @@ async def run_query(
         query: User's natural language query.
         deal_id: Deal identifier for isolation.
         session_id: Optional session ID (generated if not provided).
+        include_pii: Compliance override from the authenticated caller. Defaults
+            to False so PII-flagged chunks stay excluded unless explicitly
+            authorized. Never set from LLM output — see AgentState.include_pii.
 
     Returns:
         Final AgentState with answer and metadata.
@@ -245,6 +249,7 @@ async def run_query(
         "force_refusal": False,
         "deal_id": deal_id,
         "session_id": session_id,
+        "include_pii": include_pii,
         "total_latency_ms": 0.0,
         "status": "running",
         "error": None,
