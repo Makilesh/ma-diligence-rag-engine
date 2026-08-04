@@ -364,4 +364,61 @@ async def _process_and_index(
             points=batch,
         )
 
-    return len(points)
+    return len(points), risk_signals
+
+
+async def _mark_superseded(
+    deal_id: str,
+    superseded_doc_id: str,
+    superseded_by: str,
+) -> None:
+    """
+    Flips every chunk of a superseded document to is_current_version=0.
+
+    Without this, uploading a replacement document leaves both versions marked
+    current, and retrieval's default is_current_version=1 filter happily returns
+    stale terms alongside the ones that replaced them — the exact failure mode
+    the version metadata exists to prevent.
+
+    Failures are logged, not raised: the new document is already indexed and
+    usable, and losing the retirement stamp degrades results rather than
+    invalidating the upload.
+
+    Args:
+        deal_id: Deal scope, so one deal can never retire another deal's docs.
+        superseded_doc_id: Document being retired.
+        superseded_by: Document ID replacing it.
+    """
+    from qdrant_client.models import Filter, FieldCondition, MatchValue
+    from src.vector_db.qdrant_client import get_qdrant_client
+    from src.vector_db.constants import COLLECTION_NAME
+
+    try:
+        client = get_qdrant_client()
+        await client.set_payload(
+            collection_name=COLLECTION_NAME,
+            payload={"is_current_version": 0, "superseded_by": superseded_by},
+            points=Filter(
+                must=[
+                    FieldCondition(key="deal_id", match=MatchValue(value=deal_id)),
+                    FieldCondition(key="doc_id", match=MatchValue(value=superseded_doc_id)),
+                ]
+            ),
+        )
+        logger.info(
+            "Superseded document retired",
+            extra={
+                "deal_id": deal_id,
+                "superseded_doc_id": superseded_doc_id,
+                "superseded_by": superseded_by,
+            },
+        )
+    except Exception as e:
+        logger.error(
+            "Failed to retire superseded document",
+            extra={
+                "deal_id": deal_id,
+                "superseded_doc_id": superseded_doc_id,
+                "error": str(e),
+            },
+        )
