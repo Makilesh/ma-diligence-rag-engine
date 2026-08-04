@@ -8,6 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 
 from api.models.response_models import IngestResponse
+from api.routes.deals import register_document
 from src.data_processing.document_classifier import DocumentClassifier
 from src.utils.logger import setup_logger
 
@@ -87,7 +88,7 @@ async def ingest_document(
             document_category = classifier.classify(temp_path, file.filename)
 
         # Process based on file type
-        chunks_created = await _process_and_index(
+        chunks_created, risk_signals = await _process_and_index(
             file_path=temp_path,
             extension=extension,
             doc_id=doc_id,
@@ -96,6 +97,27 @@ async def ingest_document(
             is_current_version=is_current_version,
             supersedes_doc_id=supersedes_doc_id,
             filename=file.filename,
+        )
+
+        # Retire the superseded document's chunks so retrieval's default
+        # is_current_version=1 filter stops returning them, and any citation that
+        # does surface them (include_stale queries) carries the pointer forward.
+        if supersedes_doc_id and chunks_created:
+            await _mark_superseded(
+                deal_id=deal_id,
+                superseded_doc_id=supersedes_doc_id,
+                superseded_by=doc_id,
+            )
+
+        register_document(
+            deal_id=deal_id,
+            doc_id=doc_id,
+            filename=file.filename,
+            document_category=document_category,
+            chunks_created=chunks_created,
+            is_current_version=is_current_version,
+            supersedes_doc_id=supersedes_doc_id,
+            risk_signals=risk_signals,
         )
 
         logger.info(
@@ -107,6 +129,8 @@ async def ingest_document(
                 "file_name": file.filename,
                 "category": document_category,
                 "chunks_created": chunks_created,
+                "risk_signal_types": [s["signal_type"] for s in risk_signals],
+                "supersedes_doc_id": supersedes_doc_id or "",
             },
         )
 
@@ -140,7 +164,7 @@ async def _process_and_index(
     is_current_version: bool,
     supersedes_doc_id: str | None,
     filename: str,
-) -> int:
+) -> tuple[int, list[dict]]:
     """
     Processes document and indexes chunks in Qdrant.
 
@@ -155,11 +179,12 @@ async def _process_and_index(
         filename: Original filename.
 
     Returns:
-        Number of chunks created.
+        Tuple of (number of chunks created, document-level risk signal dicts).
     """
     from src.data_processing.structural_chunker import StructuralChunker
     from src.data_processing.semantic_chunker import SemanticChunker
     from src.data_processing.pii_detector import PIIDetector
+    from src.data_processing.risk_signal_extractor import RiskSignalExtractor
     from src.vector_db.reranker import embed_texts_async
     from src.vector_db.hybrid_search import compute_sparse_bm25
     from src.vector_db.qdrant_client import get_qdrant_client
@@ -228,7 +253,7 @@ async def _process_and_index(
             })
 
     if not sections:
-        return 0
+        return 0, []
 
     # Step 2: Structural chunking
     structural_chunker = StructuralChunker()
