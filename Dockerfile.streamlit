@@ -7,8 +7,15 @@ WORKDIR /app
 # UI image is reproducible and cannot drift onto a Streamlit 2.x breaking change.
 RUN pip install --no-cache-dir "streamlit>=1.35.0,<2.0.0" "requests>=2.31.0,<3.0.0"
 
-# Copy application code
+# curl is used by the compose healthcheck
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy application code and theme. .streamlit/ must land at the working
+# directory Streamlit is launched from, or the theme is silently ignored.
 COPY app/ ./app/
+COPY .streamlit/ ./.streamlit/
 
 # Expose port
 EXPOSE 8501
