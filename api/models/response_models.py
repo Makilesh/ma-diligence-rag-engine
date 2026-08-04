@@ -12,6 +12,9 @@ class Citation(BaseModel):
     page_number: int | None = None
     section_heading: str = ""
     is_current_version: bool = True
+    content_type: str = "text"
+    is_redline: bool = False
+    superseded_by: str = ""
 
 
 class QueryResponse(BaseModel):
@@ -26,6 +29,13 @@ class QueryResponse(BaseModel):
     session_id: str = Field(..., description="Session ID for this query")
     rewrite_iterations: int = Field(0, description="Number of query rewrites performed")
     agent_trace: list[dict] = Field(default_factory=list, description="Agent execution trace")
+    is_refusal: bool = Field(
+        False,
+        description="True when the pipeline refused to answer for lack of usable context",
+    )
+    context_quality_score: float = Field(
+        0.0, description="Best context quality score achieved across retrieval attempts"
+    )
 
 
 class IngestResponse(BaseModel):

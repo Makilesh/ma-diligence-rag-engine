@@ -129,9 +129,22 @@ async def answer_synthesizer_node(state: AgentState) -> dict:
         max_tokens=3000,
     )
 
-    # Extract citations from the answer (basic extraction)
+    # Extract citations from the answer (basic extraction).
+    # The full chunk payload is carried through — not just chunk_id/source_file —
+    # so the API can surface page, section, version and computed-metric provenance
+    # without a second round-trip to Qdrant. Anything the ingestion pipeline does
+    # not yet write (is_redline, superseded_by) simply falls back to its default.
     citations = [
-        {"chunk_id": c.get("chunk_id", ""), "source_file": c.get("source_file", "")}
+        {
+            "chunk_id": c.get("chunk_id", ""),
+            "source_file": c.get("source_file", ""),
+            "page_number": c.get("page_number"),
+            "section_heading": c.get("section_heading", "") or "",
+            "is_current_version": c.get("is_current_version", 1),
+            "content_type": c.get("content_type", "text") or "text",
+            "is_redline": bool(c.get("is_redline", 0)),
+            "superseded_by": c.get("superseded_by", "") or "",
+        }
         for c in chunks
         if c.get("source_file") and c.get("source_file", "") in answer
     ]
