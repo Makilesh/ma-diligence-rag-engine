@@ -130,6 +130,18 @@ async def answer_synthesizer_node(state: AgentState) -> dict:
     )
 
     # Extract citations from the answer (basic extraction).
+    #
+    # KNOWN IMPRECISION: matching on source_file is document-level, not
+    # passage-level. When every retrieved chunk comes from the same document,
+    # all of them are returned, so the citation list can name sections the answer
+    # never used. Verified against a live run: an answer citing only "SECTION 8.
+    # INDEMNIFICATION" produced citations labelled SECTION 7 and SECTION 5.
+    # Narrowing by section_heading does not fix it — section_heading is the
+    # heading of the *chunk*, and a chunk routinely spans several sections, so
+    # the heading is simply absent from the answer. A real fix means either
+    # finer-grained heading metadata per chunk, or parsing the inline
+    # `[file | p.N | SECTION]` markers the synthesis prompt already emits.
+    #
     # The full chunk payload is carried through — not just chunk_id/source_file —
     # so the API can surface page, section, version and computed-metric provenance
     # without a second round-trip to Qdrant. Anything the ingestion pipeline does
