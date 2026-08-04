@@ -146,6 +146,29 @@ def inject_styles() -> None:
     st.markdown(_CSS, unsafe_allow_html=True)
 
 
+def escape_currency(text: str) -> str:
+    """
+    Escapes dollar signs so Streamlit does not parse them as LaTeX math.
+
+    Streamlit's markdown treats `$...$` as inline math. An answer containing two
+    currency figures on one line — "revenue was $184.2M, up from $151.7M" — has
+    the span between them rendered as math, and BOTH dollar signs plus any
+    formatting inside are silently swallowed. For a tool whose premise is that a
+    wrong number is a hard failure, a figure disappearing from the rendered
+    answer is unacceptable, so every LLM-produced string is escaped before display.
+
+    Args:
+        text: Raw text that may contain currency figures.
+
+    Returns:
+        Text with dollar signs escaped for Streamlit markdown.
+    """
+    if not text:
+        return text
+    # Normalise first so already-escaped input is not double-escaped.
+    return text.replace("\\$", "$").replace("$", r"\$")
+
+
 def pill(text: str, variant: str = "muted") -> str:
     """
     Returns an inline HTML pill badge.
