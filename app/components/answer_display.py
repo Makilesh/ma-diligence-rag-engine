@@ -4,7 +4,7 @@ Answer display component — renders answer with confidence badge and validation
 
 import streamlit as st
 
-from app.styles import pill
+from app.styles import escape_currency, pill
 
 
 def render_answer(
@@ -65,13 +65,13 @@ def render_answer(
     # markdown (lists, tables, emphasis) still renders correctly.
     st.write("")
     with st.container(border=True):
-        st.markdown(answer)
+        st.markdown(escape_currency(answer))
 
     if hallucination_flags:
         st.write("")
         st.markdown(pill("UNSUPPORTED CLAIMS", "bad"), unsafe_allow_html=True)
         for flag in hallucination_flags:
-            st.markdown(f"- 🔴 {flag}")
+            st.markdown(f"- 🔴 {escape_currency(flag)}")
 
 
 def render_refusal(quality_score: float, rewrite_count: int) -> None:

@@ -4,7 +4,7 @@ Risk dashboard component — summarizes risk signals detected during ingestion.
 
 import streamlit as st
 
-from app.styles import pill
+from app.styles import escape_currency, pill
 
 # Display metadata per signal type. Keys mirror RISK_PATTERNS in
 # src/data_processing/risk_signal_extractor.py — keep the two in sync when a
@@ -95,4 +95,4 @@ def render_risk_dashboard(risk_signals: list[dict]) -> None:
                     + (f"<span class='dd-cite-meta'> · page {page}</span>" if page else ""),
                     unsafe_allow_html=True,
                 )
-                st.caption(f"{SEVERITY_ICON.get(severity, '⚪')} {desc}")
+                st.caption(f"{SEVERITY_ICON.get(severity, '⚪')} {escape_currency(desc)}")
