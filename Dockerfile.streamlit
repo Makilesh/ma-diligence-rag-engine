@@ -3,9 +3,9 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir streamlit requests
+# Install dependencies — pinned to the same ranges as requirements.txt so the
+# UI image is reproducible and cannot drift onto a Streamlit 2.x breaking change.
+RUN pip install --no-cache-dir "streamlit>=1.35.0,<2.0.0" "requests>=2.31.0,<3.0.0"
 
 # Copy application code
 COPY app/ ./app/

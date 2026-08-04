@@ -5,8 +5,19 @@ Sidebar: live budget status display, deal selector, document uploader.
 Main: query interface, answer display, citation viewer, agent execution trace.
 """
 
+import os
+import sys
+from pathlib import Path
+
 import streamlit as st
 import requests
+
+# `streamlit run app/streamlit_app.py` puts only app/ on sys.path — not the
+# project root — so the absolute `app.components.*` imports below would fail.
+# Prepend the project root explicitly. Works identically locally and in Docker.
+_PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
 
 from app.components.deal_manager import render_deal_manager
 from app.components.document_uploader import render_document_uploader
@@ -15,8 +26,10 @@ from app.components.answer_display import render_answer, render_refusal
 from app.components.citation_viewer import render_citations
 from app.components.agent_trace_viewer import render_agent_trace
 
-# API base URL
-API_URL = "http://localhost:8000/api/v1"
+# API base URL — docker-compose injects API_URL=http://api:8000 (service DNS name);
+# falls back to localhost for a bare-metal `streamlit run`.
+API_BASE = os.getenv("API_URL", "http://localhost:8000").rstrip("/")
+API_URL = f"{API_BASE}/api/v1"
 
 st.set_page_config(
     page_title="M&A Due Diligence Intelligence Engine",
@@ -41,7 +54,7 @@ def main():
         # 2. Budget status
         st.subheader("💰 API Budget Status")
         try:
-            resp = requests.get(f"{API_URL}/budget")
+            resp = requests.get(f"{API_URL}/budget", timeout=10)
             if resp.status_code == 200:
                 budget = resp.json()
                 for model_key, status in budget.items():
