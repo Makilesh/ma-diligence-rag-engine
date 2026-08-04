@@ -77,6 +77,11 @@ class AgentState(TypedDict):
     # ==================== Session ====================
     deal_id: str
     session_id: str
+    # Compliance authorization for PII-flagged content. Set ONCE from the
+    # authenticated API request and never derived from LLM output — Agents 1
+    # and 6 both strip `include_pii` out of extracted_filters precisely so a
+    # model cannot escalate its own access. Consumed by retrieval_executor.
+    include_pii: bool
     total_latency_ms: float
     status: str
     error: Optional[str]
