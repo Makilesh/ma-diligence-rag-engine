@@ -264,10 +264,46 @@ async def _process_and_index(
     semantic_chunks = semantic_chunker.chunk_batch(structural_chunks)
 
     if not semantic_chunks:
-        return 0
+        return 0, []
 
     # Step 4: PII detection
     pii_detector = PIIDetector()
+
+    # Step 4b: Risk signal extraction (regex only — no LLM, no added latency).
+    # Signals are written per-chunk into the payload AND aggregated to document
+    # level for the risk dashboard, which reports per-document not per-chunk.
+    risk_extractor = RiskSignalExtractor()
+    chunk_risk_signals: dict[int, list[str]] = {}
+    aggregated_risk: dict[str, dict] = {}
+
+    for i, chunk in enumerate(semantic_chunks):
+        result = risk_extractor.extract(
+            chunk.text,
+            file_name=filename,
+            document_category=document_category,
+        )
+        if not result.signals:
+            continue
+
+        chunk_risk_signals[i] = result.signals
+
+        for detail in result.signal_details:
+            signal_type = detail["signal_type"]
+            entry = aggregated_risk.setdefault(
+                signal_type,
+                {
+                    "signal_type": signal_type,
+                    "match_count": 0,
+                    "sample_matches": [],
+                    "page_number": chunk.page_number,
+                },
+            )
+            entry["match_count"] += detail["match_count"]
+            for sample in detail["sample_matches"]:
+                if sample and len(entry["sample_matches"]) < 3:
+                    entry["sample_matches"].append(sample)
+
+    risk_signals = list(aggregated_risk.values())
 
     # Step 5: Embed and index
     texts = [c.text for c in semantic_chunks]
@@ -311,6 +347,10 @@ async def _process_and_index(
                 "contains_pii": contains_pii,
                 "content_type": chunk.metadata.get("content_type", "text") if hasattr(chunk, "metadata") else "text",
                 "token_count": chunk.token_count,
+                "risk_signals": chunk_risk_signals.get(i, []),
+                "supersedes_doc_id": supersedes_doc_id or "",
+                "superseded_by": "",  # stamped later if a newer version replaces this doc
+                "is_redline": 0,
             },
         )
         points.append(point)
