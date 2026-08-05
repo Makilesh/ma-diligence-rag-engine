@@ -3,30 +3,298 @@
     "id": "fin_01",
     "query": "What was Aurora's total revenue in FY2023 and how does it compare to FY2022?",
     "query_type": "financial",
-    "status": "failed",
-    "error": "{\"detail\":\"Query pipeline error: litellm.ServiceUnavailableError: GeminiException - {\\n  \\\"error\\\": {\\n    \\\"code\\\": 503,\\n    \\\"message\\\": \\\"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.\\\",\\n    \\\"status\\\": \\\"UNAVAILABLE\\\"\\n  }\\n}\\n\"}",
-    "latency_ms": 79031.99999999924
+    "status": "passed",
+    "answer": "The total revenue for Aurora Technologies Inc. was $452.8 million for FY2023 and $387.1 million for FY2022. The year-over-year (YoY) variance is an increase of $65.7 million, representing a 17.0% growth rate.\n\n### Supporting Evidence\n*   **FY2023 Revenue:** $452.8 million [\ud83d\udcc4 aurora_financials_fy2023.txt | 2023 | p.1 | CONSOLIDATED INCOME STATEMENT]\n*   **FY2022 Revenue:** $387.1 million [\ud83d\udcc4 aurora_financials_fy2023.txt | 2022 | p.1 | CONSOLIDATED INCOME STATEMENT]\n*   **YoY Growth Percentage:** 17.0% [\ud83d\udcc4 aurora_financials_fy2023.txt | 2023 | p.3 | Revenue Growth: 17.0% YoY]\n\n### Financial Calculation\n*   **YoY Variance (Absolute):** $452.8M - $387.1M = $65.7M [\ud83d\udcca aurora_financials_fy2023.txt | Income Statement | COMPUTED: Revenue variance from FY2022\u2013FY2023]\n*   **YoY Variance (Percentage):** ($65.7M / $387.1M) * 100 \u2248 16.97% (rounded to 17.0% in source documentation) [\ud83d\udcca aurora_financials_fy2023.txt | Income Statement | COMPUTED: Revenue growth percentage from FY2022\u2013FY2023]\n\n*Note: All financial figures are in millions of USD.*",
+    "confidence_score": 1.0,
+    "validation_status": "passed",
+    "hallucination_flags": [],
+    "citations": [
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0000",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 1,
+        "section_heading": "AURORA TECHNOLOGIES INC.",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0012",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 3,
+        "section_heading": "Revenue Growth: 17.0% YoY",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0010",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 2,
+        "section_heading": "================================================================================",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0001",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 1,
+        "section_heading": "Operating Income (EBIT)                    $68.0           $51.4",
+        "is_current_version": true,
+        "content_type": "table_markdown",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0007",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 2,
+        "section_heading": "LIABILITIES AND STOCKHOLDERS' EQUITY      FY2023          FY2022",
+        "is_current_version": true,
+        "content_type": "table_markdown",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0004",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 1,
+        "section_heading": "Earnings Per Share (Diluted)               $3.87           $2.86",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0005",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 2,
+        "section_heading": "ASSETS                                    FY2023          FY2022",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0008",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 2,
+        "section_heading": "Non-Current Liabilities:",
+        "is_current_version": true,
+        "content_type": "table_markdown",
+        "is_redline": false,
+        "superseded_by": ""
+      }
+    ],
+    "latency_ms": 45483.99999999674,
+    "recall_score": 1.0,
+    "recalled_facts": [
+      "$452.8",
+      "$387.1",
+      "17.0%",
+      "growth"
+    ],
+    "missing_facts": [],
+    "citation_match": true,
+    "agent_trace": [
+      {
+        "agent": "query_intelligence",
+        "model": "gemini/gemini-3.1-flash-lite",
+        "input_query": "What was Aurora's total revenue in FY2023 and how does it compare to FY2022?",
+        "output": {
+          "query_type": "comparative",
+          "primary_intent": "Compare total revenue between FY2023 and FY2022 for Aurora",
+          "extracted_entities": {
+            "companies": [
+              "Aurora"
+            ],
+            "fiscal_years": [
+              "FY2023",
+              "FY2022"
+            ],
+            "financial_metrics": [
+              "total revenue"
+            ],
+            "legal_clause_types": [],
+            "dollar_thresholds": [],
+            "date_ranges": [],
+            "clause_ids": []
+          },
+          "metadata_filters": {
+            "fiscal_year": "FY2023",
+            "document_category": "financial",
+            "is_current_version": 1,
+            "currency": null
+          },
+          "requires_numerical_precision": true,
+          "requires_cross_document": true,
+          "document_scope": [
+            "financial"
+          ],
+          "query_expansions": [
+            "Aurora revenue growth FY2022 to FY2023",
+            "year-over-year revenue comparison for Aurora 2022-2023",
+            "Aurora financial performance revenue FY2023 vs FY2022"
+          ],
+          "reformulated_query": "Provide the total revenue for Aurora for FY2023 and FY2022 and calculate the year-over-year variance.",
+          "ambiguities": []
+        }
+      },
+      {
+        "agent": "retrieval_executor",
+        "elapsed_ms": 4235.0,
+        "dense_count": 15,
+        "reranked_count": 8
+      },
+      {
+        "agent": "financial_verifier",
+        "model": "ollama/qwen2.5:14b",
+        "inconsistencies": 0
+      },
+      {
+        "agent": "quality_assessor",
+        "method": "heuristic",
+        "score": 0.946
+      },
+      {
+        "agent": "answer_synthesizer",
+        "model": "gemini/gemini-3.1-flash-lite",
+        "answer_length": 1041
+      },
+      {
+        "agent": "hallucination_validator",
+        "model": "ollama/qwen2.5:14b",
+        "validation_status": "passed",
+        "confidence_score": 1.0,
+        "flags_count": 0
+      }
+    ]
   },
   {
     "id": "fin_02",
     "query": "What is the EBITDA and Adjusted EBITDA for FY2023?",
     "query_type": "financial",
     "status": "passed",
-    "answer": "I was unable to find sufficient relevant information in the data room to answer this question, even after refining the search. This may mean the relevant documents haven't been uploaded yet, or the question falls outside the scope of the available materials.\n\nSearch attempts: 3\nBest quality score achieved: 0.64",
-    "confidence_score": 0.0,
+    "answer": "For the fiscal year 2023, the reported financial values are as follows:\n\n*   **EBITDA:** $92.8 million [\ud83d\udcc4 aurora_financials_fy2023.txt | 2023 | p.2 | Section: EBITDA Reconciliation]\n*   **Adjusted EBITDA:** $97.3 million [\ud83d\udcc4 aurora_financials_fy2023.txt | 2023 | p.2 | Section: Adjusted EBITDA (excluding restructuring)]\n\n**Financial Context:**\nAll values are reported in millions of USD [\ud83d\udcc4 aurora_financials_fy2023.txt | 2023 | p.1 | Section: CONSOLIDATED INCOME STATEMENT]. The Adjusted EBITDA figure is calculated by adding back $4.5 million in restructuring charges to the reported EBITDA of $92.8 million [\ud83d\udcc4 aurora_financials_fy2023.txt | 2023 | p.2 | Section: Adjusted EBITDA (excluding restructuring)].",
+    "confidence_score": 1.0,
     "validation_status": "passed",
     "hallucination_flags": [],
-    "citations": [],
-    "latency_ms": 57343.00000000076,
-    "recall_score": 0.0,
-    "recalled_facts": [],
-    "missing_facts": [
+    "citations": [
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0010",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 2,
+        "section_heading": "================================================================================",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0001",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 1,
+        "section_heading": "Operating Income (EBIT)                    $68.0           $51.4",
+        "is_current_version": true,
+        "content_type": "table_markdown",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0011",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 3,
+        "section_heading": "Net Debt:",
+        "is_current_version": true,
+        "content_type": "table_markdown",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0004",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 1,
+        "section_heading": "Earnings Per Share (Diluted)               $3.87           $2.86",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0000",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 1,
+        "section_heading": "AURORA TECHNOLOGIES INC.",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0013",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 3,
+        "section_heading": "Note 7 \u2014 Debt:",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0012",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 3,
+        "section_heading": "Revenue Growth: 17.0% YoY",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0009",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 2,
+        "section_heading": "Stockholders' Equity:",
+        "is_current_version": true,
+        "content_type": "table_markdown",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0003",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 1,
+        "section_heading": "Income Tax Expense                         $15.5           $11.5",
+        "is_current_version": true,
+        "content_type": "table_markdown",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0002",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 1,
+        "section_heading": "Interest Expense                           ($8.2)          ($7.4)",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      }
+    ],
+    "latency_ms": 53922.00000000594,
+    "recall_score": 1.0,
+    "recalled_facts": [
       "$92.8",
       "$97.3",
       "restructuring",
       "$4.5"
     ],
-    "citation_match": false,
+    "missing_facts": [],
+    "citation_match": true,
     "agent_trace": [
       {
         "agent": "query_intelligence",
@@ -71,7 +339,7 @@
       },
       {
         "agent": "retrieval_executor",
-        "elapsed_ms": 2141.0,
+        "elapsed_ms": 2063.0,
         "dense_count": 15,
         "reranked_count": 10
       },
@@ -83,55 +351,19 @@
       {
         "agent": "quality_assessor",
         "method": "heuristic",
-        "score": 0.543
+        "score": 0.802
       },
       {
-        "agent": "query_rewriter",
+        "agent": "answer_synthesizer",
         "model": "gemini/gemini-3.1-flash-lite",
-        "iteration": 1,
-        "rewritten_query": "What are the financial results for FY2023, specifically the reported EBITDA and Adjusted EBITDA figures, including any reconciliations or adjustments provided in the financial statements?"
+        "answer_length": 708
       },
       {
-        "agent": "retrieval_executor",
-        "elapsed_ms": 2641.0,
-        "dense_count": 15,
-        "reranked_count": 15
-      },
-      {
-        "agent": "financial_verifier",
+        "agent": "hallucination_validator",
         "model": "ollama/qwen2.5:14b",
-        "inconsistencies": 0
-      },
-      {
-        "agent": "quality_assessor",
-        "method": "heuristic",
-        "score": 0.734
-      },
-      {
-        "agent": "query_rewriter",
-        "model": "gemini/gemini-3.1-flash-lite",
-        "iteration": 2,
-        "rewritten_query": "What are the FY2023 EBITDA and Adjusted EBITDA figures for the company, including detailed breakdowns of adjustments, non-recurring items, and the reconciliation table provided in the annual financial report or earnings release?"
-      },
-      {
-        "agent": "retrieval_executor",
-        "elapsed_ms": 2500.0,
-        "dense_count": 15,
-        "reranked_count": 15
-      },
-      {
-        "agent": "financial_verifier",
-        "model": "ollama/qwen2.5:14b",
-        "inconsistencies": 0
-      },
-      {
-        "agent": "quality_assessor",
-        "method": "heuristic",
-        "score": 0.638
-      },
-      {
-        "agent": "insufficient_context",
-        "force_refusal": true
+        "validation_status": "passed",
+        "confidence_score": 1.0,
+        "flags_count": 0
       }
     ]
   },
@@ -140,16 +372,17 @@
     "query": "What is the company's free cash flow for FY2023 and what were the components?",
     "query_type": "financial",
     "status": "passed",
-    "answer": "### 1. Direct Answer\n\nThe total Free Cash Flow for Aurora Technologies Inc. in **FY2023** is **$64.2 million**. \n\n---\n\n### 2. Detailed Breakdown of Components\n\nThe Free Cash Flow is calculated by subtracting Capital Expenditures from Cash from Operations:\n\n*   **Cash from Operations:** $78.4 million\n*   **Capital Expenditures:** ($14.2 million)\n*   **Total Free Cash Flow:** **$64.2 million** (calculated as $78.4M - $14.2M)\n\n---\n\n### 3. Supporting Evidence & Citations\n\n*   **Scale Context:** All financial figures are reported in millions of USD [\ud83d\udcc4 aurora_financials_fy2023.txt | Page: 1 | Section: AURORA TECHNOLOGIES INC.].\n*   **Free Cash Flow & Components (FY2023):** \n    *   Cash from Operations: $78.4 million [\ud83d\udcc4 aurora_financials_fy2023.txt | Page: 2 | Section: ================================================================================]\n    *   Capital Expenditures: ($14.2 million) [\ud83d\udcc4 aurora_financials_fy2023.txt | Page: 2 | Section: ================================================================================]\n    *   Free Cash Flow: $64.2 million [\ud83d\udcc4 aurora_financials_fy2023.txt | Page: 2 | Section: ================================================================================]\n\n---\n\n### 4. Caveats, Inconsistencies, or Missing Information\n\n*   No inconsistencies were found in the provided financial statements regarding these metrics. \n*   A full Cash Flow Statement detailing the individual operating cash flow adjustments (e.g., net income, working capital changes) was not provided in the context chunks, but the summarized \"Cash from Operations\" figure is clearly stated.",
+    "answer": "The total free cash flow for Aurora Technologies Inc. for FY2023 was **$64.2 million** [\ud83d\udcc4 aurora_financials_fy2023.txt | FY2023 | p.2 | Section: Free Cash Flow].\n\n### Breakdown of Components\nThe free cash flow is calculated by subtracting capital expenditures from cash provided by operations:\n\n*   **Cash from Operations:** $78.4 million [\ud83d\udcc4 aurora_financials_fy2023.txt | FY2023 | p.2 | Section: Free Cash Flow]\n*   **Capital Expenditures:** ($14.2 million) [\ud83d\udcc4 aurora_financials_fy2023.txt | FY2023 | p.2 | Section: Free Cash Flow]\n\n**Calculation:**\n$78.4 million (Cash from Operations) - $14.2 million (Capital Expenditures) = **$64.2 million** [\ud83d\udcc4 aurora_financials_fy2023.txt | FY2023 | p.2 | Section: Free Cash Flow]\n\n*Note: All financial values are in millions of USD.*",
     "confidence_score": 0.0,
     "validation_status": "failed",
     "hallucination_flags": [
-      "The total Free Cash Flow for FY2023 is provided without direct evidence.",
-      "Cash from Operations and Capital Expenditures values are not directly supported by context chunks."
+      "Total free cash flow of $64.2 million",
+      "Cash from operations of $78.4 million",
+      "Capital expenditures of ($14.2 million)"
     ],
     "citations": [
       {
-        "chunk_id": "aurora_vertex_2024_852b96ac-0904-4030-add8-3cb77a018abc_0010",
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0010",
         "source_file": "aurora_financials_fy2023.txt",
         "page_number": 2,
         "section_heading": "================================================================================",
@@ -159,7 +392,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_852b96ac-0904-4030-add8-3cb77a018abc_0011",
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0011",
         "source_file": "aurora_financials_fy2023.txt",
         "page_number": 3,
         "section_heading": "Net Debt:",
@@ -169,7 +402,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_852b96ac-0904-4030-add8-3cb77a018abc_0005",
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0005",
         "source_file": "aurora_financials_fy2023.txt",
         "page_number": 2,
         "section_heading": "ASSETS                                    FY2023          FY2022",
@@ -179,7 +412,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_852b96ac-0904-4030-add8-3cb77a018abc_0012",
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0012",
         "source_file": "aurora_financials_fy2023.txt",
         "page_number": 3,
         "section_heading": "Revenue Growth: 17.0% YoY",
@@ -189,7 +422,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_852b96ac-0904-4030-add8-3cb77a018abc_0000",
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0000",
         "source_file": "aurora_financials_fy2023.txt",
         "page_number": 1,
         "section_heading": "AURORA TECHNOLOGIES INC.",
@@ -199,7 +432,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_852b96ac-0904-4030-add8-3cb77a018abc_0002",
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0002",
         "source_file": "aurora_financials_fy2023.txt",
         "page_number": 1,
         "section_heading": "Interest Expense                           ($8.2)          ($7.4)",
@@ -209,7 +442,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_852b96ac-0904-4030-add8-3cb77a018abc_0009",
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0009",
         "source_file": "aurora_financials_fy2023.txt",
         "page_number": 2,
         "section_heading": "Stockholders' Equity:",
@@ -219,7 +452,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_852b96ac-0904-4030-add8-3cb77a018abc_0006",
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0006",
         "source_file": "aurora_financials_fy2023.txt",
         "page_number": 2,
         "section_heading": "Non-Current Assets:",
@@ -229,7 +462,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_852b96ac-0904-4030-add8-3cb77a018abc_0008",
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0008",
         "source_file": "aurora_financials_fy2023.txt",
         "page_number": 2,
         "section_heading": "Non-Current Liabilities:",
@@ -239,7 +472,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_852b96ac-0904-4030-add8-3cb77a018abc_0007",
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0007",
         "source_file": "aurora_financials_fy2023.txt",
         "page_number": 2,
         "section_heading": "LIABILITIES AND STOCKHOLDERS' EQUITY      FY2023          FY2022",
@@ -249,7 +482,7 @@
         "superseded_by": ""
       }
     ],
-    "latency_ms": 44921.99999999866,
+    "latency_ms": 56921.99999999866,
     "recall_score": 1.0,
     "recalled_facts": [
       "$64.2",
@@ -305,7 +538,7 @@
       },
       {
         "agent": "retrieval_executor",
-        "elapsed_ms": 2172.0,
+        "elapsed_ms": 2375.0,
         "dense_count": 15,
         "reranked_count": 10
       },
@@ -316,21 +549,20 @@
       },
       {
         "agent": "quality_assessor",
-        "method": "llm",
-        "model": "gemini/gemini-3.1-flash-lite",
-        "score": 1.0
+        "method": "heuristic",
+        "score": 0.741
       },
       {
         "agent": "answer_synthesizer",
-        "model": "gemini/gemini-3.5-flash",
-        "answer_length": 1609
+        "model": "gemini/gemini-3.1-flash-lite",
+        "answer_length": 774
       },
       {
         "agent": "hallucination_validator",
         "model": "ollama/qwen2.5:14b",
         "validation_status": "failed",
         "confidence_score": 0.0,
-        "flags_count": 2
+        "flags_count": 3
       }
     ]
   },
@@ -338,9 +570,198 @@
     "id": "fin_04",
     "query": "What is the Net Debt/EBITDA leverage ratio and how has it changed?",
     "query_type": "financial",
-    "status": "failed",
-    "error": "{\"detail\":\"Query pipeline error: argument of type 'NoneType' is not iterable\"}",
-    "latency_ms": 68203.00000000134
+    "status": "passed",
+    "answer": "The Net Debt/EBITDA leverage ratio for Aurora Technologies Inc. is as follows:\n\n### **Net Debt/EBITDA Leverage Ratio**\n*   **FY2023:** 0.2x [\ud83d\udcc4 aurora_financials_fy2023.txt | FY2023 | p.3 | Net Debt:]\n*   **FY2022:** 0.7x [\ud83d\udcc4 aurora_financials_fy2023.txt | FY2022 | p.3 | Net Debt:]\n\n### **Trend Analysis**\nThe Net Debt/EBITDA ratio decreased from 0.7x in FY2022 to 0.2x in FY2023. This downward trend indicates a deleveraging of the company's balance sheet, driven by a combination of reduced Net Debt (which fell from $49.9M in FY2022 to $20.6M in FY2023) and increased EBITDA (which grew from $74.0M in FY2022 to $92.8M in FY2023) [\ud83d\udcc4 aurora_financials_fy2023.txt | p.3 | Net Debt:] [\ud83d\udcc4 aurora_financials_fy2023.txt | p.2 | EBITDA Reconciliation:].\n\n### **Financial Context**\n*   **Net Debt (FY2023):** $20.6M [\ud83d\udcc4 aurora_financials_fy2023.txt | p.3 | Net Debt:]\n*   **Net Debt (FY2022):** $49.9M [\ud83d\udcc4 aurora_financials_fy2023.txt | p.3 | Net Debt:]\n*   **EBITDA (FY2023):** $92.8M [\ud83d\udcc4 aurora_financials_fy2023.txt | p.2 | EBITDA Reconciliation:]\n*   **EBITDA (FY2022):** $74.0M [\ud83d\udcc4 aurora_financials_fy2023.txt | p.2 | EBITDA Reconciliation:]\n\n*Note: The company remains in compliance with its senior secured revolving credit facility covenant, which requires a Net Debt/EBITDA ratio of \u2264 3.5x [\ud83d\udcc4 aurora_financials_fy2023.txt | p.3 | Note 7 \u2014 Debt:].*",
+    "confidence_score": 1.0,
+    "validation_status": "passed",
+    "hallucination_flags": [],
+    "citations": [
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0013",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 3,
+        "section_heading": "Note 7 \u2014 Debt:",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0011",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 3,
+        "section_heading": "Net Debt:",
+        "is_current_version": true,
+        "content_type": "table_markdown",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0010",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 2,
+        "section_heading": "================================================================================",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0007",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 2,
+        "section_heading": "LIABILITIES AND STOCKHOLDERS' EQUITY      FY2023          FY2022",
+        "is_current_version": true,
+        "content_type": "table_markdown",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0008",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 2,
+        "section_heading": "Non-Current Liabilities:",
+        "is_current_version": true,
+        "content_type": "table_markdown",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0000",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 1,
+        "section_heading": "AURORA TECHNOLOGIES INC.",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0012",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 3,
+        "section_heading": "Revenue Growth: 17.0% YoY",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0009",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 2,
+        "section_heading": "Stockholders' Equity:",
+        "is_current_version": true,
+        "content_type": "table_markdown",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0001",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 1,
+        "section_heading": "Operating Income (EBIT)                    $68.0           $51.4",
+        "is_current_version": true,
+        "content_type": "table_markdown",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0005",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 2,
+        "section_heading": "ASSETS                                    FY2023          FY2022",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      }
+    ],
+    "latency_ms": 97828.00000000134,
+    "recall_score": 0.6,
+    "recalled_facts": [
+      "0.2x",
+      "0.7x",
+      "$20.6"
+    ],
+    "missing_facts": [
+      "improved",
+      "deleveraged"
+    ],
+    "citation_match": true,
+    "agent_trace": [
+      {
+        "agent": "query_intelligence",
+        "model": "gemini/gemini-3.1-flash-lite",
+        "input_query": "What is the Net Debt/EBITDA leverage ratio and how has it changed?",
+        "output": {
+          "query_type": "financial",
+          "primary_intent": "Calculate and analyze the trend of the Net Debt to EBITDA leverage ratio",
+          "extracted_entities": {
+            "companies": [],
+            "fiscal_years": [],
+            "financial_metrics": [
+              "Net Debt",
+              "EBITDA",
+              "leverage ratio"
+            ],
+            "legal_clause_types": [],
+            "dollar_thresholds": [],
+            "date_ranges": [],
+            "clause_ids": []
+          },
+          "metadata_filters": {
+            "fiscal_year": null,
+            "document_category": "financial",
+            "is_current_version": 1,
+            "currency": null
+          },
+          "requires_numerical_precision": true,
+          "requires_cross_document": true,
+          "document_scope": [
+            "financial"
+          ],
+          "query_expansions": [
+            "historical trend of Net Debt to EBITDA ratio",
+            "leverage ratio analysis over time",
+            "Net Debt/EBITDA calculation and variance"
+          ],
+          "reformulated_query": "Calculate the Net Debt/EBITDA leverage ratio for the available periods and describe the trend or change in this ratio over time.",
+          "ambiguities": [
+            "The specific time period for the trend analysis is not defined.",
+            "The definition of 'Net Debt' (e.g., inclusion of lease liabilities) is not specified."
+          ]
+        }
+      },
+      {
+        "agent": "retrieval_executor",
+        "elapsed_ms": 2922.0,
+        "dense_count": 15,
+        "reranked_count": 10
+      },
+      {
+        "agent": "financial_verifier",
+        "model": "ollama/qwen2.5:14b",
+        "inconsistencies": 0
+      },
+      {
+        "agent": "quality_assessor",
+        "method": "heuristic",
+        "score": 0.569
+      },
+      {
+        "agent": "answer_synthesizer",
+        "model": "gemini/gemini-3.1-flash-lite",
+        "answer_length": 1345
+      },
+      {
+        "agent": "hallucination_validator",
+        "model": "ollama/qwen2.5:14b",
+        "validation_status": "passed",
+        "confidence_score": 1.0,
+        "flags_count": 0
+      }
+    ]
   },
   {
     "id": "fin_05",
@@ -352,7 +773,7 @@
     "validation_status": "passed",
     "hallucination_flags": [],
     "citations": [],
-    "latency_ms": 16671.99999999866,
+    "latency_ms": 19875.0,
     "recall_score": 0.0,
     "recalled_facts": [],
     "missing_facts": [
@@ -410,41 +831,41 @@
       },
       {
         "agent": "retrieval_executor",
-        "elapsed_ms": 3359.0,
+        "elapsed_ms": 4094.0,
         "dense_count": 23,
         "reranked_count": 10
       },
       {
         "agent": "quality_assessor",
         "method": "heuristic",
-        "score": 0.002
+        "score": 0.003
       },
       {
         "agent": "query_rewriter",
         "model": "gemini/gemini-3.1-flash-lite",
         "iteration": 1,
-        "rewritten_query": "What are the specific financial terms, interest rate margins, maturity date, and restrictive financial covenants associated with the company's revolving credit facility agreement?"
+        "rewritten_query": "What are the specific financial terms, interest rate margins, maturity dates, and restrictive covenants defined in the company's revolving credit agreement or debt financing documents?"
       },
       {
         "agent": "retrieval_executor",
-        "elapsed_ms": 3797.0,
+        "elapsed_ms": 5000.0,
         "dense_count": 23,
         "reranked_count": 20
       },
       {
         "agent": "quality_assessor",
         "method": "heuristic",
-        "score": 0.001
+        "score": 0.005
       },
       {
         "agent": "query_rewriter",
         "model": "gemini/gemini-3.1-flash-lite",
         "iteration": 2,
-        "rewritten_query": "revolving credit facility agreement financial terms interest rate margin maturity date restrictive covenants"
+        "rewritten_query": "revolving credit facility terms interest rate margin maturity date restrictive covenants debt financing agreement"
       },
       {
         "agent": "retrieval_executor",
-        "elapsed_ms": 4281.0,
+        "elapsed_ms": 5000.0,
         "dense_count": 23,
         "reranked_count": 23
       },
@@ -464,12 +885,12 @@
     "query": "What is the per share merger consideration and what premium does it represent?",
     "query_type": "legal",
     "status": "passed",
-    "answer": "I was unable to find sufficient relevant information in the data room to answer this question, even after refining the search. This may mean the relevant documents haven't been uploaded yet, or the question falls outside the scope of the available materials.\n\nSearch attempts: 3\nBest quality score achieved: 0.01",
+    "answer": "I was unable to find sufficient relevant information in the data room to answer this question, even after refining the search. This may mean the relevant documents haven't been uploaded yet, or the question falls outside the scope of the available materials.\n\nSearch attempts: 3\nBest quality score achieved: 0.04",
     "confidence_score": 0.0,
     "validation_status": "passed",
     "hallucination_flags": [],
     "citations": [],
-    "latency_ms": 33203.00000000134,
+    "latency_ms": 41655.9999999954,
     "recall_score": 0.0,
     "recalled_facts": [],
     "missing_facts": [
@@ -523,7 +944,7 @@
       },
       {
         "agent": "retrieval_executor",
-        "elapsed_ms": 2313.0,
+        "elapsed_ms": 3156.0,
         "dense_count": 15,
         "reranked_count": 10
       },
@@ -535,17 +956,17 @@
       {
         "agent": "quality_assessor",
         "method": "heuristic",
-        "score": 0.005
+        "score": 0.008
       },
       {
         "agent": "query_rewriter",
         "model": "gemini/gemini-3.1-flash-lite",
         "iteration": 1,
-        "rewritten_query": "Aurora Vertex merger agreement per share cash consideration and premium calculation over unaffected stock price"
+        "rewritten_query": "Aurora Vertex merger agreement terms per share price and premium over unaffected stock price"
       },
       {
         "agent": "retrieval_executor",
-        "elapsed_ms": 2328.0,
+        "elapsed_ms": 2734.0,
         "dense_count": 15,
         "reranked_count": 15
       },
@@ -557,17 +978,17 @@
       {
         "agent": "quality_assessor",
         "method": "heuristic",
-        "score": 0.017
+        "score": 0.027
       },
       {
         "agent": "query_rewriter",
         "model": "gemini/gemini-3.1-flash-lite",
         "iteration": 2,
-        "rewritten_query": "Aurora Innovation Vertex merger agreement cash consideration per share and premium over unaffected stock price"
+        "rewritten_query": "Aurora Innovation Vertex merger agreement cash consideration per share and premium calculation over unaffected stock price"
       },
       {
         "agent": "retrieval_executor",
-        "elapsed_ms": 2625.0,
+        "elapsed_ms": 2937.0,
         "dense_count": 15,
         "reranked_count": 15
       },
@@ -579,7 +1000,7 @@
       {
         "agent": "quality_assessor",
         "method": "heuristic",
-        "score": 0.01
+        "score": 0.038
       },
       {
         "agent": "insufficient_context",
@@ -591,92 +1012,14 @@
     "id": "legal_02",
     "query": "What are the termination fee provisions?",
     "query_type": "legal",
-    "status": "failed",
-    "error": "{\"detail\":\"Query pipeline error: argument of type 'NoneType' is not iterable\"}",
-    "latency_ms": 20890.999999995984
-  },
-  {
-    "id": "legal_03",
-    "query": "What are the indemnification caps and deductible?",
-    "query_type": "legal",
     "status": "passed",
-    "answer": "Based on the provided transaction documents, the specific indemnification caps and deductible amounts for the Aurora Vertex transaction are as follows:\n\n### 1. Direct Answer\n*   **General Indemnification Cap:** $69.6 million (representing 10% of the aggregate Merger Consideration)\n*   **Fundamental Representations Cap:** $174.0 million (representing 25% of the aggregate Merger Consideration)\n*   **Deductible:** $3.48 million (representing 0.5% of the aggregate Merger Consideration)\n\n---\n\n### 2. Supporting Evidence\n*   **General Cap & Fundamental Cap:** The aggregate liability of the Company's stockholders for standard indemnification claims is capped at $69.6 million. However, for claims arising from breaches of Fundamental Representations, the cap is increased to $174.0 million [\ud83d\udcc4 merger_agreement_v2_final.txt | p. 3 | Section 8.2 \u2014 Indemnification Cap | v2_final].\n*   **Deductible Mechanics:** Stockholders are not liable for indemnification claims until the aggregate amount of Losses exceeds $3.48 million. Once this threshold is met, the stockholders are liable for all Losses from the first dollar (functioning as a \"tipping basket\") [\ud83d\udcc4 merger_agreement_v2_final.txt | p. 3 | Section 8.3 \u2014 Deductible | v2_final].\n*   **Transaction Scale Context:** These percentages are calculated based on an aggregate Merger Consideration of approximately $696 million [\ud83d\udcc4 merger_agreement_v2_final.txt | p. 1 | The aggregate Merger Consideration is approximately $696 million... | v2_final].\n\n---\n\n### 3. Caveats and Missing Information\n*   **Deductible Terminology:** Although the agreement labels the $3.48 million threshold as the \"Deductible,\" the provision specifies that stockholders are liable \"for all Losses from the first dollar\" once the threshold is exceeded. In standard M&A practice, this mechanism is typically referred to as a \"tipping basket\" rather than a true deductible (where the first $3.48 million would be permanently absorbed by the buyer). \n*   **Fundamental Representations Defined:** The Fundamental Representations subject to the higher $174.0 million cap are identified as Sections 3.1, 3.2, 3.5, and 3.12, and they survive for a period of thirty-six (36) months compared to the standard eighteen (18) months [\ud83d\udcc4 merger_agreement_v2_final.txt | p. 3 | Section 8.1 \u2014 Survival of Representations | v2_final]. The specific titles or subject matters of these sections are not fully detailed in the provided context.",
-    "confidence_score": 0.95,
+    "answer": "The merger agreement for the aurora_vertex_2024 deal specifies two distinct termination fee provisions payable by the Company to the Buyer, triggered by specific termination events:\n\n### **Termination Fee Provisions**\n\n1.  **Superior Proposal Termination Fee:**\n    *   **Trigger Event:** Termination of the Agreement pursuant to Section 7.1(d) to accept a Superior Proposal.\n    *   **Monetary Amount:** $20.88 million (representing 3.0% of the aggregate Merger Consideration).\n    *   **Source:** [\ud83d\udcc4 merger_agreement_v2_final.txt | 2024 | p.3 | Section 7.2 \u2014 Termination Fee]\n\n2.  **Reverse Termination Fee (Company Breach):**\n    *   **Trigger Event:** Termination of the Agreement by the Buyer pursuant to Section 7.1(c) due to an uncured breach by the Company of any representation, warranty, or covenant.\n    *   **Monetary Amount:** $13.92 million (representing 2.0% of the aggregate Merger Consideration).\n    *   **Source:** [\ud83d\udcc4 merger_agreement_v2_final.txt | 2024 | p.3 | Section 7.2 \u2014 Termination Fee]\n\n### **Summary of Triggering Sections**\n*   **Section 7.1(c):** Termination by Buyer if there has been an uncured breach by the Company of any representation, warranty, or covenant. [\ud83d\udcc4 merger_agreement_v2_final.txt | 2024 | p.3 | Section (c)]\n*   **Section 7.1(d):** Termination by the Company to accept a Superior Proposal. [\ud83d\udcc4 merger_agreement_v2_final.txt | 2024 | p.3 | Section (d)]\n\nNo inconsistencies were identified in the provided documentation regarding these provisions.",
+    "confidence_score": 1.0,
     "validation_status": "passed",
     "hallucination_flags": [],
     "citations": [
       {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0019",
-        "source_file": "merger_agreement_v2_final.txt",
-        "page_number": 3,
-        "section_heading": "Section 8.2 \u2014 Indemnification Cap",
-        "is_current_version": true,
-        "content_type": "text",
-        "is_redline": false,
-        "superseded_by": ""
-      },
-      {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0020",
-        "source_file": "merger_agreement_v2_final.txt",
-        "page_number": 3,
-        "section_heading": "Section 8.3 \u2014 Deductible",
-        "is_current_version": true,
-        "content_type": "text",
-        "is_redline": false,
-        "superseded_by": ""
-      },
-      {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0001",
-        "source_file": "merger_agreement_v2_final.txt",
-        "page_number": 1,
-        "section_heading": "VERTEX CAPITAL PARTNERS LLC, a Delaware limited liability company (\"Buyer\"),",
-        "is_current_version": true,
-        "content_type": "text",
-        "is_redline": false,
-        "superseded_by": ""
-      },
-      {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0018",
-        "source_file": "merger_agreement_v2_final.txt",
-        "page_number": 3,
-        "section_heading": "================================================================================",
-        "is_current_version": true,
-        "content_type": "text",
-        "is_redline": false,
-        "superseded_by": ""
-      },
-      {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0010",
-        "source_file": "merger_agreement_v2_final.txt",
-        "page_number": 2,
-        "section_heading": "Section 3.15 \u2014 Litigation",
-        "is_current_version": true,
-        "content_type": "text",
-        "is_redline": false,
-        "superseded_by": ""
-      },
-      {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0012",
-        "source_file": "merger_agreement_v2_final.txt",
-        "page_number": 2,
-        "section_heading": "(a) amend its certificate of incorporation or bylaws;",
-        "is_current_version": true,
-        "content_type": "text",
-        "is_redline": false,
-        "superseded_by": ""
-      },
-      {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0004",
-        "source_file": "merger_agreement_v2_final.txt",
-        "page_number": 1,
-        "section_heading": "The aggregate Merger Consideration is approximately $696 million, subject to",
-        "is_current_version": true,
-        "content_type": "text",
-        "is_redline": false,
-        "superseded_by": ""
-      },
-      {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0017",
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0017",
         "source_file": "merger_agreement_v2_final.txt",
         "page_number": 3,
         "section_heading": "Section 7.2 \u2014 Termination Fee",
@@ -686,7 +1029,47 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0022",
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0016",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 3,
+        "section_heading": "(a) by mutual written consent of Buyer and the Company;",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0001",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 1,
+        "section_heading": "VERTEX CAPITAL PARTNERS LLC, a Delaware limited liability company (\"Buyer\"),",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0003",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 1,
+        "section_heading": "Section 1.2 \u2014 Consideration",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0010",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 2,
+        "section_heading": "Section 3.15 \u2014 Litigation",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0022",
         "source_file": "merger_agreement_v2_final.txt",
         "page_number": 3,
         "section_heading": "Section 9.2 \u2014 Effect on Material Contracts",
@@ -696,7 +1079,232 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0016",
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0000",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 1,
+        "section_heading": "AGREEMENT AND PLAN OF MERGER",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0015",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 2,
+        "section_heading": "================================================================================",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0013",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 2,
+        "section_heading": "Section 5.3 \u2014 No-Shop Provision",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0007",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 1,
+        "section_heading": "Section 3.5 \u2014 Financial Statements",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      }
+    ],
+    "latency_ms": 69421.99999999866,
+    "recall_score": 1.0,
+    "recalled_facts": [
+      "$20.88",
+      "3.0%",
+      "$13.92",
+      "2.0%",
+      "Superior Proposal",
+      "Company Breach"
+    ],
+    "missing_facts": [],
+    "citation_match": true,
+    "agent_trace": [
+      {
+        "agent": "query_intelligence",
+        "model": "gemini/gemini-3.1-flash-lite",
+        "input_query": "What are the termination fee provisions?",
+        "output": {
+          "query_type": "legal",
+          "primary_intent": "Identify and extract the specific terms, conditions, and monetary amounts associated with termination fees in the merger agreement.",
+          "extracted_entities": {
+            "companies": [],
+            "fiscal_years": [],
+            "financial_metrics": [],
+            "legal_clause_types": [
+              "termination fee",
+              "break-up fee"
+            ],
+            "dollar_thresholds": [],
+            "date_ranges": [],
+            "clause_ids": []
+          },
+          "metadata_filters": {
+            "fiscal_year": null,
+            "document_category": "legal",
+            "is_current_version": 1,
+            "currency": null
+          },
+          "requires_numerical_precision": true,
+          "requires_cross_document": false,
+          "document_scope": [
+            "legal"
+          ],
+          "query_expansions": [
+            "What is the break-up fee amount in the merger agreement?",
+            "Under what conditions is the termination fee payable?",
+            "Are there reverse termination fee provisions in the deal documents?"
+          ],
+          "reformulated_query": "Identify the termination fee provisions, including the specific trigger events and the associated monetary amounts, within the merger agreement for the aurora_vertex_2024 deal.",
+          "ambiguities": [
+            "The query does not specify if it is looking for a buyer-side or seller-side termination fee (reverse termination fee)."
+          ]
+        }
+      },
+      {
+        "agent": "retrieval_executor",
+        "elapsed_ms": 5391.0,
+        "dense_count": 23,
+        "reranked_count": 10
+      },
+      {
+        "agent": "financial_verifier",
+        "skipped": true,
+        "reason": "no_financial_chunks"
+      },
+      {
+        "agent": "quality_assessor",
+        "method": "heuristic",
+        "score": 0.628
+      },
+      {
+        "agent": "answer_synthesizer",
+        "model": "gemini/gemini-3.1-flash-lite",
+        "answer_length": 1492
+      },
+      {
+        "agent": "hallucination_validator",
+        "model": "ollama/qwen2.5:14b",
+        "validation_status": "passed",
+        "confidence_score": 1.0,
+        "flags_count": 0
+      }
+    ]
+  },
+  {
+    "id": "legal_03",
+    "query": "What are the indemnification caps and deductible?",
+    "query_type": "legal",
+    "status": "passed",
+    "answer": "In the Aurora Vertex transaction agreement, the indemnification obligations are structured as follows:\n\n### **Indemnification Caps**\n*   **General Cap:** The aggregate liability of the Company's stockholders for indemnification claims is limited to **$69.6 million** (10% of the aggregate Merger Consideration) [\ud83d\udcc4 merger_agreement_v2_final.txt | p.3 | Section 8.2 | Version: N/A].\n*   **Fundamental Representations Cap:** For claims related to Fundamental Representations, the liability cap is increased to **$174.0 million** (25% of the aggregate Merger Consideration) [\ud83d\udcc4 merger_agreement_v2_final.txt | p.3 | Section 8.2 | Version: N/A].\n\n### **Deductible**\n*   **Deductible Amount:** The Company's stockholders are not liable for indemnification claims until the aggregate amount of Losses exceeds **$3.48 million** (0.5% of the aggregate Merger Consideration). Once this threshold is met, the stockholders are liable for all Losses starting from the first dollar [\ud83d\udcc4 merger_agreement_v2_final.txt | p.3 | Section 8.3 | Version: N/A].\n\n***\n\n**Financial Context:**\n*   The aggregate Merger Consideration is approximately **$696 million** [\ud83d\udcc4 merger_agreement_v2_final.txt | p.1 | Section: N/A | Version: N/A].",
+    "confidence_score": 1.0,
+    "validation_status": "passed",
+    "hallucination_flags": [],
+    "citations": [
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0019",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 3,
+        "section_heading": "Section 8.2 \u2014 Indemnification Cap",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0020",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 3,
+        "section_heading": "Section 8.3 \u2014 Deductible",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0001",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 1,
+        "section_heading": "VERTEX CAPITAL PARTNERS LLC, a Delaware limited liability company (\"Buyer\"),",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0018",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 3,
+        "section_heading": "================================================================================",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0010",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 2,
+        "section_heading": "Section 3.15 \u2014 Litigation",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0012",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 2,
+        "section_heading": "(a) amend its certificate of incorporation or bylaws;",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0004",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 1,
+        "section_heading": "The aggregate Merger Consideration is approximately $696 million, subject to",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0017",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 3,
+        "section_heading": "Section 7.2 \u2014 Termination Fee",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0022",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 3,
+        "section_heading": "Section 9.2 \u2014 Effect on Material Contracts",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0016",
         "source_file": "merger_agreement_v2_final.txt",
         "page_number": 3,
         "section_heading": "(a) by mutual written consent of Buyer and the Company;",
@@ -706,7 +1314,7 @@
         "superseded_by": ""
       }
     ],
-    "latency_ms": 73453.00000000134,
+    "latency_ms": 42094.0000000046,
     "recall_score": 1.0,
     "recalled_facts": [
       "$69.6",
@@ -764,7 +1372,7 @@
       },
       {
         "agent": "retrieval_executor",
-        "elapsed_ms": 2500.0,
+        "elapsed_ms": 4281.0,
         "dense_count": 23,
         "reranked_count": 10
       },
@@ -781,14 +1389,14 @@
       },
       {
         "agent": "answer_synthesizer",
-        "model": "gemini/gemini-3.5-flash",
-        "answer_length": 2445
+        "model": "gemini/gemini-3.1-flash-lite",
+        "answer_length": 1209
       },
       {
         "agent": "hallucination_validator",
         "model": "ollama/qwen2.5:14b",
         "validation_status": "passed",
-        "confidence_score": 0.95,
+        "confidence_score": 1.0,
         "flags_count": 0
       }
     ]
@@ -798,12 +1406,12 @@
     "query": "What pending litigation does the company face?",
     "query_type": "legal",
     "status": "passed",
-    "answer": "I was unable to find sufficient relevant information in the data room to answer this question, even after refining the search. This may mean the relevant documents haven't been uploaded yet, or the question falls outside the scope of the available materials.\n\nSearch attempts: 3\nBest quality score achieved: 0.30",
+    "answer": "I was unable to find sufficient relevant information in the data room to answer this question, even after refining the search. This may mean the relevant documents haven't been uploaded yet, or the question falls outside the scope of the available materials.\n\nSearch attempts: 3\nBest quality score achieved: 0.01",
     "confidence_score": 0.0,
     "validation_status": "passed",
     "hallucination_flags": [],
     "citations": [],
-    "latency_ms": 30860.000000000582,
+    "latency_ms": 20905.9999999954,
     "recall_score": 0.0,
     "recalled_facts": [],
     "missing_facts": [
@@ -861,49 +1469,48 @@
       },
       {
         "agent": "retrieval_executor",
-        "elapsed_ms": 2625.0,
+        "elapsed_ms": 4297.0,
         "dense_count": 23,
         "reranked_count": 10
       },
       {
         "agent": "quality_assessor",
         "method": "heuristic",
-        "score": 0.008
+        "score": 0.032
       },
       {
         "agent": "query_rewriter",
         "model": "gemini/gemini-3.1-flash-lite",
         "iteration": 1,
-        "rewritten_query": "Identify all material legal proceedings, pending litigation, active lawsuits, regulatory investigations, and contingent liabilities disclosed in the target company's financial filings or legal exhibits."
+        "rewritten_query": "Identify all legal proceedings, pending litigation, active lawsuits, regulatory investigations, and material legal disputes disclosed in the target company's financial filings, 10-K, 10-Q, or legal notes."
       },
       {
         "agent": "retrieval_executor",
-        "elapsed_ms": 3281.0,
+        "elapsed_ms": 5360.0,
         "dense_count": 23,
         "reranked_count": 20
       },
       {
         "agent": "quality_assessor",
         "method": "heuristic",
-        "score": 0.01
+        "score": 0.012
       },
       {
         "agent": "query_rewriter",
         "model": "gemini/gemini-3.1-flash-lite",
         "iteration": 2,
-        "rewritten_query": "List all material legal proceedings, pending litigation, regulatory investigations, and contingent liabilities disclosed in the target company's 10-K, 10-Q, and legal exhibits. Specifically search for 'Legal Proceedings' sections, 'Commitments and Contingencies' notes, and 'Risk Factors' related to litigation."
+        "rewritten_query": "Search for 'Legal Proceedings', 'Commitments and Contingencies', 'Regulatory Matters', and 'Litigation' sections within the target company's 10-K, 10-Q, and 8-K filings to identify active lawsuits, government investigations, and material legal risks."
       },
       {
         "agent": "retrieval_executor",
-        "elapsed_ms": 3812.0,
+        "elapsed_ms": 5719.0,
         "dense_count": 23,
         "reranked_count": 23
       },
       {
         "agent": "quality_assessor",
-        "method": "llm",
-        "model": "gemini/gemini-3.1-flash-lite",
-        "score": 0.3
+        "method": "heuristic",
+        "score": 0.009
       },
       {
         "agent": "insufficient_context",
@@ -916,15 +1523,115 @@
     "query": "What change of control provisions exist in the company's material contracts?",
     "query_type": "legal",
     "status": "passed",
-    "answer": "I was unable to find sufficient relevant information in the data room to answer this question, even after refining the search. This may mean the relevant documents haven't been uploaded yet, or the question falls outside the scope of the available materials.\n\nSearch attempts: 3\nBest quality score achieved: 0.30",
-    "confidence_score": 0.0,
+    "answer": "Based on the provided merger agreement, the following material contracts contain change of control provisions:\n\n1.  **Master Services Agreement with Northstar Defense Systems**: Requires 60-day notice and consent [\ud83d\udcc4 merger_agreement_v2_final.txt | N/A | p.3 | Section 9.2 | N/A].\n2.  **Technology License Agreement with Pacific Data Corp**: The counterparty has the right to terminate the agreement within 90 days of a Change of Control [\ud83d\udcc4 merger_agreement_v2_final.txt | N/A | p.3 | Section 9.2 | N/A].\n\n**Additional Information:**\n*   The **Cloud Infrastructure Agreement with Amazon Web Services** is identified as a material contract but contains no change of control provision [\ud83d\udcc4 merger_agreement_v2_final.txt | N/A | p.3 | Section 9.2 | N/A].\n*   For the purposes of these provisions, a \"Change of Control\" is defined as the consummation of the Merger [\ud83d\udcc4 merger_agreement_v2_final.txt | N/A | p.3 | Section 9.1 | N/A].\n\n**Financial Context:**\n*   Master Services Agreement (Northstar Defense Systems): $12.4M annual value [\ud83d\udcc4 merger_agreement_v2_final.txt | N/A | p.3 | Section 9.2 | N/A].\n*   Technology License Agreement (Pacific Data Corp): $8.7M annual value [\ud83d\udcc4 merger_agreement_v2_final.txt | N/A | p.3 | Section 9.2 | N/A].\n*   Cloud Infrastructure Agreement (Amazon Web Services): $6.2M annual value [\ud83d\udcc4 merger_agreement_v2_final.txt | N/A | p.3 | Section 9.2 | N/A].",
+    "confidence_score": 0.95,
     "validation_status": "passed",
     "hallucination_flags": [],
-    "citations": [],
-    "latency_ms": 44264.99999999942,
-    "recall_score": 0.0,
-    "recalled_facts": [],
-    "missing_facts": [
+    "citations": [
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0022",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 3,
+        "section_heading": "Section 9.2 \u2014 Effect on Material Contracts",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0021",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 3,
+        "section_heading": "================================================================================",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0008",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 2,
+        "section_heading": "Section 3.8 \u2014 Material Contracts",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0012",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 2,
+        "section_heading": "(a) amend its certificate of incorporation or bylaws;",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0001",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 1,
+        "section_heading": "VERTEX CAPITAL PARTNERS LLC, a Delaware limited liability company (\"Buyer\"),",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0010",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 2,
+        "section_heading": "Section 3.15 \u2014 Litigation",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0013",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 2,
+        "section_heading": "Section 5.3 \u2014 No-Shop Provision",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0018",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 3,
+        "section_heading": "================================================================================",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0006",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 1,
+        "section_heading": "================================================================================",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0016",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 3,
+        "section_heading": "(a) by mutual written consent of Buyer and the Company;",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      }
+    ],
+    "latency_ms": 73437.00000000536,
+    "recall_score": 1.0,
+    "recalled_facts": [
       "Northstar Defense",
       "$12.4M",
       "60-day",
@@ -933,7 +1640,8 @@
       "terminate",
       "90 days"
     ],
-    "citation_match": false,
+    "missing_facts": [],
+    "citation_match": true,
     "agent_trace": [
       {
         "agent": "query_intelligence",
@@ -980,55 +1688,26 @@
       },
       {
         "agent": "retrieval_executor",
-        "elapsed_ms": 2718.0,
+        "elapsed_ms": 3968.0,
         "dense_count": 23,
         "reranked_count": 10
       },
       {
         "agent": "quality_assessor",
-        "method": "llm",
+        "method": "heuristic",
+        "score": 0.824
+      },
+      {
+        "agent": "answer_synthesizer",
         "model": "gemini/gemini-3.1-flash-lite",
-        "score": 0.7
+        "answer_length": 1378
       },
       {
-        "agent": "query_rewriter",
-        "model": "gemini/gemini-3.1-flash-lite",
-        "iteration": 1,
-        "rewritten_query": "List all material contracts for the Aurora-Vertex transaction and extract the full text or specific clauses regarding change of control provisions from each identified agreement."
-      },
-      {
-        "agent": "retrieval_executor",
-        "elapsed_ms": 3250.0,
-        "dense_count": 23,
-        "reranked_count": 23
-      },
-      {
-        "agent": "quality_assessor",
-        "method": "llm",
-        "model": "gemini/gemini-3.1-flash-lite",
-        "score": 0.6
-      },
-      {
-        "agent": "query_rewriter",
-        "model": "gemini/gemini-3.1-flash-lite",
-        "iteration": 2,
-        "rewritten_query": "Retrieve the full text of all material contracts associated with the Aurora-Vertex transaction, specifically searching for 'Change of Control', 'Assignment', 'Successors and Assigns', and 'Merger' clauses. Extract the verbatim legal language from these underlying agreements rather than summaries."
-      },
-      {
-        "agent": "retrieval_executor",
-        "elapsed_ms": 3453.0,
-        "dense_count": 23,
-        "reranked_count": 23
-      },
-      {
-        "agent": "quality_assessor",
-        "method": "llm",
-        "model": "gemini/gemini-3.1-flash-lite",
-        "score": 0.3
-      },
-      {
-        "agent": "insufficient_context",
-        "force_refusal": true
+        "agent": "hallucination_validator",
+        "model": "ollama/qwen2.5:14b",
+        "validation_status": "passed",
+        "confidence_score": 0.95,
+        "flags_count": 0
       }
     ]
   },
@@ -1042,7 +1721,7 @@
     "validation_status": "passed",
     "hallucination_flags": [],
     "citations": [],
-    "latency_ms": 53266.00000000326,
+    "latency_ms": 47562.999999994645,
     "recall_score": 0.0,
     "recalled_facts": [],
     "missing_facts": [
@@ -1107,7 +1786,7 @@
       },
       {
         "agent": "retrieval_executor",
-        "elapsed_ms": 1937.0,
+        "elapsed_ms": 3219.0,
         "dense_count": 15,
         "reranked_count": 8
       },
@@ -1118,18 +1797,19 @@
       },
       {
         "agent": "quality_assessor",
-        "method": "heuristic",
-        "score": 0.04
+        "method": "llm",
+        "model": "gemini/gemini-3.1-flash-lite",
+        "score": 0.0
       },
       {
         "agent": "query_rewriter",
         "model": "gemini/gemini-3.1-flash-lite",
         "iteration": 1,
-        "rewritten_query": "What are the specific financial bid amounts, valuation ranges, and deal certainty or closing risk assessments provided by the three bidders (Bidder A, Bidder B, and Bidder C) for the Aurora Vertex 2024 acquisition?"
+        "rewritten_query": "Provide a comparative analysis of the Aurora Vertex 2024 transaction bidders, specifically detailing the financial offer ranges, valuation multiples, and deal certainty assessments including regulatory and financing risk profiles for each bidder."
       },
       {
         "agent": "retrieval_executor",
-        "elapsed_ms": 2109.0,
+        "elapsed_ms": 3750.0,
         "dense_count": 15,
         "reranked_count": 15
       },
@@ -1140,18 +1820,19 @@
       },
       {
         "agent": "quality_assessor",
-        "method": "heuristic",
-        "score": 0.03
+        "method": "llm",
+        "model": "gemini/gemini-3.1-flash-lite",
+        "score": 0.0
       },
       {
         "agent": "query_rewriter",
         "model": "gemini/gemini-3.1-flash-lite",
         "iteration": 2,
-        "rewritten_query": "Aurora Vertex 2024 acquisition bid comparison: detailed financial offer, valuation, deal certainty, closing risk, and conditions for Bidder A, Bidder B, and Bidder C."
+        "rewritten_query": "Compare the final bids for the Aurora Vertex 2024 acquisition. For each bidder (specifically identifying the three primary parties), provide the offer price range, valuation multiples (EV/EBITDA), deal certainty, regulatory approval risk, and financing commitment status."
       },
       {
         "agent": "retrieval_executor",
-        "elapsed_ms": 1953.0,
+        "elapsed_ms": 3859.0,
         "dense_count": 15,
         "reranked_count": 15
       },
@@ -1177,12 +1858,12 @@
     "query": "How do the different valuation methodologies compare?",
     "query_type": "comparative",
     "status": "passed",
-    "answer": "I was unable to find sufficient relevant information in the data room to answer this question, even after refining the search. This may mean the relevant documents haven't been uploaded yet, or the question falls outside the scope of the available materials.\n\nSearch attempts: 3\nBest quality score achieved: 0.00",
+    "answer": "I was unable to find sufficient relevant information in the data room to answer this question, even after refining the search. This may mean the relevant documents haven't been uploaded yet, or the question falls outside the scope of the available materials.\n\nSearch attempts: 3\nBest quality score achieved: 0.01",
     "confidence_score": 0.0,
     "validation_status": "passed",
     "hallucination_flags": [],
     "citations": [],
-    "latency_ms": 22686.99999999808,
+    "latency_ms": 18594.0000000046,
     "recall_score": 0.0,
     "recalled_facts": [],
     "missing_facts": [
@@ -1245,48 +1926,48 @@
       },
       {
         "agent": "retrieval_executor",
-        "elapsed_ms": 2203.0,
+        "elapsed_ms": 3750.0,
         "dense_count": 15,
         "reranked_count": 8
       },
       {
         "agent": "quality_assessor",
         "method": "heuristic",
-        "score": 0.016
+        "score": 0.022
       },
       {
         "agent": "query_rewriter",
         "model": "gemini/gemini-3.1-flash-lite",
         "iteration": 1,
-        "rewritten_query": "What specific valuation methodologies, such as Discounted Cash Flow (DCF), Comparable Company Analysis, and Precedent Transactions, were explicitly detailed and applied in the Aurora-Vertex merger agreement and fairness opinion documents?"
+        "rewritten_query": "What valuation methods, such as Discounted Cash Flow (DCF), comparable company analysis, or precedent transactions, were explicitly detailed in the Aurora-Vertex merger agreement, fairness opinion, or valuation report?"
       },
       {
         "agent": "retrieval_executor",
-        "elapsed_ms": 2328.0,
+        "elapsed_ms": 3703.0,
         "dense_count": 15,
         "reranked_count": 15
       },
       {
         "agent": "quality_assessor",
         "method": "heuristic",
-        "score": 0.004
+        "score": 0.009
       },
       {
         "agent": "query_rewriter",
         "model": "gemini/gemini-3.1-flash-lite",
         "iteration": 2,
-        "rewritten_query": "valuation methodologies used in Aurora-Vertex merger fairness opinion DCF comparable company precedent transactions"
+        "rewritten_query": "valuation methodologies used in Aurora-Vertex merger agreement fairness opinion valuation report DCF comparable company analysis precedent transactions"
       },
       {
         "agent": "retrieval_executor",
-        "elapsed_ms": 1890.0,
+        "elapsed_ms": 3157.0,
         "dense_count": 15,
         "reranked_count": 15
       },
       {
         "agent": "quality_assessor",
         "method": "heuristic",
-        "score": 0.001
+        "score": 0.006
       },
       {
         "agent": "insufficient_context",
@@ -1299,13 +1980,15 @@
     "query": "Compare Aurora's gross margin and operating margin between FY2022 and FY2023.",
     "query_type": "comparative",
     "status": "passed",
-    "answer": "### 1. Direct Answer\n\nAurora Technologies Inc. experienced expansion in both its gross margin and operating margin from fiscal year 2022 (FY2022) to fiscal year 2023 (FY2023):\n\n*   **Gross Margin** expanded by **0.9 percentage points** (90 basis points), increasing from **59.1%** in FY2022 to **60.0%** in FY2023.\n*   **Operating Margin** expanded by **1.7 percentage points** (170 basis points), increasing from **13.3%** in FY2022 to **15.0%** in FY2023.\n\n---\n\n### 2. Supporting Evidence & Normalized Values\n\n#### **Gross Margin Comparison**\n*   **FY2022 Gross Margin:** **59.1%** \n    *   *Derived from:* Gross Profit of **$228.8M** on Total Revenue of **$387.1M** [\ud83d\udcc4 aurora_financials_fy2023.txt | Page: 1 | Section: AURORA TECHNOLOGIES INC.]\n*   **FY2023 Gross Margin:** **60.0%** \n    *   *Derived from:* Gross Profit of **$271.7M** on Total Revenue of **$452.8M** [\ud83d\udcc4 aurora_financials_fy2023.txt | Page: 1 | Section: AURORA TECHNOLOGIES INC.]\n\n#### **Operating Margin Comparison**\n*   **FY2022 Operating Margin:** **13.3%** \n    *   *Derived from:* Operating Income (EBIT) of **$51.4M** on Total Revenue of **$387.1M** [\ud83d\udcc4 aurora_financials_fy2023.txt | Page: 1 | Section: Operating Income (EBIT)                    $68.0           $51.4]\n*   **FY2023 Operating Margin:** **15.0%** \n    *   *Derived from:* Operating Income (EBIT) of **$68.0M** on Total Revenue of **$452.8M** [\ud83d\udcc4 aurora_financials_fy2023.txt | Page: 1 | Section: Operating Income (EBIT)                    $68.0           $51.4]\n\n---\n\n### 3. Caveats and Financial Notes\n\n*   **Restructuring Impact:** Operating expenses in FY2023 included **$4.5M** in restructuring charges, whereas FY2022 had **$0.0M** [\ud83d\udcc4 aurora_financials_fy2023.txt | Page: 1 | Section: AURORA TECHNOLOGIES INC.]. Excluding these charges, the Adjusted EBITDA margin expanded from **19.1%** in FY2022 to **21.5%** in FY2023 [\ud83d\udcc4 aurora_financials_fy2023.txt | Page: 2 | Section: ================================================================================].\n*   **Data Consistency:** The automated verification flagged a \"scale mismatch\" inconsistency for operating income ($68.0M vs $51.4M). However, this is a standard year-over-year operational growth variance rather than a reporting error or structural inconsistency.",
+    "answer": "The year-over-year comparison for Aurora Technologies Inc.'s gross margin and operating margin for fiscal years 2022 and 2023 is as follows:\n\n### **Margin Comparison**\n\n| Metric | FY2023 | FY2022 |\n| :--- | :--- | :--- |\n| **Gross Margin** | 60.0% | 59.1% |\n| **Operating Margin** | 15.0% | 13.3% |\n\n### **Supporting Evidence**\n*   **Gross Margin:** The gross margin was 60.0% for FY2023 and 59.1% for FY2022 [\ud83d\udcc4 aurora_financials_fy2023.txt | 2023 | p.1 | Consolidated Income Statement].\n*   **Operating Margin:** The operating margin was 15.0% for FY2023 and 13.3% for FY2022 [\ud83d\udcc4 aurora_financials_fy2023.txt | 2023 | p.1 | Operating Income (EBIT)].\n\n### **Notes**\n*   The provided context is consistent across the Consolidated Income Statement and the Operating Income section.\n*   No inconsistencies were identified regarding the margin percentages provided in the source documents.",
     "confidence_score": 0.85,
     "validation_status": "warning",
-    "hallucination_flags": [],
+    "hallucination_flags": [
+      "The provided context is consistent across the Consolidated Income Statement and the Operating Income section."
+    ],
     "citations": [
       {
-        "chunk_id": "aurora_vertex_2024_852b96ac-0904-4030-add8-3cb77a018abc_0000",
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0000",
         "source_file": "aurora_financials_fy2023.txt",
         "page_number": 1,
         "section_heading": "AURORA TECHNOLOGIES INC.",
@@ -1315,7 +1998,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_852b96ac-0904-4030-add8-3cb77a018abc_0001",
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0001",
         "source_file": "aurora_financials_fy2023.txt",
         "page_number": 1,
         "section_heading": "Operating Income (EBIT)                    $68.0           $51.4",
@@ -1325,7 +2008,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_852b96ac-0904-4030-add8-3cb77a018abc_0012",
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0012",
         "source_file": "aurora_financials_fy2023.txt",
         "page_number": 3,
         "section_heading": "Revenue Growth: 17.0% YoY",
@@ -1335,7 +2018,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_852b96ac-0904-4030-add8-3cb77a018abc_0010",
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0010",
         "source_file": "aurora_financials_fy2023.txt",
         "page_number": 2,
         "section_heading": "================================================================================",
@@ -1345,7 +2028,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_852b96ac-0904-4030-add8-3cb77a018abc_0004",
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0004",
         "source_file": "aurora_financials_fy2023.txt",
         "page_number": 1,
         "section_heading": "Earnings Per Share (Diluted)               $3.87           $2.86",
@@ -1355,7 +2038,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_852b96ac-0904-4030-add8-3cb77a018abc_0003",
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0003",
         "source_file": "aurora_financials_fy2023.txt",
         "page_number": 1,
         "section_heading": "Income Tax Expense                         $15.5           $11.5",
@@ -1365,7 +2048,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_852b96ac-0904-4030-add8-3cb77a018abc_0005",
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0005",
         "source_file": "aurora_financials_fy2023.txt",
         "page_number": 2,
         "section_heading": "ASSETS                                    FY2023          FY2022",
@@ -1375,7 +2058,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_852b96ac-0904-4030-add8-3cb77a018abc_0009",
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0009",
         "source_file": "aurora_financials_fy2023.txt",
         "page_number": 2,
         "section_heading": "Stockholders' Equity:",
@@ -1385,7 +2068,7 @@
         "superseded_by": ""
       }
     ],
-    "latency_ms": 130188.00000000192,
+    "latency_ms": 87436.99999999808,
     "recall_score": 0.8,
     "recalled_facts": [
       "60.0%",
@@ -1444,7 +2127,7 @@
       },
       {
         "agent": "retrieval_executor",
-        "elapsed_ms": 1907.0,
+        "elapsed_ms": 3109.0,
         "dense_count": 15,
         "reranked_count": 8
       },
@@ -1456,19 +2139,19 @@
       {
         "agent": "quality_assessor",
         "method": "heuristic",
-        "score": 0.894
+        "score": 0.961
       },
       {
         "agent": "answer_synthesizer",
-        "model": "gemini/gemini-3.5-flash",
-        "answer_length": 2267
+        "model": "gemini/gemini-3.1-flash-lite",
+        "answer_length": 884
       },
       {
         "agent": "hallucination_validator",
         "model": "ollama/qwen2.5:14b",
         "validation_status": "warning",
         "confidence_score": 0.85,
-        "flags_count": 0
+        "flags_count": 1
       }
     ]
   },
@@ -1477,13 +2160,13 @@
     "query": "Summarize the board's recommendation regarding the strategic alternatives.",
     "query_type": "summary",
     "status": "passed",
-    "answer": "### 1. Direct Answer\n\nThe Board of Directors of Aurora Technologies Inc. unanimously (7-0 vote) approved proceeding with **Vertex Capital Partners** as the preferred bidder for the transaction [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | Page: 3 | Vote: 7-0 (unanimous)]. Following the joint recommendation of the Management Team and financial advisor Goldman Sachs, the Board authorized granting Vertex a 60-day exclusivity period and instructed management to negotiate with a price floor of $55.00 per share [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | Page: 2 | SLIDE 5: MANAGEMENT RECOMMENDATION] [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | Page: 3 | RESOLVED, that the Board of Directors hereby authorizes the Company to:].\n\n---\n\n### 2. Supporting Evidence and Reasoning\n\n#### A. Preferred Path: Proceed with Vertex Capital Partners\nThe Board and management selected Vertex Capital Partners based on several key strategic and financial advantages:\n*   **Premium Valuation:** Vertex offered the highest non-binding indication of interest at **$55.00 to $60.00 per share** [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | Page: 2 | SLIDE 5: MANAGEMENT RECOMMENDATION] [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | Page: 2 | Party A \u2014 Vertex Capital Partners (Private Equity)]. This range is at the top of Goldman Sachs' reference range of $50.00 to $60.00 [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | Page: 2 | 52-Week High (Jan 8, 2024): $44.12].\n*   **No Stock Risk:** The transaction is structured as an **all-cash consideration**, eliminating stock price volatility risk for Aurora's shareholders [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | Page: 2 | SLIDE 5: MANAGEMENT RECOMMENDATION].\n*   **High Execution Certainty:** Vertex is an experienced buyer with fully committed debt financing secured from JPMorgan and Goldman Sachs [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | Page: 2 | SLIDE 5: MANAGEMENT RECOMMENDATION] [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | Page: 2 | Party A \u2014 Vertex Capital Partners (Private Equity)].\n*   **Speed to Close:** Vertex offered the shortest timeline to signing, requiring a 60-day exclusivity period and targeting 90 days to a definitive agreement [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | Page: 2 | SLIDE 5: MANAGEMENT RECOMMENDATION] [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | Page: 2 | Party A \u2014 Vertex Capital Partners (Private Equity)].\n\n#### B. Backup Path: Maintain Engagement with Meridian Software\nThe Board recommended keeping Meridian Software engaged as a secondary option to:\n*   Drive competitive tension to potentially force Vertex to improve its pricing [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | Page: 2 | SLIDE 5: MANAGEMENT RECOMMENDATION].\n*   Serve as a viable alternative, as Meridian's potential synergy value could justify a higher price if outstanding antitrust concerns can be resolved [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | Page: 2 | SLIDE 5: MANAGEMENT RECOMMENDATION].\n\n#### C. Rejected Path: Decline Atlas Data Holdings\nThe Board recommended declining further engagement with Atlas Data Holdings due to:\n*   Submitting the lowest offer range among the bidders [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | Page: 2 | SLIDE 5: MANAGEMENT RECOMMENDATION].\n*   High execution risk stemming from uncommitted financing [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | Page: 2 | SLIDE 5: MANAGEMENT RECOMMENDATION].\n*   An overly complex consortium structure [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | Page: 2 | SLIDE 5: MANAGEMENT RECOMMENDATION].\n\n#### D. Board Resolutions Approved\nTo execute this strategy, the Board formally authorized the following actions [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | Page: 3 | RESOLVED, that the Board of Directors hereby authorizes the Company to:]:\n1.  Grant Vertex Capital Partners a 60-day exclusivity period.\n2.  Open the virtual data room (VDR) for Vertex's due diligence team.\n3.  Retain Skadden Arps as legal counsel to draft the definitive merger agreement.\n4.  Authorize management to negotiate within a price floor of $55.00 per share.\n\n---\n\n### 3. Caveats and Missing Information\n*   **Missing Financial Details for Alternatives:** While the deck notes that Atlas Data Holdings had the \"lowest offer range\" and Meridian Software had potential \"synergy value,\" the exact dollar values or ranges of their bids are not provided in the text.\n*   **Antitrust Specifics:** The exact nature of the antitrust risks associated with Meridian Software is not detailed.\n*   **Exclusivity vs. Signing Timeline Discrepancy:** Slide 5 lists Vertex's timeline as \"60-day exclusivity, 90-day to signing\" [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | Page: 2 | Party A \u2014 Vertex Capital Partners (Private Equity)], whereas the detailed timeline on Slide 6 indicates a target of Week 9 (approx. 63 days from March 11) for Board approval and signing [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | Page: 3 | Week 1-2 (Mar 11-22): Grant Vertex exclusivity, open data room].",
-    "confidence_score": 0.85,
-    "validation_status": "warning",
+    "answer": "The Aurora Technologies Inc. Board of Directors unanimously (7-0) approved the recommendation to proceed with Vertex Capital Partners as the preferred bidder for the company's strategic transaction [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | 2024 | p.3 | Section: RESOLVED... | Current Version].\n\n### **Board Recommendation and Reasoning**\nThe Board\u2019s decision to select Vertex Capital Partners was based on the following factors:\n*   **Superior Financial Terms:** Vertex provided the highest offer range of $55.00\u2013$60.00 per share [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | 2024 | p.2 | Section: SLIDE 5: MANAGEMENT RECOMMENDATION].\n*   **Transaction Certainty:** The offer is all-cash, eliminating stock price risk for shareholders, and is supported by committed debt financing from JPMorgan and Goldman Sachs [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | 2024 | p.2 | Section: Party A \u2014 Vertex Capital Partners (Private Equity)].\n*   **Execution Efficiency:** Vertex offers the shortest timeline to signing and has standard due diligence requirements with no unusual conditions [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | 2024 | p.2 | Section: SLIDE 5: MANAGEMENT RECOMMENDATION].\n\n### **Authorized Actions**\nPursuant to the Board resolution, the company is authorized to:\n*   Grant Vertex Capital Partners a 60-day exclusivity period [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | 2024 | p.3 | Section: RESOLVED...].\n*   Open the virtual data room for due diligence [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | 2024 | p.3 | Section: RESOLVED...].\n*   Retain Skadden Arps to prepare the definitive merger agreement [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | 2024 | p.3 | Section: RESOLVED...].\n*   Negotiate within a price floor of $55.00 per share [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | 2024 | p.3 | Section: RESOLVED...].\n\n### **Additional Strategic Context**\n*   **Backup Strategy:** The Board decided to maintain engagement with Meridian Software as a backup bidder to potentially drive price improvement through competition [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | 2024 | p.2 | Section: SLIDE 5: MANAGEMENT RECOMMENDATION].\n*   **Rejected Bidder:** The Board declined the offer from Atlas Data Holdings due to their status as the lowest bidder, uncommitted financing, and a complex consortium structure that created execution risk [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | 2024 | p.2 | Section: SLIDE 5: MANAGEMENT RECOMMENDATION].\n*   **Timeline:** The target closing date for the transaction is September 15, 2024 [\ud83d\udcc4 board_deck_strategic_review_mar2024.txt | 2024 | p.3 | Section: Target Closing Date: September 15, 2024].",
+    "confidence_score": 1.0,
+    "validation_status": "passed",
     "hallucination_flags": [],
     "citations": [
       {
-        "chunk_id": "aurora_vertex_2024_b05c8fc1-26c7-4275-9f8a-cc5ffd5c3c27_0000",
+        "chunk_id": "aurora_vertex_2024_00e05936-ef6f-4d1d-a52c-347760231e73_0000",
         "source_file": "board_deck_strategic_review_mar2024.txt",
         "page_number": 1,
         "section_heading": "AURORA TECHNOLOGIES INC.",
@@ -1493,7 +2176,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_b05c8fc1-26c7-4275-9f8a-cc5ffd5c3c27_0009",
+        "chunk_id": "aurora_vertex_2024_00e05936-ef6f-4d1d-a52c-347760231e73_0009",
         "source_file": "board_deck_strategic_review_mar2024.txt",
         "page_number": 2,
         "section_heading": "52-Week High (Jan 8, 2024):         $44.12",
@@ -1503,7 +2186,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_b05c8fc1-26c7-4275-9f8a-cc5ffd5c3c27_0014",
+        "chunk_id": "aurora_vertex_2024_00e05936-ef6f-4d1d-a52c-347760231e73_0014",
         "source_file": "board_deck_strategic_review_mar2024.txt",
         "page_number": 3,
         "section_heading": "RESOLVED, that the Board of Directors hereby authorizes the Company to:",
@@ -1513,7 +2196,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_b05c8fc1-26c7-4275-9f8a-cc5ffd5c3c27_0010",
+        "chunk_id": "aurora_vertex_2024_00e05936-ef6f-4d1d-a52c-347760231e73_0010",
         "source_file": "board_deck_strategic_review_mar2024.txt",
         "page_number": 3,
         "section_heading": "Week 1-2 (Mar 11-22):  Grant Vertex exclusivity, open data room",
@@ -1523,7 +2206,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_b05c8fc1-26c7-4275-9f8a-cc5ffd5c3c27_0004",
+        "chunk_id": "aurora_vertex_2024_00e05936-ef6f-4d1d-a52c-347760231e73_0004",
         "source_file": "board_deck_strategic_review_mar2024.txt",
         "page_number": 2,
         "section_heading": "Party A \u2014 Vertex Capital Partners (Private Equity)",
@@ -1533,7 +2216,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_b05c8fc1-26c7-4275-9f8a-cc5ffd5c3c27_0002",
+        "chunk_id": "aurora_vertex_2024_00e05936-ef6f-4d1d-a52c-347760231e73_0002",
         "source_file": "board_deck_strategic_review_mar2024.txt",
         "page_number": 1,
         "section_heading": "Aurora's Position:",
@@ -1543,7 +2226,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_b05c8fc1-26c7-4275-9f8a-cc5ffd5c3c27_0013",
+        "chunk_id": "aurora_vertex_2024_00e05936-ef6f-4d1d-a52c-347760231e73_0013",
         "source_file": "board_deck_strategic_review_mar2024.txt",
         "page_number": 3,
         "section_heading": "================================================================================",
@@ -1553,7 +2236,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_b05c8fc1-26c7-4275-9f8a-cc5ffd5c3c27_0003",
+        "chunk_id": "aurora_vertex_2024_00e05936-ef6f-4d1d-a52c-347760231e73_0003",
         "source_file": "board_deck_strategic_review_mar2024.txt",
         "page_number": 1,
         "section_heading": "Competitive Risks:",
@@ -1563,7 +2246,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_b05c8fc1-26c7-4275-9f8a-cc5ffd5c3c27_0011",
+        "chunk_id": "aurora_vertex_2024_00e05936-ef6f-4d1d-a52c-347760231e73_0011",
         "source_file": "board_deck_strategic_review_mar2024.txt",
         "page_number": 3,
         "section_heading": "Target Closing Date: September 15, 2024",
@@ -1573,7 +2256,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_b05c8fc1-26c7-4275-9f8a-cc5ffd5c3c27_0015",
+        "chunk_id": "aurora_vertex_2024_00e05936-ef6f-4d1d-a52c-347760231e73_0015",
         "source_file": "board_deck_strategic_review_mar2024.txt",
         "page_number": 3,
         "section_heading": "Vote: 7-0 (unanimous)",
@@ -1583,7 +2266,7 @@
         "superseded_by": ""
       }
     ],
-    "latency_ms": 122436.99999999808,
+    "latency_ms": 79641.00000000326,
     "recall_score": 1.0,
     "recalled_facts": [
       "Vertex Capital",
@@ -1643,26 +2326,25 @@
       },
       {
         "agent": "retrieval_executor",
-        "elapsed_ms": 3297.0,
+        "elapsed_ms": 4750.0,
         "dense_count": 17,
         "reranked_count": 10
       },
       {
         "agent": "quality_assessor",
-        "method": "llm",
-        "model": "gemini/gemini-3.1-flash-lite",
-        "score": 0.95
+        "method": "heuristic",
+        "score": 0.805
       },
       {
         "agent": "answer_synthesizer",
-        "model": "gemini/gemini-3.5-flash",
-        "answer_length": 4976
+        "model": "gemini/gemini-3.1-flash-lite",
+        "answer_length": 2648
       },
       {
         "agent": "hallucination_validator",
         "model": "ollama/qwen2.5:14b",
-        "validation_status": "warning",
-        "confidence_score": 0.85,
+        "validation_status": "passed",
+        "confidence_score": 1.0,
         "flags_count": 0
       }
     ]
@@ -1672,22 +2354,126 @@
     "query": "What are the key risk factors identified for this transaction?",
     "query_type": "summary",
     "status": "passed",
-    "answer": "I was unable to find sufficient relevant information in the data room to answer this question, even after refining the search. This may mean the relevant documents haven't been uploaded yet, or the question falls outside the scope of the available materials.\n\nSearch attempts: 3\nBest quality score achieved: 0.03",
-    "confidence_score": 0.0,
+    "answer": "The due diligence documentation for the Aurora-Vertex transaction identifies the following key risk factors:\n\n### **1. Litigation Risks**\n*   **Patent Infringement:** The Company is currently a defendant in *DataFlow Systems Inc. v. Aurora Technologies Inc.* (Case No. 2023-CV-04821, U.S. District Court, Northern District of California). The litigation involves allegations of patent infringement regarding data processing algorithms. Outside counsel has estimated the probable exposure for this matter at **$3.5 million to $8.0 million** [\ud83d\udcc4 merger_agreement_v2_final.txt | 2024 | p.2 | Section 3.15 | v2].\n\n### **2. Contractual Risks (Change of Control)**\nThe Company has identified specific Material Contracts that are impacted by the transaction:\n*   **Northstar Defense Systems:** The Master Services Agreement (annual value **$12.4 million**) requires a 60-day notice and consent [\ud83d\udcc4 merger_agreement_v2_final.txt | 2024 | p.3 | Section 9.2 | v2].\n*   **Pacific Data Corp:** The Technology License Agreement (annual value **$8.7 million**) grants the counterparty the right to terminate the agreement within 90 days of a Change of Control [\ud83d\udcc4 merger_agreement_v2_final.txt | 2024 | p.3 | Section 9.2 | v2].\n\n### **3. Transactional and Operational Risks**\n*   **Termination Rights:** The merger may be terminated by either party if the transaction is not consummated by the \"Outside Date\" of **September 15, 2024** [\ud83d\udcc4 merger_agreement_v2_final.txt | 2024 | p.3 | Section 4 | v2].\n*   **Superior Proposals:** The Company retains the right to engage in discussions regarding unsolicited Acquisition Proposals that the Board determines could lead to a \"Superior Proposal,\" which introduces the risk of the current agreement being terminated in favor of a competing offer (subject to a Termination Fee) [\ud83d\udcc4 merger_agreement_v2_final.txt | 2024 | p.2-3 | Section 7 | v2].\n*   **Operational Covenants:** The Company is restricted from taking certain actions prior to closing without consent, including incurring indebtedness exceeding **$10.0 million**, making capital expenditures exceeding **$5.0 million** individually or **$15.0 million** in the aggregate, or settling litigation in excess of **$1.0 million** [\ud83d\udcc4 merger_agreement_v2_final.txt | 2024 | p.2 | Section 3 | v2].\n\n***\n\n**Caveats and Missing Information:**\n*   The provided documentation does not detail the specific terms or amount of the \"Termination Fee\" mentioned in Section 4(d).\n*   While the Company represents that there is no other pending or threatened action expected to result in liability exceeding **$2.0 million**, this is subject to exceptions set forth in \"Schedule 3.15,\" which was not provided in the context chunks [\ud83d\udcc4 merger_agreement_v2_final.txt | 2024 | p.2 | Section 3.15 | v2].",
+    "confidence_score": 0.95,
     "validation_status": "passed",
-    "hallucination_flags": [],
-    "citations": [],
-    "latency_ms": 22171.99999999866,
-    "recall_score": 0.0,
-    "recalled_facts": [],
-    "missing_facts": [
+    "hallucination_flags": [
+      "Outside counsel has estimated the probable exposure for this matter at $3.5 million to $8.0 million."
+    ],
+    "citations": [
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0001",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 1,
+        "section_heading": "VERTEX CAPITAL PARTNERS LLC, a Delaware limited liability company (\"Buyer\"),",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0010",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 2,
+        "section_heading": "Section 3.15 \u2014 Litigation",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0012",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 2,
+        "section_heading": "(a) amend its certificate of incorporation or bylaws;",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0016",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 3,
+        "section_heading": "(a) by mutual written consent of Buyer and the Company;",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0006",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 1,
+        "section_heading": "================================================================================",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0022",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 3,
+        "section_heading": "Section 9.2 \u2014 Effect on Material Contracts",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0014",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 2,
+        "section_heading": "Notwithstanding the foregoing, the Company may engage in discussions with a",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0007",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 1,
+        "section_heading": "Section 3.5 \u2014 Financial Statements",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0003",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 1,
+        "section_heading": "Section 1.2 \u2014 Consideration",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0004",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 1,
+        "section_heading": "The aggregate Merger Consideration is approximately $696 million, subject to",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      }
+    ],
+    "latency_ms": 85468.99999999732,
+    "recall_score": 0.4444444444444444,
+    "recalled_facts": [
       "DataFlow",
-      "patent litigation",
-      "customer consent",
       "Northstar",
       "Pacific Data",
+      "CTO"
+    ],
+    "missing_facts": [
+      "patent litigation",
+      "customer consent",
       "key employee",
-      "CTO",
       "$4.5M",
       "HSR"
     ],
@@ -1738,52 +2524,27 @@
       },
       {
         "agent": "retrieval_executor",
-        "elapsed_ms": 4141.0,
+        "elapsed_ms": 3985.0,
         "dense_count": 23,
         "reranked_count": 10
       },
       {
         "agent": "quality_assessor",
-        "method": "heuristic",
-        "score": 0.013
-      },
-      {
-        "agent": "query_rewriter",
+        "method": "llm",
         "model": "gemini/gemini-3.1-flash-lite",
-        "iteration": 1,
-        "rewritten_query": "Identify and summarize the material risks, legal contingencies, operational vulnerabilities, and financial exposure items documented in the due diligence reports for the Aurora-Vertex acquisition."
+        "score": 0.5
       },
       {
-        "agent": "retrieval_executor",
-        "elapsed_ms": 5078.0,
-        "dense_count": 23,
-        "reranked_count": 20
-      },
-      {
-        "agent": "quality_assessor",
-        "method": "heuristic",
-        "score": 0.047
-      },
-      {
-        "agent": "query_rewriter",
+        "agent": "answer_synthesizer",
         "model": "gemini/gemini-3.1-flash-lite",
-        "iteration": 2,
-        "rewritten_query": "What are the specific material risk factors, legal liabilities, regulatory hurdles, and financial exposures identified in the due diligence reports for the Aurora-Vertex acquisition? Please extract findings from the risk assessment, legal due diligence, and financial audit sections."
+        "answer_length": 2763
       },
       {
-        "agent": "retrieval_executor",
-        "elapsed_ms": 5515.0,
-        "dense_count": 23,
-        "reranked_count": 23
-      },
-      {
-        "agent": "quality_assessor",
-        "method": "heuristic",
-        "score": 0.034
-      },
-      {
-        "agent": "insufficient_context",
-        "force_refusal": true
+        "agent": "hallucination_validator",
+        "model": "ollama/qwen2.5:14b",
+        "validation_status": "passed",
+        "confidence_score": 0.95,
+        "flags_count": 1
       }
     ]
   },
@@ -1792,24 +2553,149 @@
     "query": "What is the relationship between the FY2023 restructuring charge and the Adjusted EBITDA? Where did the restructuring charge come from?",
     "query_type": "multi_hop",
     "status": "passed",
-    "answer": "I was unable to find sufficient relevant information in the data room to answer this question, even after refining the search. This may mean the relevant documents haven't been uploaded yet, or the question falls outside the scope of the available materials.\n\nSearch attempts: 3\nBest quality score achieved: 0.33",
-    "confidence_score": 0.0,
-    "validation_status": "passed",
-    "hallucination_flags": [],
-    "citations": [],
-    "latency_ms": 50656.00000000268,
-    "recall_score": 0.0,
-    "recalled_facts": [],
-    "missing_facts": [
+    "answer": "### Relationship Between FY2023 Restructuring Charge and Adjusted EBITDA\n\nIn FY2023, the restructuring charge of $4.5 million is added back to the reported EBITDA of $92.8 million to arrive at an Adjusted EBITDA of $97.3 million [\ud83d\udcc4 aurora_financials_fy2023.txt | 2023 | p.2 | KEY FINANCIAL METRICS AND NOTES]. This adjustment is performed to exclude the impact of these non-recurring or specific restructuring expenses when evaluating the company's operational performance [\ud83d\udcc4 aurora_financials_fy2023.txt | 2023 | p.2 | KEY FINANCIAL METRICS AND NOTES].\n\n### Nature and Source of Restructuring Charges\n\nThe provided documents identify the $4.5 million as \"Restructuring Charges\" within the Operating Expenses section of the Consolidated Income Statement [\ud83d\udcc4 aurora_financials_fy2023.txt | 2023 | p.1 | CONSOLIDATED INCOME STATEMENT]. \n\n**Caveats and Missing Information:**\n* **Nature of Charges:** While the documents confirm the financial impact and classification of the restructuring charges, they do not provide a descriptive narrative or specific details regarding the nature of these charges (e.g., whether they relate to severance, facility closures, or asset impairments).\n* **Missing Information:** The provided context does not contain the notes to the financial statements that would typically elaborate on the specific activities or events triggering the $4.5 million restructuring expense.\n\n### Financial Summary (in millions of USD)\n\n| Metric | FY2023 Value |\n| :--- | :--- |\n| EBITDA | $92.8 |\n| Restructuring Charges (Add-back) | $4.5 |\n| **Adjusted EBITDA** | **$97.3** |\n\n*Source: [\ud83d\udcc4 aurora_financials_fy2023.txt | 2023 | p.2 | KEY FINANCIAL METRICS AND NOTES]*",
+    "confidence_score": 0.85,
+    "validation_status": "warning",
+    "hallucination_flags": [
+      "While the documents confirm the financial impact and classification of the restructuring charges, they do not provide a descriptive narrative or specific details regarding the nature of these charges (e.g., whether they relate to severance, facility closures, or asset impairments)",
+      "The provided context does not contain the notes to the financial statements that would typically elaborate on the specific activities or events triggering the $4.5 million restructuring expense"
+    ],
+    "citations": [
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0010",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 2,
+        "section_heading": "================================================================================",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0000",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 1,
+        "section_heading": "AURORA TECHNOLOGIES INC.",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0011",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 3,
+        "section_heading": "Net Debt:",
+        "is_current_version": true,
+        "content_type": "table_markdown",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0003",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 1,
+        "section_heading": "Income Tax Expense                         $15.5           $11.5",
+        "is_current_version": true,
+        "content_type": "table_markdown",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0002",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 1,
+        "section_heading": "Interest Expense                           ($8.2)          ($7.4)",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0001",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 1,
+        "section_heading": "Operating Income (EBIT)                    $68.0           $51.4",
+        "is_current_version": true,
+        "content_type": "table_markdown",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0013",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 3,
+        "section_heading": "Note 7 \u2014 Debt:",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0009",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 2,
+        "section_heading": "Stockholders' Equity:",
+        "is_current_version": true,
+        "content_type": "table_markdown",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0008",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 2,
+        "section_heading": "Non-Current Liabilities:",
+        "is_current_version": true,
+        "content_type": "table_markdown",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0006",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 2,
+        "section_heading": "Non-Current Assets:",
+        "is_current_version": true,
+        "content_type": "table_markdown",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0005",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 2,
+        "section_heading": "ASSETS                                    FY2023          FY2022",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0007",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 2,
+        "section_heading": "LIABILITIES AND STOCKHOLDERS' EQUITY      FY2023          FY2022",
+        "is_current_version": true,
+        "content_type": "table_markdown",
+        "is_redline": false,
+        "superseded_by": ""
+      }
+    ],
+    "latency_ms": 62703.00000000134,
+    "recall_score": 0.5714285714285714,
+    "recalled_facts": [
       "$4.5",
       "restructuring",
+      "$92.8",
+      "$97.3"
+    ],
+    "missing_facts": [
       "Austin development center",
       "32 employees",
-      "$92.8",
-      "$97.3",
       "add back"
     ],
-    "citation_match": false,
+    "citation_match": true,
     "agent_trace": [
       {
         "agent": "query_intelligence",
@@ -1856,7 +2742,7 @@
       },
       {
         "agent": "retrieval_executor",
-        "elapsed_ms": 3407.0,
+        "elapsed_ms": 2812.0,
         "dense_count": 15,
         "reranked_count": 12
       },
@@ -1867,59 +2753,20 @@
       },
       {
         "agent": "quality_assessor",
-        "method": "llm",
+        "method": "heuristic",
+        "score": 0.568
+      },
+      {
+        "agent": "answer_synthesizer",
         "model": "gemini/gemini-3.1-flash-lite",
-        "score": 0.67
+        "answer_length": 1678
       },
       {
-        "agent": "query_rewriter",
-        "model": "gemini/gemini-3.1-flash-lite",
-        "iteration": 1,
-        "rewritten_query": "How does the FY2023 restructuring charge impact the calculation of Adjusted EBITDA? Provide a detailed breakdown of the components of these restructuring charges, specifically identifying if they relate to severance, facility closures, asset impairments, or other operational initiatives."
-      },
-      {
-        "agent": "retrieval_executor",
-        "elapsed_ms": 3937.0,
-        "dense_count": 15,
-        "reranked_count": 15
-      },
-      {
-        "agent": "financial_verifier",
+        "agent": "hallucination_validator",
         "model": "ollama/qwen2.5:14b",
-        "inconsistencies": 0
-      },
-      {
-        "agent": "quality_assessor",
-        "method": "llm",
-        "model": "gemini/gemini-3.1-flash-lite",
-        "score": 0.4
-      },
-      {
-        "agent": "query_rewriter",
-        "model": "gemini/gemini-3.1-flash-lite",
-        "iteration": 2,
-        "rewritten_query": "What are the specific components of the $4.5 million FY2023 restructuring charge, and how are these items treated in the reconciliation to Adjusted EBITDA? Please detail the amounts allocated to severance, facility closures, asset impairments, and other operational initiatives."
-      },
-      {
-        "agent": "retrieval_executor",
-        "elapsed_ms": 4110.0,
-        "dense_count": 15,
-        "reranked_count": 15
-      },
-      {
-        "agent": "financial_verifier",
-        "model": "ollama/qwen2.5:14b",
-        "inconsistencies": 0
-      },
-      {
-        "agent": "quality_assessor",
-        "method": "llm",
-        "model": "gemini/gemini-3.1-flash-lite",
-        "score": 0.33
-      },
-      {
-        "agent": "insufficient_context",
-        "force_refusal": true
+        "validation_status": "warning",
+        "confidence_score": 0.85,
+        "flags_count": 2
       }
     ]
   },
@@ -1928,13 +2775,13 @@
     "query": "What indemnification exposure is tied to the financial statement representations, and how long do those representations survive?",
     "query_type": "multi_hop",
     "status": "passed",
-    "answer": "### Direct Answer\n\nThe financial statement representations set forth in **Section 3.5** of the purchase agreement have a survival period of **thirty-six (36) months** following the Closing [\ud83d\udcc4 merger_agreement_v2_final.txt | Page 3 | Section 8.1 \u2014 Survival of Representations]. \n\nThis representation is classified as a **\"Fundamental Representation\"** for indemnification purposes, rather than a standard representation [\ud83d\udcc4 merger_agreement_v2_final.txt | Page 3 | Section 8.1 \u2014 Survival of Representations].\n\n---\n\n### Supporting Evidence\n\n* **Classification and Survival Period:** Section 8.1 (*Survival of Representations*) explicitly states that while standard representations and warranties of the Company survive the Closing for eighteen (18) months, \"Fundamental Representations (Sections 3.1, 3.2, **3.5**, 3.12) shall survive for thirty-six (36) months\" [\ud83d\udcc4 merger_agreement_v2_final.txt | Page 3 | Section 8.1 \u2014 Survival of Representations].\n* **Subject Matter of Section 3.5:** Section 3.5 (*Financial Statements*) covers the delivery and accuracy of the Company's audited consolidated financial statements for FY2022 and FY2023, as well as the unaudited quarterly financial statements for Q1 2024 [\ud83d\udcc4 merger_agreement_v2_final.txt | Page 1 | Section 3.5 \u2014 Financial Statements].\n* **Indemnification Cap Implications:** Because Section 3.5 is classified as a Fundamental Representation, it is subject to a higher indemnification cap of **$174.0 million** (representing 25% of the aggregate Merger Consideration), compared to the General Cap of $69.6 million (10% of the aggregate Merger Consideration) that applies to standard representations [\ud83d\udcc4 merger_agreement_v2_final.txt | Page 3 | Section 8.2 \u2014 Indemnification Cap].\n\n---\n\n### Caveats and Inconsistencies\n* No inconsistencies or conflicting terms regarding Section 3.5 or its survival period were identified in the provided contract documents.",
-    "confidence_score": 1.0,
+    "answer": "The indemnification obligations and survival periods regarding the accuracy of financial statement representations are as follows:\n\n### **Survival Period**\nThe representation regarding financial statements (Section 3.5) is classified as a \"Fundamental Representation\" [\ud83d\udcc4 merger_agreement_v2_final.txt | p.1 | Section 3.5]. Consequently, it survives the Closing for a period of **thirty-six (36) months** [\ud83d\udcc4 merger_agreement_v2_final.txt | p.3 | Section 8.1].\n\n### **Indemnification Obligations**\n*   **Indemnification Cap:** For Fundamental Representations, the aggregate liability of the Company's stockholders is capped at **$174.0 million** (representing 25% of the aggregate Merger Consideration) [\ud83d\udcc4 merger_agreement_v2_final.txt | p.3 | Section 8.2].\n*   **Deductible:** The Company's stockholders are not liable for indemnification claims until the aggregate amount of Losses exceeds **$3.48 million** (0.5% of the aggregate Merger Consideration). Once this threshold is met, the stockholders are liable for all Losses from the first dollar [\ud83d\udcc4 merger_agreement_v2_final.txt | p.3 | Section 8.3].\n\n### **Summary of Financial Representation**\nUnder Section 3.5, the Company represents that the audited consolidated financial statements for FY2022 and FY2023 and the unaudited quarterly financial statements for Q1 2024 (ended March 31, 2024):\n1. Were prepared in accordance with GAAP applied on a consistent basis;\n2. Fairly present in all material respects the consolidated financial position and results of operations for the covered periods; and\n3. Are consistent with the Company's books and records [\ud83d\udcc4 merger_agreement_v2_final.txt | p.1 | Section 3.5].",
+    "confidence_score": 0.95,
     "validation_status": "passed",
     "hallucination_flags": [],
     "citations": [
       {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0018",
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0018",
         "source_file": "merger_agreement_v2_final.txt",
         "page_number": 3,
         "section_heading": "================================================================================",
@@ -1944,17 +2791,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0019",
-        "source_file": "merger_agreement_v2_final.txt",
-        "page_number": 3,
-        "section_heading": "Section 8.2 \u2014 Indemnification Cap",
-        "is_current_version": true,
-        "content_type": "text",
-        "is_redline": false,
-        "superseded_by": ""
-      },
-      {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0007",
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0007",
         "source_file": "merger_agreement_v2_final.txt",
         "page_number": 1,
         "section_heading": "Section 3.5 \u2014 Financial Statements",
@@ -1964,7 +2801,17 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0020",
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0019",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 3,
+        "section_heading": "Section 8.2 \u2014 Indemnification Cap",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0020",
         "source_file": "merger_agreement_v2_final.txt",
         "page_number": 3,
         "section_heading": "Section 8.3 \u2014 Deductible",
@@ -1974,7 +2821,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0016",
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0016",
         "source_file": "merger_agreement_v2_final.txt",
         "page_number": 3,
         "section_heading": "(a) by mutual written consent of Buyer and the Company;",
@@ -1984,27 +2831,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0013",
-        "source_file": "merger_agreement_v2_final.txt",
-        "page_number": 2,
-        "section_heading": "Section 5.3 \u2014 No-Shop Provision",
-        "is_current_version": true,
-        "content_type": "text",
-        "is_redline": false,
-        "superseded_by": ""
-      },
-      {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0011",
-        "source_file": "merger_agreement_v2_final.txt",
-        "page_number": 2,
-        "section_heading": "================================================================================",
-        "is_current_version": true,
-        "content_type": "text",
-        "is_redline": false,
-        "superseded_by": ""
-      },
-      {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0006",
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0006",
         "source_file": "merger_agreement_v2_final.txt",
         "page_number": 1,
         "section_heading": "================================================================================",
@@ -2014,7 +2841,17 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0010",
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0011",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 2,
+        "section_heading": "================================================================================",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0010",
         "source_file": "merger_agreement_v2_final.txt",
         "page_number": 2,
         "section_heading": "Section 3.15 \u2014 Litigation",
@@ -2024,7 +2861,17 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0012",
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0013",
+        "source_file": "merger_agreement_v2_final.txt",
+        "page_number": 2,
+        "section_heading": "Section 5.3 \u2014 No-Shop Provision",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0012",
         "source_file": "merger_agreement_v2_final.txt",
         "page_number": 2,
         "section_heading": "(a) amend its certificate of incorporation or bylaws;",
@@ -2032,59 +2879,9 @@
         "content_type": "text",
         "is_redline": false,
         "superseded_by": ""
-      },
-      {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0002",
-        "source_file": "merger_agreement_v2_final.txt",
-        "page_number": 1,
-        "section_heading": "================================================================================",
-        "is_current_version": true,
-        "content_type": "text",
-        "is_redline": false,
-        "superseded_by": ""
-      },
-      {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0014",
-        "source_file": "merger_agreement_v2_final.txt",
-        "page_number": 2,
-        "section_heading": "Notwithstanding the foregoing, the Company may engage in discussions with a",
-        "is_current_version": true,
-        "content_type": "text",
-        "is_redline": false,
-        "superseded_by": ""
-      },
-      {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0001",
-        "source_file": "merger_agreement_v2_final.txt",
-        "page_number": 1,
-        "section_heading": "VERTEX CAPITAL PARTNERS LLC, a Delaware limited liability company (\"Buyer\"),",
-        "is_current_version": true,
-        "content_type": "text",
-        "is_redline": false,
-        "superseded_by": ""
-      },
-      {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0003",
-        "source_file": "merger_agreement_v2_final.txt",
-        "page_number": 1,
-        "section_heading": "Section 1.2 \u2014 Consideration",
-        "is_current_version": true,
-        "content_type": "text",
-        "is_redline": false,
-        "superseded_by": ""
-      },
-      {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0017",
-        "source_file": "merger_agreement_v2_final.txt",
-        "page_number": 3,
-        "section_heading": "Section 7.2 \u2014 Termination Fee",
-        "is_current_version": true,
-        "content_type": "text",
-        "is_redline": false,
-        "superseded_by": ""
       }
     ],
-    "latency_ms": 55562.999999994645,
+    "latency_ms": 52093.00000000076,
     "recall_score": 0.8333333333333334,
     "recalled_facts": [
       "$174.0",
@@ -2142,44 +2939,25 @@
       },
       {
         "agent": "retrieval_executor",
-        "elapsed_ms": 3954.0,
+        "elapsed_ms": 3250.0,
         "dense_count": 23,
         "reranked_count": 10
       },
       {
         "agent": "quality_assessor",
-        "method": "llm",
-        "model": "gemini/gemini-3.1-flash-lite",
-        "score": 0.5
-      },
-      {
-        "agent": "query_rewriter",
-        "model": "gemini/gemini-3.1-flash-lite",
-        "iteration": 1,
-        "rewritten_query": "What is the survival period for the financial statement representations in Section 3.5 of the purchase agreement, and is this representation classified as a 'Fundamental Representation' or a standard representation for indemnification purposes?"
-      },
-      {
-        "agent": "retrieval_executor",
-        "elapsed_ms": 5016.0,
-        "dense_count": 23,
-        "reranked_count": 15
-      },
-      {
-        "agent": "quality_assessor",
-        "method": "llm",
-        "model": "gemini/gemini-3.1-flash-lite",
-        "score": 1.0
+        "method": "heuristic",
+        "score": 0.452
       },
       {
         "agent": "answer_synthesizer",
-        "model": "gemini/gemini-3.5-flash",
-        "answer_length": 1905
+        "model": "gemini/gemini-3.1-flash-lite",
+        "answer_length": 1662
       },
       {
         "agent": "hallucination_validator",
         "model": "ollama/qwen2.5:14b",
         "validation_status": "passed",
-        "confidence_score": 1.0,
+        "confidence_score": 0.95,
         "flags_count": 0
       }
     ]
@@ -2189,13 +2967,16 @@
     "query": "How does the DataFlow litigation exposure compare to the merger's indemnification deductible?",
     "query_type": "multi_hop",
     "status": "passed",
-    "answer": "### 1. Direct Answer\nThe estimated financial liability arising from the DataFlow litigation (**$3.5 million to $8.0 million**) entirely exceeds the indemnification deductible threshold (**$3.48 million**) specified in the merger agreement. \n\nEven at the lowest end of the estimated exposure range ($3.5 million), the litigation liability exceeds the deductible threshold by $0.02 million ($20,000). At the high end of the estimated exposure range ($8.0 million), it exceeds the deductible by $4.52 million.\n\n---\n\n### 2. Supporting Evidence\n\n*   **DataFlow Litigation Estimated Liability:** The Company's outside counsel has assessed the probable exposure in the matter of *DataFlow Systems Inc. v. Aurora Technologies Inc.* to be between **$3.5 million and $8.0 million** [\ud83d\udcc4 merger_agreement_v2_final.txt | p.2 | Section 3.15 \u2014 Litigation].\n*   **Indemnification Deductible Threshold:** The deductible threshold is set at **$3.48 million** (which represents exactly 0.5% of the aggregate Merger Consideration) [\ud83d\udcc4 merger_agreement_v2_final.txt | p.3 | Section 8.3 \u2014 Deductible].\n*   **Deductible Mechanics:** Once the aggregate amount of Losses exceeds this $3.48 million threshold, the Company's stockholders become liable for all Losses from the first dollar [\ud83d\udcc4 merger_agreement_v2_final.txt | p.3 | Section 8.3 \u2014 Deductible].\n\n---\n\n### 3. Financial Comparison & Normalized Values\n\n| Metric | Value (Exact) | Scale Context | Source |\n| :--- | :--- | :--- | :--- |\n| **DataFlow Litigation Exposure (Low)** | $3,500,000 | $3.5 million | [\ud83d\udcc4 merger_agreement_v2_final.txt | p.2 | Section 3.15] |\n| **DataFlow Litigation Exposure (High)** | $8,000,000 | $8.0 million | [\ud83d\udcc4 merger_agreement_v2_final.txt | p.2 | Section 3.15] |\n| **Indemnification Deductible** | $3,480,000 | $3.48 million (0.5% of Merger Consideration) | [\ud83d\udcc4 merger_agreement_v2_final.txt | p.3 | Section 8.3] |\n| **Minimum Excess over Deductible** | $20,000 | $0.02 million | *Computed* |\n| **Maximum Excess over Deductible** | $4,520,000 | $4.52 million | *Computed* |\n\n---\n\n### 4. Caveats and Missing Information\n*   **Indemnification Applicability:** While the estimated litigation liability exceeds the deductible, the context does not explicitly state whether losses arising from the DataFlow litigation are fully indemnifiable under Article VIII or if they are subject to specific exclusions or separate schedules. \n*   **Merger Consideration Context:** The deductible is noted as representing 0.5% of the aggregate Merger Consideration [\ud83d\udcc4 merger_agreement_v2_final.txt | p.3 | Section 8.3 \u2014 Deductible], implying an aggregate Merger Consideration of $696.0 million (which aligns with the General Cap of $69.6 million representing 10% of the consideration [\ud83d\udcc4 merger_agreement_v2_final.txt | p.3 | Section 8.2 \u2014 Indemnification Cap]).",
-    "confidence_score": 1.0,
-    "validation_status": "passed",
-    "hallucination_flags": [],
+    "answer": "The estimated financial liability for the *DataFlow Systems Inc. v. Aurora Technologies Inc.* litigation exceeds the indemnification deductible threshold specified in the merger agreement.\n\n### Comparison of Financial Values\n*   **Estimated Litigation Liability:** The Company\u2019s outside counsel has assessed the probable exposure for the DataFlow litigation at **$3.5 million to $8.0 million** [\ud83d\udcc4 merger_agreement_v2_final.txt | 2024 | p.2 | Section 3.15(c) | Final].\n*   **Indemnification Deductible:** The merger agreement specifies a deductible of **$3.48 million** (representing 0.5% of the aggregate Merger Consideration), below which the Company's stockholders are not liable for indemnification claims [\ud83d\udcc4 merger_agreement_v2_final.txt | 2024 | p.3 | Section 8.3 | Final].\n\n### Analysis\nThe lower bound of the estimated litigation exposure ($3.5 million) is **$0.02 million higher** than the $3.48 million deductible threshold. Consequently, if the DataFlow litigation results in a loss, the entire amount of the loss would be subject to indemnification by the Company's stockholders, as the agreement stipulates that once the deductible is exceeded, stockholders are liable for all losses from the first dollar [\ud83d\udcc4 merger_agreement_v2_final.txt | 2024 | p.3 | Section 8.3 | Final].\n\n### Caveats and Missing Information\n*   **Status of Litigation:** The Company maintains that the claims are without merit and intends to defend against them [\ud83d\udcc4 merger_agreement_v2_final.txt | 2024 | p.2 | Section 3.15(c) | Final].\n*   **Missing Information:** The provided documents do not specify the total aggregate Merger Consideration in absolute dollar terms, though they define the deductible and caps as percentages of that total [\ud83d\udcc4 merger_agreement_v2_final.txt | 2024 | p.3 | Section 8.3 | Final].",
+    "confidence_score": 0.85,
+    "validation_status": "warning",
+    "hallucination_flags": [
+      "The Company\u2019s outside counsel has assessed the probable exposure for the DataFlow litigation at **$3.5 million to $8.0 million**.",
+      "The lower bound of the estimated litigation exposure ($3.5 million) is **$0.02 million higher** than the $3.48 million deductible threshold."
+    ],
     "citations": [
       {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0010",
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0010",
         "source_file": "merger_agreement_v2_final.txt",
         "page_number": 2,
         "section_heading": "Section 3.15 \u2014 Litigation",
@@ -2205,7 +2986,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0020",
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0020",
         "source_file": "merger_agreement_v2_final.txt",
         "page_number": 3,
         "section_heading": "Section 8.3 \u2014 Deductible",
@@ -2215,7 +2996,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0016",
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0016",
         "source_file": "merger_agreement_v2_final.txt",
         "page_number": 3,
         "section_heading": "(a) by mutual written consent of Buyer and the Company;",
@@ -2225,7 +3006,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0001",
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0001",
         "source_file": "merger_agreement_v2_final.txt",
         "page_number": 1,
         "section_heading": "VERTEX CAPITAL PARTNERS LLC, a Delaware limited liability company (\"Buyer\"),",
@@ -2235,7 +3016,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0003",
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0003",
         "source_file": "merger_agreement_v2_final.txt",
         "page_number": 1,
         "section_heading": "Section 1.2 \u2014 Consideration",
@@ -2245,7 +3026,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0007",
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0007",
         "source_file": "merger_agreement_v2_final.txt",
         "page_number": 1,
         "section_heading": "Section 3.5 \u2014 Financial Statements",
@@ -2255,7 +3036,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0000",
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0000",
         "source_file": "merger_agreement_v2_final.txt",
         "page_number": 1,
         "section_heading": "AGREEMENT AND PLAN OF MERGER",
@@ -2265,7 +3046,7 @@
         "superseded_by": ""
       },
       {
-        "chunk_id": "aurora_vertex_2024_a484f81d-3313-4257-a40c-477959c56750_0019",
+        "chunk_id": "aurora_vertex_2024_d5a5c565-4208-4e4b-93ae-81c13541f9da_0019",
         "source_file": "merger_agreement_v2_final.txt",
         "page_number": 3,
         "section_heading": "Section 8.2 \u2014 Indemnification Cap",
@@ -2275,7 +3056,7 @@
         "superseded_by": ""
       }
     ],
-    "latency_ms": 58141.00000000326,
+    "latency_ms": 55625.0,
     "recall_score": 1.0,
     "recalled_facts": [
       "$3.5",
@@ -2338,7 +3119,7 @@
       },
       {
         "agent": "retrieval_executor",
-        "elapsed_ms": 2640.0,
+        "elapsed_ms": 2703.0,
         "dense_count": 23,
         "reranked_count": 8
       },
@@ -2349,21 +3130,20 @@
       },
       {
         "agent": "quality_assessor",
-        "method": "llm",
-        "model": "gemini/gemini-3.1-flash-lite",
-        "score": 1.0
+        "method": "heuristic",
+        "score": 0.738
       },
       {
         "agent": "answer_synthesizer",
-        "model": "gemini/gemini-3.5-flash",
-        "answer_length": 2801
+        "model": "gemini/gemini-3.1-flash-lite",
+        "answer_length": 1795
       },
       {
         "agent": "hallucination_validator",
         "model": "ollama/qwen2.5:14b",
-        "validation_status": "passed",
-        "confidence_score": 1.0,
-        "flags_count": 0
+        "validation_status": "warning",
+        "confidence_score": 0.85,
+        "flags_count": 2
       }
     ]
   },
@@ -2372,20 +3152,122 @@
     "query": "What is the implied EV/EBITDA multiple of the Vertex deal based on the agreed price and Aurora's FY2023 EBITDA?",
     "query_type": "multi_hop",
     "status": "passed",
-    "answer": "I was unable to find sufficient relevant information in the data room to answer this question, even after refining the search. This may mean the relevant documents haven't been uploaded yet, or the question falls outside the scope of the available materials.\n\nSearch attempts: 3\nBest quality score achieved: 0.65",
-    "confidence_score": 0.0,
+    "answer": "The provided context does not contain information regarding the agreed transaction price for the Vertex acquisition. Consequently, it is not possible to calculate the implied EV/EBITDA multiple.\n\n**Missing Information:**\n*   The agreed transaction price for the Vertex acquisition is not mentioned in the provided documents.\n\n**Financial Reference:**\n*   Aurora's FY2023 EBITDA is $92.8 million [\ud83d\udcc4 aurora_financials_fy2023.txt | FY2023 | p.2 | Section: EBITDA Reconciliation].",
+    "confidence_score": 1.0,
     "validation_status": "passed",
     "hallucination_flags": [],
-    "citations": [],
-    "latency_ms": 65703.00000000134,
-    "recall_score": 0.0,
-    "recalled_facts": [],
+    "citations": [
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0010",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 2,
+        "section_heading": "================================================================================",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0001",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 1,
+        "section_heading": "Operating Income (EBIT)                    $68.0           $51.4",
+        "is_current_version": true,
+        "content_type": "table_markdown",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0011",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 3,
+        "section_heading": "Net Debt:",
+        "is_current_version": true,
+        "content_type": "table_markdown",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0004",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 1,
+        "section_heading": "Earnings Per Share (Diluted)               $3.87           $2.86",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0000",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 1,
+        "section_heading": "AURORA TECHNOLOGIES INC.",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0012",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 3,
+        "section_heading": "Revenue Growth: 17.0% YoY",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0002",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 1,
+        "section_heading": "Interest Expense                           ($8.2)          ($7.4)",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0013",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 3,
+        "section_heading": "Note 7 \u2014 Debt:",
+        "is_current_version": true,
+        "content_type": "text",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0009",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 2,
+        "section_heading": "Stockholders' Equity:",
+        "is_current_version": true,
+        "content_type": "table_markdown",
+        "is_redline": false,
+        "superseded_by": ""
+      },
+      {
+        "chunk_id": "aurora_vertex_2024_0f6d7cf4-0537-4c9d-aca9-9cdeb43928f4_0003",
+        "source_file": "aurora_financials_fy2023.txt",
+        "page_number": 1,
+        "section_heading": "Income Tax Expense                         $15.5           $11.5",
+        "is_current_version": true,
+        "content_type": "table_markdown",
+        "is_redline": false,
+        "superseded_by": ""
+      }
+    ],
+    "latency_ms": 41796.99999999866,
+    "recall_score": 0.3333333333333333,
+    "recalled_facts": [
+      "$92.8"
+    ],
     "missing_facts": [
       "$696",
-      "$92.8",
       "7.5x"
     ],
-    "citation_match": false,
+    "citation_match": true,
     "agent_trace": [
       {
         "agent": "query_intelligence",
@@ -2435,7 +3317,7 @@
       },
       {
         "agent": "retrieval_executor",
-        "elapsed_ms": 2766.0,
+        "elapsed_ms": 2812.0,
         "dense_count": 15,
         "reranked_count": 10
       },
@@ -2446,57 +3328,20 @@
       },
       {
         "agent": "quality_assessor",
-        "method": "llm",
-        "model": "gemini/gemini-3.1-flash-lite",
-        "score": 0.33
-      },
-      {
-        "agent": "query_rewriter",
-        "model": "gemini/gemini-3.1-flash-lite",
-        "iteration": 1,
-        "rewritten_query": "What is the total transaction value or agreed purchase price for the acquisition of Vertex by Aurora, and what is the resulting implied EV/EBITDA multiple based on Aurora's FY2023 EBITDA?"
-      },
-      {
-        "agent": "retrieval_executor",
-        "elapsed_ms": 2812.0,
-        "dense_count": 15,
-        "reranked_count": 15
-      },
-      {
-        "agent": "financial_verifier",
-        "model": "ollama/qwen2.5:14b",
-        "inconsistencies": 0
-      },
-      {
-        "agent": "quality_assessor",
         "method": "heuristic",
-        "score": 0.733
+        "score": 0.633
       },
       {
-        "agent": "query_rewriter",
+        "agent": "answer_synthesizer",
         "model": "gemini/gemini-3.1-flash-lite",
-        "iteration": 2,
-        "rewritten_query": "What is the total enterprise value (EV) and agreed purchase price for the acquisition of Vertex by Aurora, and what is the implied EV/EBITDA multiple calculated using Vertex's or Aurora's FY2023 EBITDA figures as disclosed in the transaction documents?"
+        "answer_length": 476
       },
       {
-        "agent": "retrieval_executor",
-        "elapsed_ms": 2828.0,
-        "dense_count": 15,
-        "reranked_count": 15
-      },
-      {
-        "agent": "financial_verifier",
+        "agent": "hallucination_validator",
         "model": "ollama/qwen2.5:14b",
-        "inconsistencies": 0
-      },
-      {
-        "agent": "quality_assessor",
-        "method": "heuristic",
-        "score": 0.645
-      },
-      {
-        "agent": "insufficient_context",
-        "force_refusal": true
+        "validation_status": "passed",
+        "confidence_score": 1.0,
+        "flags_count": 0
       }
     ]
   }
