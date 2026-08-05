@@ -25,15 +25,69 @@ from src.utils.logger import setup_logger
 logger = setup_logger(__name__)
 
 
+# ==============================================================================
+# Calibration constants
+#
+# These are measured, not chosen. tests/golden_qa_set.json provides 19 questions
+# with expected facts; labelling every reranked chunk relevant/irrelevant by
+# whether it contains an expected fact yields a ground-truth score distribution
+# for BAAI/bge-reranker-v2-m3 on this corpus:
+#
+#   relevant chunks   (n=49):  median 0.241, max 0.998
+#   irrelevant chunks (n=143): median 0.006, p75 0.111
+#
+# A floor sweep over that labelled data put peak F1 at 0.10, so that is the
+# boundary between "usable evidence" and noise. See DECISIONS_LOG Decision 17.
+# ==============================================================================
+
+# Score at or above which a chunk counts as usable evidence (peak-F1 from sweep).
+RELEVANCE_FLOOR = 0.10
+
+# Below this, the best chunk is noise and no amount of context will help.
+CONFIDENT_REFUSAL_CEILING = 0.05
+
+# Above this, the heuristic is confident enough to skip the LLM assessor.
+CONFIDENT_PASS_FLOOR = 0.30
+
+# How many usable chunks a fully-answered query of each type needs. Taken from
+# the observed relevant-chunk counts per type in the same labelled run: pointed
+# lookups (financial, legal) are satisfied by a couple of chunks, whereas
+# summary/comparative/multi-hop genuinely need breadth. This denominator is where
+# query-type expectations live — which is why the gate thresholds themselves are
+# uniform rather than a second set of hand-tuned per-type numbers.
+EXPECTED_EVIDENCE_COUNT: dict[str, int] = {
+    "financial": 2,
+    "legal": 2,
+    "comparative": 3,
+    "summary": 3,
+    "multi_hop": 3,
+}
+
+
 def _heuristic_assessment(state: AgentState) -> dict | None:
     """
     Attempt heuristic quality assessment without LLM.
     Returns assessment dict if confident, None if LLM fallback needed.
 
-    Heuristic signals:
-    1. Mean reranker score of top-5 chunks
-    2. Number of unique source files
-    3. Query term coverage in retrieved chunks
+    Scores the *usable* evidence rather than the whole retrieved set. This is the
+    key correction over the original mean/min-of-top-5 design: a cross-encoder is
+    a per-pair relevance classifier, so its outputs are sharply bimodal — on this
+    corpus a genuinely relevant chunk scores 0.24–0.99 while noise sits near
+    0.006. Averaging across the whole top-k therefore drags quality down in
+    proportion to how many candidates were retrieved, so improving recall made
+    the context look *worse*, and requiring `min(top_5) >= 0.2` demanded that the
+    fifth-best chunk be excellent — a bar that peaked score distributions almost
+    never clear. Measured effect: two golden queries scored 0.638 and 0.645 with
+    genuinely good context and were still refused.
+
+    Dimensions:
+      relevance    — max score. Is there strong evidence at all? One decisive
+                     chunk is enough to answer a pointed question.
+      precision    — mean score of the chunks above RELEVANCE_FLOOR, i.e. the
+                     quality of the evidence that would actually be used. Noise
+                     is excluded rather than allowed to dilute the signal.
+      completeness — how much usable evidence there is relative to what this
+                     query type needs (EXPECTED_EVIDENCE_COUNT).
 
     Args:
         state: Current AgentState with reranked_results.
@@ -52,21 +106,38 @@ def _heuristic_assessment(state: AgentState) -> dict | None:
             "force_refusal": True,
         }
 
-    # Reranker score analysis
-    scores = [c.get("reranker_score", 0.0) for c in chunks[:5]]
-    mean_score = float(np.mean(scores)) if scores else 0.0
-    min_score = float(np.min(scores)) if scores else 0.0
+    scores = [float(c.get("reranker_score", 0.0)) for c in chunks]
+    usable = [s for s in scores if s >= RELEVANCE_FLOOR]
 
-    # Source diversity
-    unique_sources = len(set(c.get("source_file", "") for c in chunks))
+    relevance = max(scores) if scores else 0.0
 
-    # High confidence: clearly good or clearly bad
-    if mean_score >= 0.5 and min_score >= 0.2 and len(chunks) >= 3:
-        relevance = min(mean_score, 1.0)
-        completeness = min(0.6 + (unique_sources * 0.1), 1.0)
-        precision = min(min_score + 0.2, 1.0)
-        overall = (relevance * 0.4 + completeness * 0.3 + precision * 0.3)
+    # Clearly nothing worth answering from — refuse without spending an LLM call.
+    if relevance < CONFIDENT_REFUSAL_CEILING:
+        return {
+            "context_quality_score": round(relevance, 3),
+            "quality_breakdown": {
+                "relevance": round(relevance, 3),
+                "completeness": 0.0,
+                "precision": 0.0,
+            },
+            "missing_aspects": ["No retrieved chunk is relevant to the query"],
+            "quality_method": "heuristic",
+            "force_refusal": True,
+        }
 
+    expected = EXPECTED_EVIDENCE_COUNT.get(state.get("query_type", ""), 2)
+    precision = float(np.mean(usable)) if usable else 0.0
+    completeness = min(len(usable) / expected, 1.0)
+    overall = relevance * 0.4 + completeness * 0.3 + precision * 0.3
+
+    # Confident enough to skip the LLM assessor entirely.
+    if relevance >= CONFIDENT_PASS_FLOOR and usable:
+        missing = []
+        if completeness < 1.0:
+            missing.append(
+                f"Only {len(usable)} usable passage(s); "
+                f"{expected} expected for a {state.get('query_type', 'general')} query"
+            )
         return {
             "context_quality_score": round(overall, 3),
             "quality_breakdown": {
@@ -74,25 +145,12 @@ def _heuristic_assessment(state: AgentState) -> dict | None:
                 "completeness": round(completeness, 3),
                 "precision": round(precision, 3),
             },
-            "missing_aspects": [],
+            "missing_aspects": missing,
             "quality_method": "heuristic",
             "force_refusal": False,
         }
 
-    if mean_score < 0.05:
-        return {
-            "context_quality_score": round(mean_score, 3),
-            "quality_breakdown": {
-                "relevance": round(mean_score, 3),
-                "completeness": 0.1,
-                "precision": round(min_score, 3),
-            },
-            "missing_aspects": ["Low relevance scores across all retrieved chunks"],
-            "quality_method": "heuristic",
-            "force_refusal": mean_score < 0.01,
-        }
-
-    # Ambiguous — fall back to LLM
+    # Genuinely ambiguous band (best chunk scores 0.05–0.30) — ask the LLM.
     return None
 
 
