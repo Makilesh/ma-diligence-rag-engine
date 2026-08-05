@@ -112,18 +112,68 @@ class TestQualityAssessorHeuristic:
 
         assert result is not None
         assert result["context_quality_score"] < 0.3
+        assert result["force_refusal"] is True
 
     def test_ambiguous_falls_through_to_llm(self, sample_agent_state):
-        """Ambiguous scores return None (triggering LLM fallback)."""
+        """Scores in the ambiguous band return None (triggering LLM fallback)."""
         from src.agents.quality_assessor import _heuristic_assessment
 
+        # Best chunk sits between CONFIDENT_REFUSAL_CEILING (0.05) and
+        # CONFIDENT_PASS_FLOOR (0.30) — too weak to trust, too strong to reject.
         chunks = [
-            {"reranker_score": 0.5, "source_file": "f1.pdf"},
-            {"reranker_score": 0.4, "source_file": "f2.pdf"},
-            {"reranker_score": 0.35, "source_file": "f3.pdf"},
+            {"reranker_score": 0.20, "source_file": "f1.pdf"},
+            {"reranker_score": 0.08, "source_file": "f2.pdf"},
         ]
         state = {**sample_agent_state, "reranked_results": chunks}
         result = _heuristic_assessment(state)
 
-        # Ambiguous — should return None to trigger LLM
         assert result is None
+
+    def test_one_decisive_chunk_is_enough(self, sample_agent_state):
+        """
+        A single strongly-relevant chunk passes even when surrounded by noise.
+
+        This is the regression guard for the metric-design fix: under the old
+        mean/min-of-top-5 scoring, the noise tail dragged quality below the gate
+        and a pointed question with a decisive answer chunk was refused.
+        """
+        from src.agents.quality_assessor import _heuristic_assessment
+        from src.workflow.conditional_edges import _meets_type_threshold
+
+        chunks = [
+            {"reranker_score": 0.95, "source_file": "f1.pdf"},
+            {"reranker_score": 0.0004, "source_file": "f1.pdf"},
+            {"reranker_score": 0.0001, "source_file": "f1.pdf"},
+        ]
+        state = {**sample_agent_state, "reranked_results": chunks,
+                 "query_type": "legal"}
+        result = _heuristic_assessment(state)
+
+        assert result is not None
+        assert result["force_refusal"] is False
+
+        state.update(
+            context_quality_score=result["context_quality_score"],
+            quality_breakdown=result["quality_breakdown"],
+        )
+        assert _meets_type_threshold(state) is True
+
+    def test_retrieving_more_noise_does_not_lower_quality(self, sample_agent_state):
+        """
+        Adding irrelevant candidates must not degrade the quality verdict.
+
+        The original scoring averaged over the whole top-k, so improving recall
+        made context look worse — the defect this design corrects.
+        """
+        from src.agents.quality_assessor import _heuristic_assessment
+
+        good = [{"reranker_score": 0.9, "source_file": "f1.pdf"},
+                {"reranker_score": 0.7, "source_file": "f2.pdf"}]
+        noisy = good + [{"reranker_score": 0.001, "source_file": "f3.pdf"}
+                        for _ in range(8)]
+
+        a = _heuristic_assessment({**sample_agent_state, "reranked_results": good})
+        b = _heuristic_assessment({**sample_agent_state, "reranked_results": noisy})
+
+        assert a is not None and b is not None
+        assert b["context_quality_score"] >= a["context_quality_score"]
