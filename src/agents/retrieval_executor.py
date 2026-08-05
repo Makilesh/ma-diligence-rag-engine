@@ -73,6 +73,37 @@ async def retrieval_executor_node(state: AgentState) -> dict:
     # only trusted source is the authenticated request, which lands on the state root.
     include_pii = bool(state.get("include_pii", False))
     metadata_filters = {**state.get("extracted_filters", {}), "include_pii": include_pii}
+
+    # Progressive filter relaxation.
+    #
+    # document_category is Agent 1's *guess* at which kind of document holds the
+    # answer, applied as a hard `must` condition. When that guess is wrong the
+    # answer is removed from the search space entirely and no amount of query
+    # rewriting can recover it — the rewriter only changes text, never filters.
+    #
+    # Measured on the golden set: legal_01 ("per-share merger consideration") was
+    # classified financial, so the merger agreement — the one document containing
+    # the answer — was filtered out; fin_05 (credit facility terms) was classified
+    # legal and excluded the financials; comp_02 (valuation methodologies) was
+    # classified financial and excluded the board deck. All three refused after
+    # burning both rewrite attempts against a search space that could never
+    # contain the answer.
+    #
+    # It is also compounding two error sources: an LLM guessing a category that
+    # was itself assigned by a heuristic classifier at ingestion time.
+    #
+    # So: keep the filter on the first attempt, where it buys precision, and drop
+    # it once retrieval has already failed and we are explicitly trading precision
+    # for recall. deal_id, version and PII filters are NEVER relaxed — those are
+    # isolation and compliance constraints, not relevance hints.
+    if state.get("rewrite_iteration", 0) >= 1:
+        dropped = metadata_filters.pop("document_category", None)
+        if dropped:
+            logger.info(
+                "Relaxing document_category filter after failed retrieval",
+                extra={"dropped_category": dropped,
+                       "rewrite_iteration": state.get("rewrite_iteration")},
+            )
     dense_results, sparse_results = await hybrid_search(
         query_text=query,
         query_vector=query_vector,
