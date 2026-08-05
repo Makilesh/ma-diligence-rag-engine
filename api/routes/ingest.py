@@ -8,6 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 
 from api.models.response_models import IngestResponse
+from api.routes.deals import register_document
 from src.data_processing.document_classifier import DocumentClassifier
 from src.utils.logger import setup_logger
 
@@ -87,7 +88,7 @@ async def ingest_document(
             document_category = classifier.classify(temp_path, file.filename)
 
         # Process based on file type
-        chunks_created = await _process_and_index(
+        chunks_created, risk_signals = await _process_and_index(
             file_path=temp_path,
             extension=extension,
             doc_id=doc_id,
@@ -96,6 +97,27 @@ async def ingest_document(
             is_current_version=is_current_version,
             supersedes_doc_id=supersedes_doc_id,
             filename=file.filename,
+        )
+
+        # Retire the superseded document's chunks so retrieval's default
+        # is_current_version=1 filter stops returning them, and any citation that
+        # does surface them (include_stale queries) carries the pointer forward.
+        if supersedes_doc_id and chunks_created:
+            await _mark_superseded(
+                deal_id=deal_id,
+                superseded_doc_id=supersedes_doc_id,
+                superseded_by=doc_id,
+            )
+
+        register_document(
+            deal_id=deal_id,
+            doc_id=doc_id,
+            filename=file.filename,
+            document_category=document_category,
+            chunks_created=chunks_created,
+            is_current_version=is_current_version,
+            supersedes_doc_id=supersedes_doc_id,
+            risk_signals=risk_signals,
         )
 
         logger.info(
@@ -107,6 +129,8 @@ async def ingest_document(
                 "file_name": file.filename,
                 "category": document_category,
                 "chunks_created": chunks_created,
+                "risk_signal_types": [s["signal_type"] for s in risk_signals],
+                "supersedes_doc_id": supersedes_doc_id or "",
             },
         )
 
@@ -140,7 +164,7 @@ async def _process_and_index(
     is_current_version: bool,
     supersedes_doc_id: str | None,
     filename: str,
-) -> int:
+) -> tuple[int, list[dict]]:
     """
     Processes document and indexes chunks in Qdrant.
 
@@ -155,11 +179,12 @@ async def _process_and_index(
         filename: Original filename.
 
     Returns:
-        Number of chunks created.
+        Tuple of (number of chunks created, document-level risk signal dicts).
     """
     from src.data_processing.structural_chunker import StructuralChunker
     from src.data_processing.semantic_chunker import SemanticChunker
     from src.data_processing.pii_detector import PIIDetector
+    from src.data_processing.risk_signal_extractor import RiskSignalExtractor
     from src.vector_db.reranker import embed_texts_async
     from src.vector_db.hybrid_search import compute_sparse_bm25
     from src.vector_db.qdrant_client import get_qdrant_client
@@ -228,7 +253,7 @@ async def _process_and_index(
             })
 
     if not sections:
-        return 0
+        return 0, []
 
     # Step 2: Structural chunking
     structural_chunker = StructuralChunker()
@@ -239,10 +264,46 @@ async def _process_and_index(
     semantic_chunks = semantic_chunker.chunk_batch(structural_chunks)
 
     if not semantic_chunks:
-        return 0
+        return 0, []
 
     # Step 4: PII detection
     pii_detector = PIIDetector()
+
+    # Step 4b: Risk signal extraction (regex only — no LLM, no added latency).
+    # Signals are written per-chunk into the payload AND aggregated to document
+    # level for the risk dashboard, which reports per-document not per-chunk.
+    risk_extractor = RiskSignalExtractor()
+    chunk_risk_signals: dict[int, list[str]] = {}
+    aggregated_risk: dict[str, dict] = {}
+
+    for i, chunk in enumerate(semantic_chunks):
+        result = risk_extractor.extract(
+            chunk.text,
+            file_name=filename,
+            document_category=document_category,
+        )
+        if not result.signals:
+            continue
+
+        chunk_risk_signals[i] = result.signals
+
+        for detail in result.signal_details:
+            signal_type = detail["signal_type"]
+            entry = aggregated_risk.setdefault(
+                signal_type,
+                {
+                    "signal_type": signal_type,
+                    "match_count": 0,
+                    "sample_matches": [],
+                    "page_number": chunk.page_number,
+                },
+            )
+            entry["match_count"] += detail["match_count"]
+            for sample in detail["sample_matches"]:
+                if sample and len(entry["sample_matches"]) < 3:
+                    entry["sample_matches"].append(sample)
+
+    risk_signals = list(aggregated_risk.values())
 
     # Step 5: Embed and index
     texts = [c.text for c in semantic_chunks]
@@ -286,6 +347,10 @@ async def _process_and_index(
                 "contains_pii": contains_pii,
                 "content_type": chunk.metadata.get("content_type", "text") if hasattr(chunk, "metadata") else "text",
                 "token_count": chunk.token_count,
+                "risk_signals": chunk_risk_signals.get(i, []),
+                "supersedes_doc_id": supersedes_doc_id or "",
+                "superseded_by": "",  # stamped later if a newer version replaces this doc
+                "is_redline": 0,
             },
         )
         points.append(point)
@@ -299,4 +364,61 @@ async def _process_and_index(
             points=batch,
         )
 
-    return len(points)
+    return len(points), risk_signals
+
+
+async def _mark_superseded(
+    deal_id: str,
+    superseded_doc_id: str,
+    superseded_by: str,
+) -> None:
+    """
+    Flips every chunk of a superseded document to is_current_version=0.
+
+    Without this, uploading a replacement document leaves both versions marked
+    current, and retrieval's default is_current_version=1 filter happily returns
+    stale terms alongside the ones that replaced them — the exact failure mode
+    the version metadata exists to prevent.
+
+    Failures are logged, not raised: the new document is already indexed and
+    usable, and losing the retirement stamp degrades results rather than
+    invalidating the upload.
+
+    Args:
+        deal_id: Deal scope, so one deal can never retire another deal's docs.
+        superseded_doc_id: Document being retired.
+        superseded_by: Document ID replacing it.
+    """
+    from qdrant_client.models import Filter, FieldCondition, MatchValue
+    from src.vector_db.qdrant_client import get_qdrant_client
+    from src.vector_db.constants import COLLECTION_NAME
+
+    try:
+        client = get_qdrant_client()
+        await client.set_payload(
+            collection_name=COLLECTION_NAME,
+            payload={"is_current_version": 0, "superseded_by": superseded_by},
+            points=Filter(
+                must=[
+                    FieldCondition(key="deal_id", match=MatchValue(value=deal_id)),
+                    FieldCondition(key="doc_id", match=MatchValue(value=superseded_doc_id)),
+                ]
+            ),
+        )
+        logger.info(
+            "Superseded document retired",
+            extra={
+                "deal_id": deal_id,
+                "superseded_doc_id": superseded_doc_id,
+                "superseded_by": superseded_by,
+            },
+        )
+    except Exception as e:
+        logger.error(
+            "Failed to retire superseded document",
+            extra={
+                "deal_id": deal_id,
+                "superseded_doc_id": superseded_doc_id,
+                "error": str(e),
+            },
+        )

@@ -4,6 +4,8 @@ Citation viewer component — renders citations with version warnings and comput
 
 import streamlit as st
 
+from app.styles import pill
+
 
 def render_citations(citations: list[dict]) -> None:
     """
@@ -14,10 +16,25 @@ def render_citations(citations: list[dict]) -> None:
         citations: List of citation dicts from QueryResponse.
     """
     if not citations:
-        st.caption("No citations available.")
+        st.caption("No citations available for this answer.")
         return
 
-    st.subheader("📚 Source Citations")
+    stale = sum(1 for c in citations if not c.get("is_current_version", True))
+    computed = sum(
+        1
+        for c in citations
+        if c.get("content_type") in ("computed_metric", "table_metrics_summary")
+    )
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Sources Cited", len(citations))
+    with col2:
+        st.metric("Superseded", stale)
+    with col3:
+        st.metric("Computed Metrics", computed)
+
+    st.write("")
 
     for i, cite in enumerate(citations, 1):
         source = cite.get("source_file", "Unknown")
@@ -26,36 +43,36 @@ def render_citations(citations: list[dict]) -> None:
         is_current = cite.get("is_current_version", True)
         content_type = cite.get("content_type", "text")
 
-        # Build citation line
-        parts = [f"**{source}**"]
-        if section:
-            parts.append(f"Section: _{section}_")
-        if page:
-            parts.append(f"Page {page}")
-
-        # Flags
-        flags = []
+        # Flags — each maps to a specific provenance risk the reviewer must see
+        flags = ""
         if not is_current:
-            flags.append("⚠️ NOT CURRENT VERSION")
+            flags += pill("⚠ NOT CURRENT VERSION", "bad")
         if content_type in ("computed_metric", "table_metrics_summary"):
-            flags.append("🔢 Computed Metric")
+            # Computed metrics come from deterministic pandas arithmetic during
+            # ingestion, never from LLM arithmetic — worth signalling explicitly.
+            flags += pill("🔢 COMPUTED", "accent")
         if cite.get("is_redline"):
-            flags.append("📝 Redline")
+            flags += pill("📝 REDLINE", "warn")
 
-        flag_str = " | ".join(flags)
+        meta_parts = []
+        if section:
+            meta_parts.append(section)
+        if page:
+            meta_parts.append(f"page {page}")
+        meta = " · ".join(meta_parts) or "—"
 
-        # Render
-        col1, col2 = st.columns([4, 2])
-        with col1:
-            st.markdown(f"{i}. " + " | ".join(parts))
-        with col2:
-            if flag_str:
-                st.caption(flag_str)
+        css_class = "dd-cite dd-cite-stale" if not is_current else "dd-cite"
+        st.markdown(
+            f"<div class='{css_class}'>"
+            f"<div class='dd-cite-src'>{i}. {source}</div>"
+            f"<div class='dd-cite-meta'>{meta}</div>"
+            f"<div style='margin-top:0.35rem'>{flags}</div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
 
-        # Version warning detail
         if not is_current:
-            superseded_by = cite.get("superseded_by", "a newer version")
+            superseded_by = cite.get("superseded_by") or "a newer version"
             st.caption(
-                f"   ↳ This document has been superseded by {superseded_by}. "
-                "Information may be outdated."
+                f"↳ Superseded by {superseded_by}. This information may be outdated."
             )

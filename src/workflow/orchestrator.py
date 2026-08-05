@@ -17,6 +17,7 @@ State Machine Topology:
 
 import time
 import uuid
+from contextlib import AsyncExitStack
 
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -38,6 +39,10 @@ from src.agents.hallucination_validator import hallucination_validator_node
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
+
+# Holds the open AsyncPostgresSaver context for the process lifetime.
+# None when the MemorySaver fallback is in use.
+_checkpointer_stack: AsyncExitStack | None = None
 
 
 async def insufficient_context_node(state: AgentState) -> dict:
@@ -169,26 +174,63 @@ async def get_compiled_graph(postgres_url: str):
     Compiles the graph with PostgresSaver checkpointer.
     Checkpoints are keyed to (deal_id, session_id) via the config dict.
 
+    `AsyncPostgresSaver.from_conn_string()` returns an async *context manager*,
+    not a saver — the connection must stay open for as long as the graph is
+    used, so it is entered into a module-level AsyncExitStack that the API
+    lifespan unwinds via close_checkpointer(). Awaiting `.setup()` on the
+    context manager directly raises AttributeError and silently drops every
+    deployment back to MemorySaver, losing crash recovery.
+
     Args:
         postgres_url: PostgreSQL connection string.
 
     Returns:
         Compiled LangGraph application ready for ainvoke().
     """
+    global _checkpointer_stack
+
     graph = build_graph()
     try:
-        checkpointer = AsyncPostgresSaver.from_conn_string(postgres_url)
+        stack = AsyncExitStack()
+        checkpointer = await stack.enter_async_context(
+            AsyncPostgresSaver.from_conn_string(postgres_url)
+        )
         await checkpointer.setup()
         app = graph.compile(checkpointer=checkpointer)
+        _checkpointer_stack = stack
         logger.info("LangGraph state machine compiled with PostgresSaver")
     except Exception as e:
+        # Degrade rather than fail: the pipeline is fully functional without
+        # durable checkpoints, it just cannot resume a session after a restart.
         logger.warning(
             f"Failed to initialize PostgresSaver: {e}. Falling back to MemorySaver."
         )
+        await close_checkpointer()
         checkpointer = MemorySaver()
         app = graph.compile(checkpointer=checkpointer)
         logger.info("LangGraph state machine compiled with MemorySaver")
     return app
+
+
+async def close_checkpointer() -> None:
+    """
+    Closes the Postgres checkpointer connection, if one was opened.
+
+    Called from the FastAPI lifespan shutdown. Safe to call when the fallback
+    MemorySaver is in use — it is a no-op.
+    """
+    global _checkpointer_stack
+
+    if _checkpointer_stack is None:
+        return
+
+    try:
+        await _checkpointer_stack.aclose()
+        logger.info("PostgresSaver checkpointer closed")
+    except Exception as e:
+        logger.warning(f"Error closing checkpointer: {e}")
+    finally:
+        _checkpointer_stack = None
 
 
 async def run_query(
@@ -196,6 +238,7 @@ async def run_query(
     query: str,
     deal_id: str,
     session_id: str | None = None,
+    include_pii: bool = False,
 ) -> AgentState:
     """
     Executes a full query through the pipeline.
@@ -205,6 +248,9 @@ async def run_query(
         query: User's natural language query.
         deal_id: Deal identifier for isolation.
         session_id: Optional session ID (generated if not provided).
+        include_pii: Compliance override from the authenticated caller. Defaults
+            to False so PII-flagged chunks stay excluded unless explicitly
+            authorized. Never set from LLM output — see AgentState.include_pii.
 
     Returns:
         Final AgentState with answer and metadata.
@@ -245,6 +291,7 @@ async def run_query(
         "force_refusal": False,
         "deal_id": deal_id,
         "session_id": session_id,
+        "include_pii": include_pii,
         "total_latency_ms": 0.0,
         "status": "running",
         "error": None,

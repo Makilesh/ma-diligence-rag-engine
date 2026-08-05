@@ -83,6 +83,12 @@ services:
       api:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      # Streamlit's own readiness endpoint — returns "ok" once the server is up
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
 volumes:
   postgres_data:
