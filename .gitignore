@@ -16,3 +16,4 @@ qdrant_local_db/
 qdrant_test_db/
 qdrant_test_db_v2/
 docker_data/
+*.md
