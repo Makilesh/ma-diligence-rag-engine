@@ -52,6 +52,7 @@ async def query_endpoint(request: QueryRequest):
             query=request.query,
             deal_id=request.deal_id,
             session_id=session_id,
+            include_pii=request.include_pii,
         )
         if result.get("status") == "error":
             raise ValueError(result.get("error", "Unknown pipeline error"))
@@ -70,9 +71,18 @@ async def query_endpoint(request: QueryRequest):
             page_number=c.get("page_number"),
             section_heading=c.get("section_heading", ""),
             is_current_version=c.get("is_current_version", 1) == 1,
+            content_type=c.get("content_type", "text"),
+            is_redline=bool(c.get("is_redline", False)),
+            superseded_by=c.get("superseded_by", ""),
         )
         for c in result.get("citations", [])
     ]
+
+    # A refusal is any terminal state the pipeline reached without usable context —
+    # either the quality gate forced it, or the rewrite loop exhausted its budget.
+    is_refusal = bool(result.get("force_refusal", False)) or not result.get(
+        "generated_answer", ""
+    )
 
     response = QueryResponse(
         answer=result.get("generated_answer", ""),
@@ -85,6 +95,8 @@ async def query_endpoint(request: QueryRequest):
         session_id=session_id,
         rewrite_iterations=result.get("rewrite_iteration", 0),
         agent_trace=result.get("agent_trace", []),
+        is_refusal=is_refusal,
+        context_quality_score=result.get("context_quality_score", 0.0),
     )
 
     # Immutable audit log
@@ -101,6 +113,9 @@ async def query_endpoint(request: QueryRequest):
             "latency_ms": response.total_latency_ms,
             "citations_count": len(citations),
             "rewrite_iterations": response.rewrite_iterations,
+            # Compliance: an authorized PII query must be attributable after the fact.
+            "include_pii": request.include_pii,
+            "is_refusal": response.is_refusal,
         },
     )
 

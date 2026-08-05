@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from src.vector_db.qdrant_client import get_qdrant_client, close_qdrant_client
 from src.vector_db.collection_manager import setup_collections
 from src.llm.budget_tracker import BudgetTracker
-from src.workflow.orchestrator import get_compiled_graph
+from src.workflow.orchestrator import get_compiled_graph, close_checkpointer
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -51,6 +51,7 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("Shutting down application")
+    await close_checkpointer()
     await close_qdrant_client()
     await BudgetTracker.close()
     logger.info("Application shutdown complete")

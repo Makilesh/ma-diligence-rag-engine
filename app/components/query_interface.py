@@ -4,7 +4,8 @@ Query interface component — query input with type hints and controls.
 
 import streamlit as st
 
-
+# One example per query type the classifier recognises, so the examples double
+# as documentation of what the engine routes differently.
 EXAMPLE_QUERIES = {
     "Financial": "What was the total revenue in FY2023 and how does it compare to FY2022?",
     "Legal": "What are the key change of control provisions in the merger agreement?",
@@ -22,39 +23,45 @@ def render_query_interface() -> tuple[str, bool] | None:
     Returns:
         Tuple of (query_text, include_pii) if submitted, None otherwise.
     """
-    # Example queries
-    with st.expander("💡 Example Queries", expanded=False):
+    with st.expander("💡 Example queries — one per routed query type", expanded=False):
         for category, example in EXAMPLE_QUERIES.items():
-            col1, col2 = st.columns([1, 5])
+            col1, col2 = st.columns([1, 6])
             with col1:
                 st.caption(f"**{category}**")
             with col2:
                 if st.button(example, key=f"example_{category}", use_container_width=True):
                     st.session_state["query_text"] = example
 
-    # Query input
     query = st.text_area(
-        "Ask a question about the deal:",
+        "Ask a question about the deal",
         value=st.session_state.get("query_text", ""),
-        placeholder="Type your M&A due diligence question here...",
+        placeholder="e.g. What are the termination rights under the supply agreement?",
         height=100,
         key="query_input",
+        label_visibility="collapsed",
     )
 
-    # Controls
-    col1, col2, col3 = st.columns([2, 2, 4])
+    col1, col2, col3 = st.columns([1.4, 1.6, 5])
     with col1:
-        submit = st.button("🔎 Search", type="primary", disabled=not query)
+        submit = st.button(
+            "🔎 Run Analysis",
+            type="primary",
+            disabled=not query,
+            use_container_width=True,
+        )
     with col2:
         include_pii = st.checkbox(
             "Include PII",
             value=False,
-            help="Include PII-flagged content (HR data, salary info). Requires authorization.",
+            help=(
+                "Include PII-flagged content (HR records, salary data). Excluded by "
+                "default; every authorized use is written to the audit log."
+            ),
         )
     with col3:
         st.caption(
-            "Results include source citations. "
-            "Non-current document versions are flagged."
+            "Answers cite their sources. Superseded document versions are flagged, "
+            "and the engine refuses rather than guessing when context is thin."
         )
 
     if submit and query:

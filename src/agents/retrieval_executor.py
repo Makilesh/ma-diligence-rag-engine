@@ -68,7 +68,11 @@ async def retrieval_executor_node(state: AgentState) -> dict:
     )
 
     # Step 4: Hybrid search
-    metadata_filters = state.get("extracted_filters", {})
+    # include_pii is injected here rather than living in extracted_filters, because
+    # Agents 1 and 6 deliberately strip that key from anything an LLM produced. The
+    # only trusted source is the authenticated request, which lands on the state root.
+    include_pii = bool(state.get("include_pii", False))
+    metadata_filters = {**state.get("extracted_filters", {}), "include_pii": include_pii}
     dense_results, sparse_results = await hybrid_search(
         query_text=query,
         query_vector=query_vector,
@@ -134,6 +138,7 @@ async def retrieval_executor_node(state: AgentState) -> dict:
         chunks=reranked,
         include_parents=config.get("use_parent_expansion", True),
         include_siblings=config.get("use_sibling_expansion", True),
+        include_pii=include_pii,
     )
 
     elapsed_ms = (time.monotonic() - start) * 1000
