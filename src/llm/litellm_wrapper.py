@@ -9,6 +9,7 @@ All agents that return JSON MUST use call_structured_agent().
 Agent 7 (Answer Synthesizer) returns prose and uses call_prose_agent().
 """
 
+import asyncio
 import json
 
 import litellm
@@ -16,6 +17,12 @@ import litellm
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
+
+# Retry policy for prose calls. Matches the 3-attempt budget the structured
+# agent already used, with linear backoff so a transient upstream 503 gets a
+# meaningful gap before the next attempt.
+MAX_RETRIES = 3
+RETRY_BACKOFF_SECONDS = 2.0
 
 
 async def call_structured_agent(
@@ -140,41 +147,75 @@ async def call_prose_agent(
         max_tokens: Maximum output tokens (default 3000 for long answers).
 
     Returns:
-        Raw string response from the agent.
+        Raw string response from the agent. Never None.
 
     Raises:
-        litellm.exceptions.APIError: On API communication failure.
+        RuntimeError: If every attempt fails or returns an empty completion.
+
+    Retries exist because both failure modes were observed on the golden-set run:
+    a transient upstream 503 ("model is currently experiencing high demand") and,
+    more insidiously, a 200 response whose content was empty. The empty case used
+    to be returned as None and propagate until something did `x in None`, failing
+    the whole request with an opaque TypeError. Both are now retried, and an
+    exhausted retry raises a typed error the synthesizer converts into a refusal —
+    a refusal is a far better outcome for the caller than a 500.
     """
-    logger.info(
-        "Calling prose agent",
-        extra={
-            "model": model,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-        },
+    last_error: Exception | None = None
+
+    for attempt in range(1, MAX_RETRIES + 1):
+        logger.info(
+            "Calling prose agent",
+            extra={
+                "model": model,
+                "attempt": attempt,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+            },
+        )
+
+        try:
+            response = await litellm.acompletion(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+            content = response.choices[0].message.content
+
+            if content and content.strip():
+                logger.info(
+                    "Prose agent call successful",
+                    extra={
+                        "model": model,
+                        "attempt": attempt,
+                        "response_length": len(content),
+                    },
+                )
+                return content
+
+            last_error = RuntimeError("empty completion")
+            logger.warning(
+                "Prose agent returned an empty completion",
+                extra={"model": model, "attempt": attempt},
+            )
+
+        except Exception as e:
+            last_error = e
+            logger.warning(
+                "Prose agent call failed",
+                extra={"model": model, "attempt": attempt, "error": str(e)},
+            )
+
+        if attempt < MAX_RETRIES:
+            await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
+
+    raise RuntimeError(
+        f"Prose agent failed after {MAX_RETRIES} attempts "
+        f"(model={model}): {last_error}"
     )
-
-    response = await litellm.acompletion(
-        model=model,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        temperature=temperature,
-        max_tokens=max_tokens,
-    )
-
-    content = response.choices[0].message.content
-
-    logger.info(
-        "Prose agent call successful",
-        extra={
-            "model": model,
-            "response_length": len(content) if content else 0,
-        },
-    )
-
-    return content
 
 
 async def call_local_agent(
