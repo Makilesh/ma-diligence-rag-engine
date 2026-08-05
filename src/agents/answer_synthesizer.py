@@ -121,13 +121,41 @@ async def answer_synthesizer_node(state: AgentState) -> dict:
     tracker = await BudgetTracker.get_instance()
     model = await tracker.get_model_for_synthesis()
 
-    answer = await call_prose_agent(
-        system_prompt=ANSWER_SYNTHESIZER_SYSTEM_PROMPT,
-        user_prompt=user_prompt,
-        model=model,
-        temperature=0.1,
-        max_tokens=3000,
-    )
+    try:
+        answer = await call_prose_agent(
+            system_prompt=ANSWER_SYNTHESIZER_SYSTEM_PROMPT,
+            user_prompt=user_prompt,
+            model=model,
+            temperature=0.1,
+            max_tokens=3000,
+        )
+    except Exception as e:
+        # Synthesis is the one place where an upstream failure would otherwise
+        # take down the whole request. Degrade to an explicit refusal instead:
+        # a reviewer who is told the engine could not answer is strictly better
+        # off than one who gets a 500 and no explanation.
+        logger.error(
+            "Agent 7: synthesis failed, degrading to refusal",
+            extra={"model": model, "error": str(e)},
+        )
+        return {
+            "generated_answer": (
+                "I could not generate an answer for this question because the "
+                "language model did not return a usable response. The retrieved "
+                "context may still be relevant — please retry the query."
+            ),
+            "citations": [],
+            "numerical_claims": [],
+            "confidence_score": 0.0,
+            "agent_trace": [
+                {
+                    "agent": "answer_synthesizer",
+                    "model": model,
+                    "synthesis_failed": True,
+                    "error": str(e),
+                }
+            ],
+        }
 
     # Extract citations from the answer (basic extraction).
     #
