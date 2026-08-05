@@ -177,3 +177,94 @@ class TestQualityAssessorHeuristic:
 
         assert a is not None and b is not None
         assert b["context_quality_score"] >= a["context_quality_score"]
+
+
+class TestProgressiveFilterRelaxation:
+    """
+    Agent 3 must relax the document_category filter once retrieval has failed.
+
+    document_category encodes Agent 1's guess at which document holds the answer,
+    applied as a hard Qdrant `must`. When the guess is wrong the answer is outside
+    the search space and the rewrite loop — which only changes query text — can
+    never recover it. Isolation (deal_id) and compliance (PII, version) filters
+    must survive relaxation.
+    """
+
+    @staticmethod
+    async def _capture_filters(monkeypatch, rewrite_iteration: int) -> dict:
+        """Runs the node with retrieval stubbed out, returning the filters it sent."""
+        import numpy as np
+        import src.agents.retrieval_executor as rx
+
+        captured: dict = {}
+
+        async def fake_hybrid_search(**kwargs):
+            captured.update(kwargs["metadata_filters"])
+            return [], []
+
+        async def fake_embed(texts):
+            return [np.zeros(1024)]
+
+        async def fake_expand(**kwargs):
+            return []
+
+        monkeypatch.setattr(rx, "hybrid_search", fake_hybrid_search)
+        monkeypatch.setattr(rx, "embed_texts_async", fake_embed)
+        monkeypatch.setattr(rx, "compute_sparse_bm25", lambda text: None)
+        monkeypatch.setattr(rx, "expand_context", fake_expand)
+        monkeypatch.setattr(rx, "reciprocal_rank_fusion", lambda **kw: [])
+
+        await rx.retrieval_executor_node({
+            "current_query": "what is the merger consideration per share?",
+            "query_type": "legal",
+            "parsed_intent": {},
+            "deal_id": "deal-1",
+            "include_pii": False,
+            "rewrite_iteration": rewrite_iteration,
+            "retrieval_config": {},
+            "extracted_filters": {"document_category": "financial", "doc_id": "d1"},
+        })
+        return captured
+
+    @pytest.mark.asyncio
+    async def test_category_kept_on_first_attempt(self, monkeypatch):
+        """First attempt keeps the category filter — it buys precision."""
+        filters = await self._capture_filters(monkeypatch, rewrite_iteration=0)
+        assert filters["document_category"] == "financial"
+
+    @pytest.mark.asyncio
+    async def test_category_dropped_after_rewrite(self, monkeypatch):
+        """After a failed attempt, trade precision for recall."""
+        filters = await self._capture_filters(monkeypatch, rewrite_iteration=1)
+        assert "document_category" not in filters
+
+    @pytest.mark.asyncio
+    async def test_isolation_and_compliance_filters_survive(self, monkeypatch):
+        """deal_id scoping and PII exclusion are never relaxed."""
+        import src.agents.retrieval_executor as rx
+
+        captured = {}
+
+        async def fake_hybrid_search(**kwargs):
+            captured.update(kwargs)
+            return [], []
+
+        import numpy as np
+        monkeypatch.setattr(rx, "hybrid_search", fake_hybrid_search)
+        monkeypatch.setattr(rx, "embed_texts_async", lambda t: _coro([np.zeros(1024)]))
+        monkeypatch.setattr(rx, "compute_sparse_bm25", lambda text: None)
+        monkeypatch.setattr(rx, "expand_context", lambda **kw: _coro([]))
+        monkeypatch.setattr(rx, "reciprocal_rank_fusion", lambda **kw: [])
+
+        await rx.retrieval_executor_node({
+            "current_query": "q", "query_type": "legal", "parsed_intent": {},
+            "deal_id": "deal-1", "include_pii": False, "rewrite_iteration": 2,
+            "retrieval_config": {}, "extracted_filters": {"document_category": "legal"},
+        })
+
+        assert captured["deal_id"] == "deal-1"
+        assert captured["metadata_filters"]["include_pii"] is False
+
+
+async def _coro(value):
+    return value
