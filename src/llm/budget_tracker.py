@@ -171,10 +171,19 @@ class BudgetTracker:
             )
         return self._rate_limiters[model_key]
 
+    # Synthesis model. config/litellm_config.yaml has specified
+    # gemini-3.1-flash-lite since the quota decision recorded there ("swapped
+    # from 3.5-flash to avoid daily quota limit, 20 RPD"), but this method kept
+    # returning 3.5-flash — the config and the code had drifted apart, and the
+    # code won. The golden-set run made the cost concrete: 3.5-flash produced one
+    # upstream 503 and two empty completions across 19 queries. Aligning with the
+    # documented decision removes the drift and the quota exposure in one move.
+    SYNTHESIS_MODEL = "gemini/gemini-3.1-flash-lite"
+
     async def get_model_for_synthesis(self) -> str:
         """
-        Returns gemini-3.5-flash model string if daily budget remains,
-        otherwise falls back to gemini-3.1-flash-lite.
+        Returns the synthesis model string if daily budget remains,
+        otherwise falls back to the agent workhorse model.
 
         CRITICAL: Acquire the rate limiter slot BEFORE consuming the daily budget.
         If the task is cancelled while sleeping in acquire(), the budget is NOT
@@ -190,7 +199,7 @@ class BudgetTracker:
 
         await self._get_rate_limiter("synthesis_primary").acquire()
         if await self._try_consume("synthesis_primary"):
-            return "gemini/gemini-3.5-flash"  # ⚠ VERIFY STRING
+            return self.SYNTHESIS_MODEL
         return await self.get_model_for_agent()
 
     async def get_model_for_agent(self) -> str:
