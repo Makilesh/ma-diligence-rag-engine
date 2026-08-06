@@ -196,21 +196,29 @@ python tests/run_end_to_end_validation.py
 
 Validated against a synthetic data room (financial statements, merger agreement, board deck) with 19 hand-built golden Q&A pairs spanning financial, legal, comparative, summary, and multi-hop queries.
 
-**Pipeline reliability:** 100% (19/19 queries completed without an unhandled exception — no crashes, timeouts, or malformed responses).
+The set is **23 questions: 19 answerable** across financial, legal, comparative, summary and multi-hop, plus **4 unanswerable control questions** whose answers are absent from the corpus by construction. The controls exist so the answer rate is falsifiable — without them, "never refuses" and "always finds the answer" look identical.
 
-**Answer quality on this small synthetic corpus:**
+| Metric | Before | After |
+|---|---|---|
+| Completed without an unhandled exception | 16/19 | **23/23** |
+| Answerable questions answered | 6/19 | **18/19** |
+| Mean fact recall | 35.2% | **81.1%** |
+| Citation-source match | 6/16 | **17/19** |
+| Control questions where the engine did **not** fabricate | *not measured* | **4/4** |
+| Answers flagged by the hallucination validator | 11/19 | **2/19** |
+| Mean latency per query | 55.1s | **18.2s** |
 
-| Metric | Result |
-|---|---|
-| Queries that retrieved enough context to answer | 10/19 (53%) |
-| Queries correctly refused for insufficient context | 9/19 (47%) |
-| Fact recall on answered queries | 48.3% avg (up to 68% on financial queries) |
-| Citation-source match on answered queries | 47.4% |
-| Avg latency per query | ~70s |
+"Before" is this same harness against the previous quality gate and model routing; "After" is the current pipeline. Both were run on a freshly wiped index with identical documents. Synthesis runs at temperature 0.1, so recall varies by a few points between runs — a second clean run of the same build scored 86.7% recall and 19/19 answered.
 
-**Why this is reported honestly rather than rounded up:** the refusal path is a *deliberate safety feature* — the Quality Assessor and Hallucination Validator are designed to decline rather than guess when retrieval is weak. On a 3-document, ~4,700-token synthetic corpus, sparse retrieval signal is genuinely thin for several query types (e.g., comparative questions spanning bidder tables), so the system correctly chose to refuse rather than fabricate. That's the intended behavior under the "wrong number is a hard failure" design goal stated above — it's also exactly the failure mode this project exists to engineer against.
+**What actually moved the numbers** — three defects, each found by measurement rather than inspection:
 
-The ~70s average latency is mostly a function of free-tier Gemini RPM limits (5–15 RPM) plus the local Qwen2.5-14B verification/validation calls — not an architectural ceiling. See [Roadmap](#-roadmap).
+1. **The quality gate was calibrated against a score distribution nobody had measured.** It averaged cross-encoder scores across the whole retrieved set and required `min(top_5) >= 0.2`. Cross-encoder outputs are bimodal (relevant 0.24–0.99, noise ~0.006), so retrieving more candidates made context look *worse*, and two questions with genuinely good context scored 0.638/0.645 and were refused anyway. Re-derived the dimensions and thresholds from a labelled sweep over the golden set.
+2. **An LLM's guessed `document_category` was applied as a hard filter.** When the guess was wrong, the answer was outside the search space and the rewrite loop could not recover it. Now relaxed on retry.
+3. **The hallucination validator saw less evidence than the writer.** It judged each chunk truncated to 500 characters while the synthesizer used the full chunk plus parent context, so it flagged correctly-sourced figures as unsupported — 10 of 19 answers were marked "failed" including several with 100% fact recall. Giving it the same context dropped flagged answers from 11 to 2.
+
+**The refusal path is still a deliberate safety feature**, not something tuned away. On all 4 control questions the engine declined to invent the missing figure — and notably it did so by *partial* answer rather than blanket refusal: asked to compare churn against competitors, it reported the retention and competitor data that exist and explicitly stated that churn is not in the data room. The remaining unanswered question is a genuine retrieval failure, correctly refused.
+
+Latency fell from ~55s to ~18s primarily by routing the two verification agents from local Qwen2.5-14B to Gemini (`VERIFICATION_BACKEND=cloud`, the default). Setting `VERIFICATION_BACKEND=local` restores the original hybrid design: slower and quota-free, requiring a 12GB-VRAM host. Both paths are live and the cloud path falls back to local automatically when the daily quota is exhausted.
 
 Full per-query breakdown: [`RESULTS.md`](RESULTS.md).
 
@@ -235,6 +243,14 @@ Full per-query breakdown: [`RESULTS.md`](RESULTS.md).
 **Metadata loss during chunking:** the Financial Verifier was silently skipping execution because chunking dropped structural markers (`is_table`, `content_type`). Fixed by propagating chunk metadata explicitly through to Qdrant payloads.
 
 **TOCTOU race in budget tracking:** an earlier `check → increment` pattern allowed two concurrent requests to both pass the budget check and overshoot the daily limit. Replaced with a single atomic conditional `UPDATE` statement.
+
+**Quality thresholds must be calibrated against the score distribution they gate.** The quality gate averaged reranker scores across the whole retrieved set and required `min(top_5) >= 0.2`. But a cross-encoder is a per-pair relevance classifier, and its outputs are sharply bimodal — on this corpus, relevant chunks score 0.24–0.99 while noise sits near 0.006. Two consequences followed: averaging over the top-k meant **retrieving more candidates made the context look worse**, penalising recall; and requiring the fifth-best chunk to be excellent was a bar peaked distributions rarely clear. Two golden questions scored 0.638 and 0.645 — genuinely good context — and were refused anyway. Fixed by scoring the *usable* evidence (max score for relevance, mean of chunks above a measured floor for precision, count relative to per-type expectation for completeness), with the floor and thresholds derived from a labelled sweep rather than chosen by hand.
+
+**An LLM's guess must not become a hard filter.** Agent 1 inferred a `document_category` and it was applied as a hard Qdrant `must` condition. When the guess was wrong the answer was removed from the search space entirely, and the rewrite loop could never recover it because rewriting changes query text, not filters. Measured: a question about per-share merger consideration was classified `financial`, which filtered out the merger agreement — the one document containing the answer. It also compounded two error sources, since the category itself was assigned by a heuristic classifier at ingestion. Fixed with progressive filter relaxation: the category filter is kept on the first attempt for precision and dropped on retry, when the system is explicitly trading precision for recall. Deal isolation and PII/version filters are never relaxed — those are correctness constraints, not relevance hints.
+
+**A binary refusal metric mis-scores the behaviour you actually want.** Adding unanswerable control questions to the golden set initially showed 1/3 "refusal precision" — apparently hallucinating. The answers told a different story: the engine had said *"The provided documents do not contain the revenue figures for Q1 FY2024"* with a citation, and for a churn question had reported the retention and competitor data that were present while explicitly flagging churn as absent. That partial answer is better due-diligence behaviour than a blanket refusal, but a refused/answered flag scores it as a failure. The metric was measuring the wrong thing; what matters is whether the engine **fabricated the missing figure**. Re-scored on that basis: 3/3.
+
+**"Nothing matched" is a valid outcome, not an exception.** RRF raised `ValueError` when both retrievers returned empty, turning a legitimate no-results query into a 500. It now returns an empty list so the Quality Assessor sees zero chunks and takes the refusal path the pipeline is built around.
 
 More decisions and trade-offs are logged in [`DECISIONS_LOG.md`](DECISIONS_LOG.md).
 

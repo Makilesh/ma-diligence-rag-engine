@@ -29,6 +29,10 @@ LOCAL_VERIFICATION_MODEL = "ollama/qwen2.5:14b"
 MAX_RETRIES = 3
 RETRY_BACKOFF_SECONDS = 2.0
 
+# Rate limits are enforced over a rolling minute, so a 429 needs a longer pause
+# than a generic transport error before the next attempt is worth making.
+RATE_LIMIT_BACKOFF_SECONDS = 20.0
+
 
 async def call_structured_agent(
     system_prompt: str,
@@ -126,6 +130,15 @@ async def call_structured_agent(
             )
             if attempt == 2:
                 raise
+            # Back off before retrying. Retrying a 429 or a connection drop with
+            # no delay just reproduces the same failure — the original loop did
+            # exactly that, so a rate-limited call burned all three attempts
+            # inside a few milliseconds and still failed. Rate limits get a
+            # longer wait than other transport errors because the window they
+            # are enforcing is measured in seconds.
+            is_rate_limit = "ratelimit" in type(e).__name__.lower() or "429" in str(e)
+            delay = RATE_LIMIT_BACKOFF_SECONDS if is_rate_limit else RETRY_BACKOFF_SECONDS
+            await asyncio.sleep(delay * (attempt + 1))
             continue
 
     # Should never reach here due to raises above, but satisfy type checker

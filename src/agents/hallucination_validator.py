@@ -50,11 +50,27 @@ async def hallucination_validator_node(state: AgentState) -> dict:
             ],
         }
 
-    # Format context for validation
-    context_text = "\n\n".join(
-        f"[Chunk {i+1} | {c.get('source_file', 'unknown')}]: {c.get('text', '')[:500]}"
-        for i, c in enumerate(chunks[:10])
-    )
+    # Format context for validation.
+    #
+    # The validator MUST see the same evidence the synthesizer wrote from.
+    # This previously truncated each chunk to 500 characters while the
+    # synthesizer received the full chunk plus its parent context — so the
+    # validator was asked "is this claim supported?" while being shown roughly a
+    # sixth of the supporting text. It duly reported unsupported claims that were
+    # perfectly grounded: on the golden set it flagged "revenue was $452.8M for
+    # FY2023 and $387.1M for FY2022" as a hallucination on an answer that scored
+    # 100% fact recall, because the figures sat past the cutoff. Ten of nineteen
+    # answers were marked failed this way, which trains a reviewer to ignore the
+    # validator — the worst possible outcome for a safety control.
+    parts = []
+    for i, c in enumerate(chunks):
+        body = c.get("text", "")
+        parent = c.get("parent_text", "")
+        entry = f"[Chunk {i + 1} | {c.get('source_file', 'unknown')}]: {body}"
+        if parent:
+            entry += f"\n[Parent context]: {parent}"
+        parts.append(entry)
+    context_text = "\n\n".join(parts)
 
     user_prompt = HALLUCINATION_VALIDATOR_USER_TEMPLATE.format(
         query=state["current_query"],

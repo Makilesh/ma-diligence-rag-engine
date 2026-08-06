@@ -23,6 +23,15 @@ def render_query_interface() -> tuple[str, bool] | None:
     Returns:
         Tuple of (query_text, include_pii) if submitted, None otherwise.
     """
+    # Example buttons write straight into the text area's own session_state key.
+    #
+    # The obvious approach — keeping a separate "query_text" key and passing it as
+    # `value=` — silently does not work: once a keyed widget exists, Streamlit
+    # serves its stored state and ignores `value=` on later reruns. The box
+    # appeared to fill in while the widget still returned "", so `disabled=not
+    # query` kept the Search button greyed out and clicking an example did
+    # nothing. Assigning to the widget's own key before it is instantiated is the
+    # supported way to set it.
     with st.expander("💡 Example queries — one per routed query type", expanded=False):
         for category, example in EXAMPLE_QUERIES.items():
             col1, col2 = st.columns([1, 6])
@@ -30,11 +39,11 @@ def render_query_interface() -> tuple[str, bool] | None:
                 st.caption(f"**{category}**")
             with col2:
                 if st.button(example, key=f"example_{category}", use_container_width=True):
-                    st.session_state["query_text"] = example
+                    st.session_state["query_input"] = example
+                    st.rerun()
 
     query = st.text_area(
         "Ask a question about the deal",
-        value=st.session_state.get("query_text", ""),
         placeholder="e.g. What are the termination rights under the supply agreement?",
         height=100,
         key="query_input",

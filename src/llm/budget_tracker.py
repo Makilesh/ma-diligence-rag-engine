@@ -153,23 +153,48 @@ class BudgetTracker:
                 )
         logger.info("Budget schema verified")
 
+    # Requests-per-minute ceiling per UPSTREAM MODEL, which is what the provider
+    # actually meters. The daily budget stays per bucket (synthesis vs agent) —
+    # that is cost allocation — but RPM is a property of the shared resource.
+    MODEL_RPM_LIMITS: dict[str, int] = {
+        "gemini/gemini-3.1-flash-lite": 15,
+        "ollama/qwen2.5:14b": 1000,  # local, effectively unlimited
+    }
+    DEFAULT_MODEL_RPM = 15
+
+    # Which upstream model each budget bucket spends against.
+    BUCKET_MODELS: dict[str, str] = {
+        "synthesis_primary": "gemini/gemini-3.1-flash-lite",
+        "agent_workhorse": "gemini/gemini-3.1-flash-lite",
+    }
+
     def _get_rate_limiter(self, model_key: str) -> RateLimiter:
         """
-        Lazily creates RateLimiter instances on first use.
-        This ensures asyncio.Lock() is called inside a running event loop,
-        not at class definition / import time.
+        Lazily creates RateLimiter instances on first use, keyed by upstream model.
+
+        Keying by model rather than by budget bucket is load-bearing. Both buckets
+        resolve to gemini-3.1-flash-lite, so separate limiters (5 RPM + 15 RPM)
+        permitted 20 requests/minute against a single 15 RPM provider quota. That
+        stayed hidden while verification ran on local Ollama and only two agents
+        touched Gemini; routing verification to the cloud raised per-query cloud
+        calls enough to expose it as RateLimitError on the golden-set run. Sharing
+        one limiter per model makes the client-side limit match the real ceiling.
+
+        Lazily constructed because asyncio.Lock() inside RateLimiter.__init__
+        requires a running event loop, which does not exist at import time.
 
         Args:
-            model_key: Model identifier (e.g., "synthesis_primary").
+            model_key: Budget bucket identifier (e.g., "synthesis_primary").
 
         Returns:
-            RateLimiter instance for the specified model.
+            RateLimiter shared by every bucket that spends against the same model.
         """
-        if model_key not in self._rate_limiters:
-            self._rate_limiters[model_key] = RateLimiter(
-                rpm_limit=self.RPM_LIMITS[model_key]
+        model = self.BUCKET_MODELS.get(model_key, model_key)
+        if model not in self._rate_limiters:
+            self._rate_limiters[model] = RateLimiter(
+                rpm_limit=self.MODEL_RPM_LIMITS.get(model, self.DEFAULT_MODEL_RPM)
             )
-        return self._rate_limiters[model_key]
+        return self._rate_limiters[model]
 
     # Synthesis model. config/litellm_config.yaml has specified
     # gemini-3.1-flash-lite since the quota decision recorded there ("swapped

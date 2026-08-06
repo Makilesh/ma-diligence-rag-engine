@@ -69,3 +69,37 @@ async def test_concurrent_acquires():
     await asyncio.gather(*tasks)
 
     assert limiter.current_usage == 3
+
+
+class TestSharedModelRateLimiter:
+    """
+    Buckets that spend against the same upstream model must share one limiter.
+
+    Separate limiters per budget bucket (5 RPM + 15 RPM) allowed 20 requests per
+    minute against a single 15 RPM provider quota once both buckets resolved to
+    the same Gemini model, producing RateLimitError under load.
+    """
+
+    def test_buckets_on_same_model_share_a_limiter(self):
+        from src.llm.budget_tracker import BudgetTracker
+
+        tracker = BudgetTracker.__new__(BudgetTracker)
+        tracker._rate_limiters = {}
+
+        synth = tracker._get_rate_limiter("synthesis_primary")
+        agent = tracker._get_rate_limiter("agent_workhorse")
+
+        assert BudgetTracker.BUCKET_MODELS["synthesis_primary"] == \
+               BudgetTracker.BUCKET_MODELS["agent_workhorse"]
+        assert synth is agent, "same upstream model must mean one shared limiter"
+
+    def test_limiter_uses_model_rpm_not_bucket_rpm(self):
+        from src.llm.budget_tracker import BudgetTracker
+
+        tracker = BudgetTracker.__new__(BudgetTracker)
+        tracker._rate_limiters = {}
+
+        limiter = tracker._get_rate_limiter("synthesis_primary")
+        model = BudgetTracker.BUCKET_MODELS["synthesis_primary"]
+
+        assert limiter.rpm_limit == BudgetTracker.MODEL_RPM_LIMITS[model]
