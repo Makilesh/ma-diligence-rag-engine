@@ -1,33 +1,89 @@
-# LiteLLM Configuration
-# ⚠ VERIFY all model strings against current LiteLLM Google provider docs
-# before locking into production. Naming conventions change frequently.
+# LiteLLM / model routing configuration
+#
+# ⚠ THIS FILE IS DOCUMENTATION, NOT THE SOURCE OF TRUTH.
+#
+# Provider quotas and routing order live in src/llm/model_registry.py and are
+# read from there at runtime. Nothing in this file is loaded by the application.
+#
+# It used to hold its own copies of the limits, and that is precisely how two
+# quota bugs happened: a `daily_limit: 480` here and another 480 in the code
+# summed to 960 against a real 500 RPD cap, and separate RPM figures per bucket
+# summed past the single per-model ceiling the provider enforces. Duplicated
+# limits drift, and drifted limits stay invisible until the API returns 429s.
+# The registry is one table so those errors are visible side by side.
+#
+# Keep this file as the human-readable explanation of *why* routing looks the
+# way it does; change behaviour in model_registry.py.
 
-models:
-  synthesis_primary:
-    model: "gemini/gemini-3.1-flash-lite"    # Swapped from 3.5-flash to 3.1-flash-lite to avoid daily quota limit (20 RPD)
-    daily_limit: 480
-    rpm_limit: 15
-    temperature: 0.1
+# ==============================================================================
+# The shape of the free tier (as reported by the Google AI Studio console)
+# ==============================================================================
+#
+#   model                    RPM     TPM      RPD    role
+#   gemini-3.6-flash           5    250K       20    synthesis (best reasoning)
+#   gemini-3.5-flash           5    250K       20    synthesis
+#   gemini-3-flash             5    250K       20    synthesis
+#   gemini-2.5-flash           5    250K       20    synthesis
+#   gemini-3.5-flash-lite     15    250K      500    agents (only volume model)
+#   gemini-2.5-flash-lite     10    250K       20    agents (overflow)
+#
+# Exactly one model can sustain traffic. Every reasoning-grade model is capped
+# at 20 requests/day, which is the single fact that dictates the routing below.
+
+routing:
+  # ~1 call per query, and the only agent whose reasoning quality is visible in
+  # the answer. Gets the good models; each rung is worth ~20 requests/day per
+  # API key, then it falls through. Lite is last so synthesis degrades rather
+  # than fails.
+  synthesis_ladder:
+    - gemini/gemini-3.6-flash
+    - gemini/gemini-3.5-flash
+    - gemini/gemini-3-flash
+    - gemini/gemini-2.5-flash
+    - gemini/gemini-3.5-flash-lite
+    - ollama/qwen2.5:14b
+
+  # ~4 calls per query doing classification, rewriting, quality assessment and
+  # validation — structured work that does not need frontier reasoning. Ordered
+  # by daily capacity, NOT capability. Reasoning models are deliberately absent:
+  # at 20 RPD each they would be drained by five queries and would then be
+  # unavailable to synthesis, which is where that quality actually matters.
+  agent_ladder:
+    - gemini/gemini-3.5-flash-lite
+    - gemini/gemini-2.5-flash-lite
+    - ollama/qwen2.5:14b
+
+# ==============================================================================
+# Multi-key rotation
+# ==============================================================================
+# Quotas are enforced per API key, so keys multiply capacity. Set any of:
+#     GEMINI_API_KEYS=key1,key2,key3
+#     GEMINI_API_KEY_1 / GEMINI_API_KEY_2 / ...
+#     GEMINI_API_KEY                        (single, legacy)
+#
+# Selection drains one key on a given model before trying the next key on the
+# SAME model, and only steps down a rung once every key is spent — so answer
+# quality degrades last, not first. With two keys that is ~152 reasoning-grade
+# syntheses before any downgrade, then ~950 lite calls, then local.
+
+sampling:
+  synthesis:
+    temperature: 0.1      # slight variety in prose
     max_tokens: 3000
-
-  agent_workhorse:
-    model: "gemini/gemini-3.1-flash-lite"    # ⚠ VERIFY — primary for all agent calls
-    daily_limit: 480                          # Leave 20 RPD buffer from 500 RPD cap
-    rpm_limit: 15
-    temperature: 0.0
+  agents:
+    temperature: 0.0      # deterministic structured output
     max_tokens: 800
-
-  local_fallback:
-    model: "ollama/qwen2.5:14b"
-    safe_fallback: "ollama/qwen2.5:7b-instruct-q4_k_m"
+  verification:
     temperature: 0.0
     max_tokens: 1500
 
-# Do NOT use these models (per p4.md rate limit strategy):
-# gemini-3-flash        :  5 RPM,  20 RPD → Do not use
-# gemini-2.5-flash      :  5 RPM,  20 RPD → Do not use (superseded)
-# gemini-2.5-flash-lite : 10 RPM,  20 RPD → Do not use
-
 general:
-  json_mode: true                             # Default for structured-output agents
-  retry_on_json_failure: 3                    # Max attempts for JSON parse
+  json_mode: true                # structured agents enforce response_format
+  retry_on_json_failure: 3       # max attempts for JSON parse
+  safety_margin: 0.95            # fraction of each provider quota we spend
+
+# TPM (250K/min) is recorded in the registry but NOT enforced — metering it
+# needs per-call token accounting the pipeline does not do. At current traffic
+# RPM binds first (15 req/min against 250K TPM implies ~16K tokens/request
+# before TPM could bind; these prompts run ~8K). Recorded rather than left
+# implicit so it does not become a third quota surprise.

@@ -1,7 +1,7 @@
 """
 Prompt template for Query Intelligence Agent (Agent 1).
 
-Model: gemini-3.1-flash-lite | Temp: 0.0 | Tokens: 800
+Model: selected per call from the agent ladder (src/llm/model_registry.py) | Temp: 0.0 | Tokens: 800
 JSON mode: response_format={"type": "json_object"}
 
 COMPLIANCE CONSTRAINT:

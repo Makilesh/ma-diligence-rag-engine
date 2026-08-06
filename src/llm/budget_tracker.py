@@ -3,7 +3,8 @@ Budget tracker — Postgres-backed daily API call tracking with per-model RPM ra
 
 The BudgetTracker must be:
 - Persistent across restarts — stored in Postgres, not in-memory
-- Per-model — tracks synthesis_primary and agent_workhorse separately
+- Per (API key, model) — quotas are enforced per key and per model, so
+  accounting at any coarser granularity mis-counts
 - Thread-safe — uses DB transactions for increment
 - UTC-midnight resetting — checked on every call
 - Exposed in the UI — Streamlit sidebar shows live budget status

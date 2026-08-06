@@ -1,8 +1,8 @@
 """
 Agent 5 — Quality Assessor Agent.
 
-Primary: heuristics (no LLM, ~60% of queries)
-Fallback: gemini-3.1-flash-lite on ambiguity
+Primary: heuristics (no LLM)
+Fallback: the agent ladder's current model, only for the narrow ambiguous band
 
 When heuristic signals are clear (high reranker scores, good coverage),
 skip the LLM entirely. Only invoke the LLM when quality is borderline

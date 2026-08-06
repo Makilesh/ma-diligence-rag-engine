@@ -17,6 +17,7 @@ A production-grade, hardware-aware **Hybrid Agentic RAG (Retrieval-Augmented Gen
 - [Core Engineering Challenges Solved](#-engineering-ma-due-diligence-challenges)
 - [Key Features](#-key-features--advanced-rag-strategies)
 - [Tech Stack](#-technology-stack)
+- [Model Routing & Quota Engineering](#-model-routing--quota-engineering)
 - [Skills Demonstrated](#-skills-demonstrated)
 - [Quick Start](#-quick-start)
 - [Results & Honest Limitations](#-results--validation)
@@ -105,13 +106,47 @@ If retrieval finds *any* of these representations, a table-id lookup automatical
 |---|---|---|
 | **Orchestration** | LangGraph | StateGraph + PostgresSaver (falls back to in-memory checkpointing) |
 | **Vector Database** | Qdrant | Hybrid (dense + sparse) search, Self-Hosted, with local-disk fallback |
-| **LLMs (Cloud)** | Gemini (via LiteLLM) | Agent reasoning & answer synthesis |
-| **LLM (Local)** | Ollama / Qwen2.5-14B | Zero-cost fallback for verification & validation |
+| **LLMs (Cloud)** | Gemini (via LiteLLM) | Capability-tiered ladders + multi-key rotation (see below) |
+| **LLM (Local)** | Ollama / Qwen2.5-14B | Final fallback when all cloud quota is spent |
 | **Embeddings** | BAAI/bge-m3 | 1024-dimensional  dense vectors + FastEmbed BM25 sparse |
 | **Reranker** | BAAI/bge-reranker-v2-m3 | Cross-encoder (Sigmoid Normalized) |
 | **API Layer** | FastAPI | Structured JSON logging, async lifespan management |
 | **Frontend** | Streamlit | 8 custom dashboard components (citations, risk, version history, agent trace) |
 | **Database** | PostgreSQL | Budget tracking, LangGraph checkpoints |
+
+---
+
+## 🔀 Model Routing & Quota Engineering
+
+The Gemini free tier is lopsided in a way that dictates the entire routing design:
+
+| Model | RPM | RPD | Role |
+|---|---|---|---|
+| `gemini-3.6-flash` | 5 | 20 | Synthesis (best reasoning) |
+| `gemini-3.5-flash` | 5 | 20 | Synthesis |
+| `gemini-3-flash` | 5 | 20 | Synthesis |
+| `gemini-2.5-flash` | 5 | 20 | Synthesis |
+| `gemini-3.5-flash-lite` | 15 | **500** | Agents — the only model with volume |
+| `gemini-2.5-flash-lite` | 10 | 20 | Agent overflow |
+
+**Exactly one model can sustain traffic.** Every reasoning-grade model is capped at 20 requests/day. A query spends ~4 agent calls (classification, rewriting, quality assessment, validation) and 1 synthesis call — so putting agent traffic on a reasoning model would drain it in five queries, and it would then be unavailable to synthesis, which is the only place reasoning quality reaches the user.
+
+Hence two ladders, both defined in [`src/llm/model_registry.py`](src/llm/model_registry.py):
+
+- **Agent ladder** — ordered by *daily capacity*, Lite models only. Reasoning models are deliberately excluded (enforced by a test).
+- **Synthesis ladder** — ordered by *capability*, spilling to Lite only once the reasoning models are spent.
+
+**Multi-key rotation.** Quotas are enforced per API key, so keys multiply capacity:
+
+```bash
+GEMINI_API_KEYS=key_one,key_two,key_three   # or GEMINI_API_KEY_1/2/…, or GEMINI_API_KEY
+```
+
+Selection drains one key on a given model before trying the next key on the **same** model, and only steps down a rung once every key is spent — so **answer quality degrades last, not first**. Across two keys that yields ~152 reasoning-grade syntheses before any downgrade, then ~950 Lite calls, then local Ollama.
+
+This required a non-blocking `RateLimiter.try_acquire()`: the existing `acquire()` *sleeps* until the window opens, which is correct with one destination but would block on a saturated key while another sat idle — wasting exactly the capacity the extra keys were added for.
+
+Two quota bugs were found and fixed by consolidating limits into one table: separate rate limiters summing to 20 RPM against a shared 15 RPM model quota, and per-bucket daily allowances summing to 960/day against a 500 RPD cap. Both were arithmetic errors over numbers that lived in three different files. The fix in each case is an invariant test, not a corrected constant.
 
 ---
 
@@ -228,7 +263,8 @@ Full per-query breakdown: [`RESULTS.md`](RESULTS.md).
 
 - [ ] Decompose comparative queries into sub-queries (one bidder/methodology per Qdrant lookup) instead of relying solely on query expansion
 - [ ] Cache embeddings for repeated query expansions to cut redundant model calls
-- [ ] Swap to a paid LLM tier or batch async calls to reduce the ~70s latency floor
+- [ ] Enforce TPM (tokens/minute) alongside RPM/RPD — needs per-call token accounting the pipeline does not yet do
+- [ ] Passage-level citations by parsing the synthesizer's inline `[file | p.N | Section]` markers (see Decision 16)
 - [ ] Replace the in-memory deal store with a Postgres-backed table for multi-instance deployments
 - [ ] Expand the synthetic corpus to better stress-test comparative and multi-hop retrieval
 

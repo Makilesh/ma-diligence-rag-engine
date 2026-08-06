@@ -1,7 +1,7 @@
 """
 Prompt template for Answer Synthesizer Agent (Agent 7).
 
-Model: gemini-3.5-flash (budget) / gemini-3.1-flash-lite (fallback)
+Model: selected per call from the synthesis ladder (src/llm/model_registry.py)
 Temp: 0.1 | Tokens: 3000 | JSON mode: OFF (prose answer)
 
 Citation format includes version and computed flags.

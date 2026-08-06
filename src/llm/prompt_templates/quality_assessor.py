@@ -2,7 +2,7 @@
 Prompt template for Quality Assessor Agent (Agent 5).
 
 Primary: heuristics (no LLM, ~60% of queries)
-Fallback: gemini-3.1-flash-lite on ambiguity
+Fallback: the agent ladder's current model, only on ambiguity
 JSON mode when LLM invoked: response_format={"type": "json_object"}
 """
 

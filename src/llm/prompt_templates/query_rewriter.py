@@ -1,7 +1,7 @@
 """
 Prompt template for Query Rewriter Agent (Agent 6).
 
-Model: gemini-3.1-flash-lite | Temp: 0.2 | Tokens: 600
+Model: selected per call from the agent ladder (src/llm/model_registry.py) | Temp: 0.2 | Tokens: 600
 JSON mode: response_format={"type": "json_object"}
 Max iterations: 2
 

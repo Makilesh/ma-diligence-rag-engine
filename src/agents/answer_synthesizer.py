@@ -1,7 +1,9 @@
 """
 Agent 7 — Answer Synthesis Agent.
 
-Model: gemini-3.5-flash (budget) / gemini-3.1-flash-lite (fallback)
+Model: chosen at call time from BudgetTracker's SYNTHESIS_LADDER — best
+available reasoning model, degrading through the ladder as daily quota is
+spent and finally to the local model. See src/llm/model_registry.py.
 Temp: 0.1 | Tokens: 3000 | JSON mode: OFF (prose answer)
 """
 
@@ -65,8 +67,8 @@ async def answer_synthesizer_node(state: AgentState) -> dict:
     LangGraph node — generates prose answer with citations.
     Populates: generated_answer, citations, numerical_claims, agent_trace.
 
-    Uses gemini-3.5-flash for synthesis quality when budget available,
-    falls back to gemini-3.1-flash-lite when exhausted.
+    Model comes from the synthesis ladder: the best reasoning model with
+    quota left, degrading through the ladder and finally to the local model.
 
     Args:
         state: Current AgentState with expanded_context and query.
