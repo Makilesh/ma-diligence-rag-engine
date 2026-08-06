@@ -3,30 +3,28 @@
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
 [![Vector Database](https://img.shields.io/badge/vector__db-Qdrant-red.svg)](https://qdrant.tech/)
 [![Orchestration](https://img.shields.io/badge/orchestration-LangGraph-purple.svg)](https://github.com/langchain-ai/langgraph)
-[![Tests](https://img.shields.io/badge/tests-76%20passed-green.svg)]()
+[![Tests](https://img.shields.io/badge/tests-93%20passed-green.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-A production-grade, hardware-aware **Hybrid Agentic RAG (Retrieval-Augmented Generation) Engine** that automates due diligence workflows in mergers & acquisitions (M&A). It ingests multi-format data rooms (financial statements, legal contracts, board decks) and performs multi-step reasoning over them with **deterministic financial verification, hallucination guarding, and traceable citations** — prioritizing "I don't know" over confident hallucination on high-stakes financial/legal questions.
-
-> Built as a portfolio project to demonstrate production-style agentic system design: multi-agent orchestration, hybrid retrieval, deterministic numerical guardrails, and graceful degradation under real-world constraints (rate limits, GPU memory, local fallback models).
+A **hybrid agentic RAG engine** for mergers & acquisitions due diligence. It ingests multi-format data rooms (financial statements, legal contracts, board decks) and performs multi-step reasoning over them with **deterministic financial verification, hallucination guarding, and traceable citations** — prioritizing "I don't know" over confident hallucination on high-stakes financial/legal questions.
 
 ---
 
 ## Table of Contents
-- [Architecture](#-multi-agent-architecture)
-- [Core Engineering Challenges Solved](#-engineering-ma-due-diligence-challenges)
-- [Key Features](#-key-features--advanced-rag-strategies)
-- [Tech Stack](#-technology-stack)
-- [Model Routing & Quota Engineering](#-model-routing--quota-engineering)
-- [Skills Demonstrated](#-skills-demonstrated)
-- [Quick Start](#-quick-start)
-- [Results & Honest Limitations](#-results--validation)
-- [Roadmap](#-roadmap)
-- [Project Structure](#-project-structure)
+- [Architecture](#multi-agent-architecture)
+- [Core Engineering Challenges Solved](#engineering-ma-due-diligence-challenges)
+- [Key Features](#key-features--advanced-rag-strategies)
+- [Tech Stack](#technology-stack)
+- [Model Routing & Quota Engineering](#model-routing--quota-engineering)
+- [Quick Start](#quick-start)
+- [Results & Honest Limitations](#results--validation)
+- [Roadmap](#roadmap)
+- [Key Engineering Lessons](#key-engineering-lessons)
+- [Project Structure](#project-structure)
 
 ---
 
-## 🏗️ Multi-Agent Architecture
+## Multi-Agent Architecture
 
 Orchestrated with a **LangGraph StateGraph** of **7 specialized graph nodes** (plus one deterministic, zero-LLM helper) collaborating through typed shared state, with checkpointing keyed by `(deal_id, session_id)`. Retrieval strategy selection is deterministic, not LLM-driven, to cut unnecessary latency and cost.
 
@@ -58,17 +56,17 @@ graph TD
 | 1 | **Query Intelligence** | Classifies user intent, flags numerical-precision needs, extracts metadata filters |
 | 2 | **Retrieval Strategy** *(deterministic, no LLM)* | Picks dense/sparse weights and top-k by query type — zero added latency |
 | 3 | **Retrieval Executor** | Queries Qdrant using hybrid search and merges results via Reciprocal Rank Fusion (RRF).|
-| 4 | **Financial Verifier** | Normalizes numbers(units/currency) and cross-checks figures against source tables |
+| 4 | **Financial Verifier** | Normalizes numbers (units/currency) and cross-checks figures against source tables |
 | 5 | **Quality Assessor** | Scores context quality using a hybrid heuristic-LLM checker. |
 | 6 | **Query Rewriter** | Reformulates the query when retrieval quality is insufficient (max 2 loops) |
 | 7 | **Answer Synthesizer** | Generates structured, cited markdown answers |
-| 8 | **Hallucination Validator** | Validates every claim against retrieved source text before to flag unsupported claims |
+| 8 | **Hallucination Validator** | Validates every claim against retrieved source text and flags unsupported ones |
 
 ---
 
-## ⚡ Engineering M&A Due Diligence Challenges
+## Engineering M&A Due Diligence Challenges
 
-M&A due diligence involves reasoning over massive, multi-format data rooms (e.g., 1000+ page PDFs, financial spreadsheets, legal contracts) **a wrong number is a hard failure, not graceful degradation**.  The engine solves these challenges through the following mechanisms:
+M&A due diligence involves reasoning over massive, multi-format data rooms (e.g., 1000+ page PDFs, financial spreadsheets, legal contracts), where **a wrong number is a hard failure, not graceful degradation**. The engine addresses this through the following mechanisms:
 
 **1. Memory-Efficient PDF Streaming** — Loading 1000+ page PDFs into memory causes Out-Of-Memory (OOM) failures. The ingestion pipeline uses **PyMuPDF (fitz)** to stream layout blocks and text page-by-page. It keeps the memory footprint flat regardless of document length.
 
@@ -88,19 +86,19 @@ If retrieval finds *any* of these representations, a table-id lookup automatical
 
 ---
 
-## 🚀 Key Features & Advanced RAG Strategies
+## Key Features & Advanced RAG Strategies
 
 - **Three-Tier Chunking** — Documents undergo structural parsing, followed by semantic chunking (sentence-boundary aware with 10% overlap) and custom tables/metrics preservation to avoid fragmentation.
 - **Hybrid Dense + Sparse Search** — Merges vector search (**BAAI/bge-m3**, 1024-dim) with sparse lexical search (**FastEmbed BM25**) in a unified Qdrant database.
 - **Reciprocal Rank Fusion (RRF)** — Custom rank-based fusion implementation that de-duplicates overlap and merges dense and sparse rankings, explicitly ignoring raw scores to prevent scale mismatch.
 - **Cross-Encoder Reranking** — Utilizes `BAAI/bge-reranker-v2-m3` for cross-attention query-passage scoring, applying a sigmoid-activation map to normalize scores within `[0,1]`.
 - **Document Versioning** — Automatically flags superseded document versions and traces information lineage.
-- **PII & Risk Detection** — flags PII at ingestion (excluded from retrieval by default) and surfaces risk signals (change-of-control, MAC clauses, litigation, etc.) on a dashboard
+- **PII & Risk Detection** — Flags PII at ingestion (excluded from retrieval by default) and surfaces risk signals (change-of-control, MAC clauses, litigation, etc.) on a dashboard
 - **Token-Budget Governance** — Features a Postgres-backed (`BudgetTracker`) daily quota + RPM rate limiting per model, with a graceful in-memory fallback if Postgres is unavailable to keep API consumption under tight guardrails.
 
 ---
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 | Component | Technology | Detail |
 |---|---|---|
@@ -108,7 +106,7 @@ If retrieval finds *any* of these representations, a table-id lookup automatical
 | **Vector Database** | Qdrant | Hybrid (dense + sparse) search, Self-Hosted, with local-disk fallback |
 | **LLMs (Cloud)** | Gemini (via LiteLLM) | Capability-tiered ladders + multi-key rotation (see below) |
 | **LLM (Local)** | Ollama / Qwen2.5-14B | Final fallback when all cloud quota is spent |
-| **Embeddings** | BAAI/bge-m3 | 1024-dimensional  dense vectors + FastEmbed BM25 sparse |
+| **Embeddings** | BAAI/bge-m3 | 1024-dimensional dense vectors + FastEmbed BM25 sparse |
 | **Reranker** | BAAI/bge-reranker-v2-m3 | Cross-encoder (Sigmoid Normalized) |
 | **API Layer** | FastAPI | Structured JSON logging, async lifespan management |
 | **Frontend** | Streamlit | 8 custom dashboard components (citations, risk, version history, agent trace) |
@@ -116,7 +114,7 @@ If retrieval finds *any* of these representations, a table-id lookup automatical
 
 ---
 
-## 🔀 Model Routing & Quota Engineering
+## Model Routing & Quota Engineering
 
 The Gemini free tier is lopsided in a way that dictates the entire routing design:
 
@@ -150,20 +148,7 @@ Two quota bugs were found and fixed by consolidating limits into one table: sepa
 
 ---
 
-## 🎯 Skills Demonstrated
-
-This project was built to exercise (and showcase) the following:
-
-- **Agentic system design** — multi-step LLM orchestration with explicit self-correction loops, conditional routing, and bounded retry budgets (not naive single-shot RAG)
-- **Production reliability patterns** — graceful degradation under failure (Qdrant local fallback, Postgres → in-memory budget fallback, LangGraph MemorySaver fallback), atomic budget consumption to avoid TOCTOU races, async-safe rate limiting
-- **Retrieval engineering** — hybrid dense/sparse search, RRF fusion, cross-encoder reranking, parent-child context expansion, table-aware chunking
-- **Deterministic correctness guardrails** — financial arithmetic computed in pandas (never delegated to an LLM), explicit citation chains for every derived metric
-- **Hardware-aware engineering** — VRAM budgeting across embedding/reranker/local-LLM models on a 12GB GPU constraint, separate thread pools to prevent resource starvation
-- **Full-stack delivery** — FastAPI backend, Streamlit UI, Dockerized multi-service deployment, 76 automated tests covering async safety, RRF correctness, and agent logic
-
----
-
-## ⚡ Quick Start
+## Quick Start
 
 ### 1. Prerequisites
 Ensure you have Docker and Python 3.12+ installed.
@@ -172,7 +157,7 @@ Ensure you have Docker and Python 3.12+ installed.
 ```bash
 # Clone the repository and configure environment variables
 cp .env.example .env
-# Edit .env — add your GEMINI_API_KEY and database password
+# Edit .env — add GEMINI_API_KEYS (one or more, comma-separated) and the DB password
 
 # Install PyTorch matching your CUDA version (example: CUDA 12.4)
 pip install torch --index-url https://download.pytorch.org/whl/cu124
@@ -217,19 +202,19 @@ streamlit run app/streamlit_app.py
 
 ### 5. Running Tests & E2E Validation
 ```bash
-# Execute pytest suite (76 tests covering async safety, agents, and RRF)
+# Execute pytest suite (93 tests covering async safety, agents, quotas, and RRF)
 pytest
 
-# Execute live E2E pipeline validation against 19 golden Q&A pairs
+# Execute the live E2E validation against the 23-question golden set
+# (requires the API running and at least one Gemini key configured)
 python tests/run_end_to_end_validation.py
-# live E2E run against 19 golden Q&A pairs
 ```
 
 ---
 
-## 📊 Results & Validation
+## Results & Validation
 
-Validated against a synthetic data room (financial statements, merger agreement, board deck) with 19 hand-built golden Q&A pairs spanning financial, legal, comparative, summary, and multi-hop queries.
+Validated against a synthetic data room (financial statements, merger agreement, board deck) using a hand-built golden Q&A set.
 
 The set is **23 questions: 19 answerable** across financial, legal, comparative, summary and multi-hop, plus **4 unanswerable control questions** whose answers are absent from the corpus by construction. The controls exist so the answer rate is falsifiable — without them, "never refuses" and "always finds the answer" look identical.
 
@@ -259,7 +244,7 @@ Full per-query breakdown: [`RESULTS.md`](RESULTS.md).
 
 ---
 
-## 🧭 Roadmap
+## Roadmap
 
 - [ ] Decompose comparative queries into sub-queries (one bidder/methodology per Qdrant lookup) instead of relying solely on query expansion
 - [ ] Cache embeddings for repeated query expansions to cut redundant model calls
@@ -270,7 +255,7 @@ Full per-query breakdown: [`RESULTS.md`](RESULTS.md).
 
 ---
 
-## 🧠 Key Engineering Lessons
+## Key Engineering Lessons
 
 **VRAM budgeting (12GB constraint):** running an embedding model, a cross-encoder reranker, and a 14B local LLM concurrently risks CUDA OOM. Solved with separate `ThreadPoolExecutor` pools for embedding vs. reranking so one doesn't starve the other.
 
@@ -292,7 +277,7 @@ More decisions and trade-offs are logged in [`DECISIONS_LOG.md`](DECISIONS_LOG.m
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 api/                  FastAPI routes, request/response models
@@ -304,20 +289,18 @@ src/
   vector_db/           Qdrant client, hybrid search, RRF fusion, reranker
   workflow/            LangGraph state machine, orchestrator, conditional edges
   utils/               Logging, token counting, audit log, metrics
-tests/                 76 tests + offline pipeline validation + live E2E runner
+tests/                 93 tests + golden Q&A set + live E2E runner
 config/                Qdrant, LiteLLM, and chunking YAML configs
 ```
 
 ---
 
-## 📄 License
+## License
 
 Licensed under the [MIT License](LICENSE).
 
 ---
 
-## 👤 Author
+## Author
 
 **Makilesh M** — [LinkedIn](https://www.linkedin.com/in/makilesh/) · [GitHub](https://github.com/makilesh) · [Portfolio](https://makilesh.github.io/)
-
-*Built as a self-directed project to explore production patterns in agentic RAG systems for high-stakes, accuracy-critical domains.*
