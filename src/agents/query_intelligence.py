@@ -43,7 +43,8 @@ async def query_intelligence_node(state: AgentState) -> dict:
     )
 
     tracker = await BudgetTracker.get_instance()
-    model = await tracker.get_model_for_agent()
+    choice = await tracker.get_model_for_agent()
+    model = choice.model
 
     user_prompt = QUERY_INTELLIGENCE_USER_TEMPLATE.format(
         query=query,
@@ -56,6 +57,7 @@ async def query_intelligence_node(state: AgentState) -> dict:
         model=model,
         temperature=0.0,
         max_tokens=800,
+        api_key=choice.api_key,
     )
 
     # Validate query_type

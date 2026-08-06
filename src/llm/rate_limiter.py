@@ -87,6 +87,30 @@ class RateLimiter:
                 await asyncio.sleep(wait_time)
             # Loop back: re-acquire lock, re-purge timestamps, re-check slot
 
+    async def try_acquire(self) -> bool:
+        """
+        Take a slot if one is free right now; never sleeps.
+
+        This is the primitive multi-key rotation needs. `acquire()` waits for the
+        window to open, which is correct when there is only one place to send the
+        request — but with several API keys, blocking on a saturated key while
+        another key sits idle wastes the very capacity the extra keys were added
+        for. The selector calls this across every (key, model) pair first and
+        only falls back to the blocking path when none can serve immediately.
+
+        Returns:
+            True if a slot was taken, False if the window is currently full.
+        """
+        async with self._lock:
+            now = time.monotonic()
+            while self._call_timestamps and self._call_timestamps[0] < now - 60:
+                self._call_timestamps.popleft()
+
+            if len(self._call_timestamps) < self.rpm_limit:
+                self._call_timestamps.append(time.monotonic())
+                return True
+            return False
+
     @property
     def current_usage(self) -> int:
         """

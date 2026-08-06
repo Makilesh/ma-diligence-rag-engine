@@ -119,7 +119,8 @@ async def answer_synthesizer_node(state: AgentState) -> dict:
     )
 
     tracker = await BudgetTracker.get_instance()
-    model = await tracker.get_model_for_synthesis()
+    choice = await tracker.get_model_for_synthesis()
+    model = choice.model
 
     try:
         answer = await call_prose_agent(
@@ -128,6 +129,7 @@ async def answer_synthesizer_node(state: AgentState) -> dict:
             model=model,
             temperature=0.1,
             max_tokens=3000,
+            api_key=choice.api_key,
         )
     except Exception as e:
         # Synthesis is the one place where an upstream failure would otherwise

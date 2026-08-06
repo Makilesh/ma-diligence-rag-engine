@@ -15,13 +15,15 @@ import os
 
 import litellm
 
+from src.llm.model_registry import AGENT_LADDER, LOCAL_MODEL
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
-# Verification-agent model routing. See call_verification_agent().
-CLOUD_VERIFICATION_MODEL = "gemini/gemini-3.1-flash-lite"
-LOCAL_VERIFICATION_MODEL = "ollama/qwen2.5:14b"
+# Local fallback for the verification agents. The cloud model is no longer named
+# here — it comes from BudgetTracker's agent ladder, so verification routes and
+# rotates across keys like every other cloud call instead of pinning one model.
+LOCAL_VERIFICATION_MODEL = LOCAL_MODEL
 
 # Retry policy for prose calls. Matches the 3-attempt budget the structured
 # agent already used, with linear backoff so a transient upstream 503 gets a
@@ -40,6 +42,7 @@ async def call_structured_agent(
     model: str,
     temperature: float = 0.0,
     max_tokens: int = 1000,
+    api_key: str | None = None,
 ) -> dict:
     """
     Wrapper for all agents that return JSON.
@@ -49,9 +52,11 @@ async def call_structured_agent(
     Args:
         system_prompt: System-level instructions for the agent.
         user_prompt: User query / context for the agent.
-        model: LiteLLM model string (e.g., "gemini/gemini-3.1-flash-lite").
+        model: LiteLLM model string (e.g., "gemini/gemini-3.5-flash-lite").
         temperature: Sampling temperature (default 0.0 for determinism).
         max_tokens: Maximum output tokens.
+        api_key: Credential for this specific call. Required when multiple keys
+            are configured — see the note at the kwargs assembly below.
 
     Returns:
         Parsed JSON dict from the agent response.
@@ -84,6 +89,12 @@ async def call_structured_agent(
             }
             if model.startswith("ollama/"):
                 kwargs["num_ctx"] = 8192  # Expand context window for local Ollama to prevent truncation
+            if api_key:
+                # Explicit per-call credential. With key rotation the key is
+                # chosen per request, so relying on the ambient GEMINI_API_KEY
+                # env var would send every call to key 1 while the tracker
+                # debited whichever key it thought it had picked.
+                kwargs["api_key"] = api_key
 
             response = await litellm.acompletion(**kwargs)
 
@@ -151,6 +162,7 @@ async def call_prose_agent(
     model: str,
     temperature: float = 0.1,
     max_tokens: int = 3000,
+    api_key: str | None = None,
 ) -> str:
     """
     Wrapper for agents that return prose (not JSON).
@@ -192,15 +204,18 @@ async def call_prose_agent(
         )
 
         try:
-            response = await litellm.acompletion(
-                model=model,
-                messages=[
+            prose_kwargs = {
+                "model": model,
+                "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+            }
+            if api_key:
+                prose_kwargs["api_key"] = api_key
+            response = await litellm.acompletion(**prose_kwargs)
             content = response.choices[0].message.content
 
             if content and content.strip():
@@ -295,22 +310,25 @@ async def call_verification_agent(
     from src.llm.budget_tracker import BudgetTracker  # deferred: avoids import cycle
 
     tracker = await BudgetTracker.get_instance()
-    model = await tracker.get_model_for_agent()
+    choice = await tracker.get_model_for_agent()
 
     try:
         return await call_structured_agent(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
-            model=model,
+            model=choice.model,
             temperature=temperature,
             max_tokens=max_tokens,
+            api_key=choice.api_key,
         )
     except Exception as e:
-        if model == LOCAL_VERIFICATION_MODEL:
+        if choice.model == LOCAL_VERIFICATION_MODEL:
             raise
         logger.warning(
             "Cloud verification failed, falling back to local model",
-            extra={"error": str(e), "fallback": LOCAL_VERIFICATION_MODEL},
+            extra={"error": str(e), "model": choice.model,
+                   "key_index": choice.key_index,
+                   "fallback": LOCAL_VERIFICATION_MODEL},
         )
         return await call_structured_agent(
             system_prompt=system_prompt,
@@ -333,4 +351,7 @@ def active_verification_model() -> str:
     than a hardcoded name that silently goes stale when the backend changes.
     """
     backend = os.getenv("VERIFICATION_BACKEND", "cloud").strip().lower()
-    return LOCAL_VERIFICATION_MODEL if backend == "local" else CLOUD_VERIFICATION_MODEL
+    if backend == "local":
+        return LOCAL_VERIFICATION_MODEL
+    # First rung of the agent ladder — what the selector will try first.
+    return AGENT_LADDER[0]

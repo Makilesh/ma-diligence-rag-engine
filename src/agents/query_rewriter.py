@@ -47,7 +47,8 @@ async def query_rewriter_node(state: AgentState) -> dict:
     )
 
     tracker = await BudgetTracker.get_instance()
-    model = await tracker.get_model_for_agent()
+    choice = await tracker.get_model_for_agent()
+    model = choice.model
 
     user_prompt = QUERY_REWRITER_USER_TEMPLATE.format(
         original_query=state["original_query"],
@@ -65,6 +66,7 @@ async def query_rewriter_node(state: AgentState) -> dict:
         model=model,
         temperature=0.2,  # Slightly higher temp for creative rewrites
         max_tokens=600,
+        api_key=choice.api_key,
     )
 
     rewritten_query = result.get("rewritten_query", state["current_query"])

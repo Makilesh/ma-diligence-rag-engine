@@ -194,7 +194,8 @@ async def quality_assessor_node(state: AgentState) -> dict:
     scores = [c.get("reranker_score", 0.0) for c in chunks[:5]]
 
     tracker = await BudgetTracker.get_instance()
-    model = await tracker.get_model_for_agent()
+    choice = await tracker.get_model_for_agent()
+    model = choice.model
 
     chunks_summary = "\n".join(
         f"Chunk {i+1} (score={c.get('reranker_score', 0):.2f}, "
@@ -220,6 +221,7 @@ async def quality_assessor_node(state: AgentState) -> dict:
         model=model,
         temperature=0.0,
         max_tokens=600,
+        api_key=choice.api_key,
     )
 
     logger.info(
