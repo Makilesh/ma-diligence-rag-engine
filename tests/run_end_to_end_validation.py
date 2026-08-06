@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 import os
 import sys
 import time
@@ -11,6 +12,44 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 API_URL = "http://127.0.0.1:8000"
 DEAL_ID = "aurora_vertex_2024"
+
+# Matches the engine's refusal templates (insufficient_context_node,
+# answer_synthesizer forced refusal, and the synthesis-failure degrade path).
+FULL_REFUSAL_PATTERN = re.compile(
+    r"not have sufficient|unable to find sufficient|insufficient relevant"
+    r"|did not return a usable",
+    re.IGNORECASE,
+)
+
+# Matches an explicit acknowledgement, inside an otherwise normal answer, that
+# the requested fact is not in the corpus.
+#
+# This distinction matters and a binary refused/answered flag gets it wrong. On
+# the control questions the engine did not refuse wholesale — it answered the
+# answerable part and named the gap: "The provided documents do not contain the
+# revenue figures for Q1 FY2024", and for the churn question it reported the NRR
+# and competitor data that *are* present while stating that churn is not. That
+# partial answer is better due-diligence behaviour than a blanket refusal, but a
+# naive metric scores it as a hallucination. What actually matters is whether the
+# engine invented the missing figure, so that is what gets measured.
+ABSENCE_ACKNOWLEDGEMENT_PATTERN = re.compile(
+    r"do(?:es)? not contain|not contain(?:ed)?|no information (?:on|about|regarding)"
+    r"|not (?:disclosed|provided|available|specified|present|included)"
+    r"|not found in the (?:provided )?document",
+    re.IGNORECASE,
+)
+
+
+def declines_to_fabricate(answer: str) -> bool:
+    """True if the answer either refuses outright or names the missing data."""
+    return bool(
+        FULL_REFUSAL_PATTERN.search(answer)
+        or ABSENCE_ACKNOWLEDGEMENT_PATTERN.search(answer)
+    )
+
+
+# Retained for the answerable set, where a full refusal is the meaningful signal.
+REFUSAL_PATTERN = FULL_REFUSAL_PATTERN
 
 async def check_api_health(client: httpx.AsyncClient) -> bool:
     try:
@@ -100,6 +139,18 @@ async def run_queries(client: httpx.AsyncClient, golden_qa_pairs: list[dict]) ->
             agent_trace = res_json.get("agent_trace", [])
             hallucination_flags = res_json.get("hallucination_flags", [])
             
+            # Refusal detection. Control questions (expect_refusal) are
+            # unanswerable by construction: for those, refusing IS the correct
+            # answer, and producing content is a hallucination.
+            refused = bool(FULL_REFUSAL_PATTERN.search(answer))
+            expect_refusal = qa.get("expect_refusal", False)
+            if expect_refusal:
+                # Correct = did not fabricate the missing fact, whether by
+                # refusing outright or by naming the gap inside the answer.
+                refusal_correct = declines_to_fabricate(answer)
+            else:
+                refusal_correct = not refused
+
             # Evaluate facts recalled
             recalled_facts = []
             missing_facts = []
@@ -108,8 +159,12 @@ async def run_queries(client: httpx.AsyncClient, golden_qa_pairs: list[dict]) ->
                     recalled_facts.append(fact)
                 else:
                     missing_facts.append(fact)
-            
-            recall_score = len(recalled_facts) / len(expected_contains)
+
+            if expect_refusal:
+                # No facts to recall; score the behaviour instead.
+                recall_score = 1.0 if refusal_correct else 0.0
+            else:
+                recall_score = len(recalled_facts) / len(expected_contains) if expected_contains else 0.0
             
             # Evaluate citations
             citation_match = False
@@ -138,6 +193,9 @@ async def run_queries(client: httpx.AsyncClient, golden_qa_pairs: list[dict]) ->
                 "recalled_facts": recalled_facts,
                 "missing_facts": missing_facts,
                 "citation_match": citation_match,
+                "refused": refused,
+                "expect_refusal": expect_refusal,
+                "refusal_correct": refusal_correct,
                 "agent_trace": agent_trace
             })
             

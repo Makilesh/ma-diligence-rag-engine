@@ -8,7 +8,7 @@ Only triggered when: query_type == "financial" OR requires_numerical_precision =
 
 import json
 
-from src.llm.litellm_wrapper import call_local_agent
+from src.llm.litellm_wrapper import call_verification_agent, active_verification_model
 from src.llm.prompt_templates.financial_verifier import (
     FINANCIAL_VERIFIER_SYSTEM_PROMPT,
     FINANCIAL_VERIFIER_USER_TEMPLATE,
@@ -89,7 +89,7 @@ async def financial_verifier_node(state: AgentState) -> dict:
         numerical_values=json.dumps(numerical_values, indent=2, default=str),
     )
 
-    result = await call_local_agent(
+    result = await call_verification_agent(
         system_prompt=FINANCIAL_VERIFIER_SYSTEM_PROMPT,
         user_prompt=user_prompt,
         temperature=0.0,
@@ -110,7 +110,7 @@ async def financial_verifier_node(state: AgentState) -> dict:
         "agent_trace": [
             {
                 "agent": "financial_verifier",
-                "model": "ollama/qwen2.5:14b",
+                "model": active_verification_model(),
                 "inconsistencies": len(result.get("inconsistencies", [])),
             }
         ],
