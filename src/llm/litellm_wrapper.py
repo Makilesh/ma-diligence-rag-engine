@@ -11,12 +11,17 @@ Agent 7 (Answer Synthesizer) returns prose and uses call_prose_agent().
 
 import asyncio
 import json
+import os
 
 import litellm
 
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
+
+# Verification-agent model routing. See call_verification_agent().
+CLOUD_VERIFICATION_MODEL = "gemini/gemini-3.1-flash-lite"
+LOCAL_VERIFICATION_MODEL = "ollama/qwen2.5:14b"
 
 # Retry policy for prose calls. Matches the 3-attempt budget the structured
 # agent already used, with linear backoff so a transient upstream 503 gets a
@@ -218,16 +223,31 @@ async def call_prose_agent(
     )
 
 
-async def call_local_agent(
+async def call_verification_agent(
     system_prompt: str,
     user_prompt: str,
     temperature: float = 0.0,
     max_tokens: int = 1500,
 ) -> dict:
     """
-    Wrapper for local Ollama agents (Agents 4 and 8).
-    Always uses the local Qwen2.5:14b model, no budget consumption.
-    Enforces JSON mode.
+    Wrapper for the verification agents (Agent 4 Financial Verifier,
+    Agent 8 Hallucination Validator). Enforces JSON mode.
+
+    Model routing is a deployment choice, not an architectural one, so it is
+    controlled by VERIFICATION_BACKEND:
+
+      "cloud" (default) — Gemini. Higher-quality structured reasoning and no
+          local GPU requirement, which also means the project runs from a clone
+          plus an API key: no 9GB model pull, no CUDA.
+      "local"           — Ollama / Qwen2.5:14b. Keeps verification off the
+          metered API entirely and out of the daily quota, at the cost of a
+          12GB-VRAM machine. This was the original design: verification is the
+          highest-volume agent traffic, so pushing it to a local model was how
+          the pipeline stayed inside the free Gemini tier.
+
+    Both paths are live; the constant only decides the default. If the cloud
+    call fails for any reason, the local model is tried before giving up, so a
+    quota exhaustion degrades rather than fails.
 
     Args:
         system_prompt: System-level instructions.
@@ -236,15 +256,68 @@ async def call_local_agent(
         max_tokens: Maximum output tokens (default 1500).
 
     Returns:
-        Parsed JSON dict from the local model.
+        Parsed JSON dict from the verification model.
 
     Raises:
-        ValueError: If model returns invalid JSON after 3 attempts.
+        ValueError: If every configured model returns invalid JSON.
     """
-    return await call_structured_agent(
-        system_prompt=system_prompt,
-        user_prompt=user_prompt,
-        model="ollama/qwen2.5:14b",
-        temperature=temperature,
-        max_tokens=max_tokens,
-    )
+    backend = os.getenv("VERIFICATION_BACKEND", "cloud").strip().lower()
+
+    if backend == "local":
+        return await call_structured_agent(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            model=LOCAL_VERIFICATION_MODEL,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+
+    # Route through the budget tracker rather than calling Gemini directly.
+    # Verification is now the highest-volume cloud traffic in the pipeline (two
+    # calls per query), so it has to take a rate-limiter slot and debit the daily
+    # quota like every other cloud call — otherwise it would silently blow
+    # through the 15 RPM free-tier limit. get_model_for_agent() already returns
+    # the local model when the quota is spent, which gives cloud-first routing
+    # with automatic local fallback for free.
+    from src.llm.budget_tracker import BudgetTracker  # deferred: avoids import cycle
+
+    tracker = await BudgetTracker.get_instance()
+    model = await tracker.get_model_for_agent()
+
+    try:
+        return await call_structured_agent(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+    except Exception as e:
+        if model == LOCAL_VERIFICATION_MODEL:
+            raise
+        logger.warning(
+            "Cloud verification failed, falling back to local model",
+            extra={"error": str(e), "fallback": LOCAL_VERIFICATION_MODEL},
+        )
+        return await call_structured_agent(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            model=LOCAL_VERIFICATION_MODEL,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+
+
+# Backwards-compatible alias — the verification agents were originally local-only.
+call_local_agent = call_verification_agent
+
+
+def active_verification_model() -> str:
+    """
+    Returns the model string the verification agents will try first.
+
+    Used for the agent trace so the UI reports the model actually in use rather
+    than a hardcoded name that silently goes stale when the backend changes.
+    """
+    backend = os.getenv("VERIFICATION_BACKEND", "cloud").strip().lower()
+    return LOCAL_VERIFICATION_MODEL if backend == "local" else CLOUD_VERIFICATION_MODEL

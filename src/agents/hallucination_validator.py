@@ -7,7 +7,7 @@ JSON mode: response_format={"type": "json_object"}
 
 import json
 
-from src.llm.litellm_wrapper import call_local_agent
+from src.llm.litellm_wrapper import call_verification_agent, active_verification_model
 from src.llm.prompt_templates.hallucination_validator import (
     HALLUCINATION_VALIDATOR_SYSTEM_PROMPT,
     HALLUCINATION_VALIDATOR_USER_TEMPLATE,
@@ -63,7 +63,7 @@ async def hallucination_validator_node(state: AgentState) -> dict:
         citations=json.dumps(state.get("citations", []), indent=2, default=str),
     )
 
-    result = await call_local_agent(
+    result = await call_verification_agent(
         system_prompt=HALLUCINATION_VALIDATOR_SYSTEM_PROMPT,
         user_prompt=user_prompt,
         temperature=0.0,
@@ -91,7 +91,7 @@ async def hallucination_validator_node(state: AgentState) -> dict:
         "agent_trace": [
             {
                 "agent": "hallucination_validator",
-                "model": "ollama/qwen2.5:14b",
+                "model": active_verification_model(),
                 "validation_status": validation_status,
                 "confidence_score": confidence,
                 "flags_count": len(flags),
