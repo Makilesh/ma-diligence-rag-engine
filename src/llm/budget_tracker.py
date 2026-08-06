@@ -57,14 +57,37 @@ class BudgetTracker:
 
     _instance: "BudgetTracker | None" = None
 
-    DAILY_LIMITS: dict[str, int] = {
-        "synthesis_primary": 480,  # gemini-3.1-flash-lite: leave 20 RPD buffer from 500
-        "agent_workhorse": 480,  # gemini-3.1-flash-lite: leave 20 RPD buffer from 500
+    # Requests-per-day ceiling per UPSTREAM MODEL — the quota the provider
+    # actually enforces against the API key.
+    MODEL_DAILY_LIMITS: dict[str, int] = {
+        "gemini/gemini-3.1-flash-lite": 500,
+        "ollama/qwen2.5:14b": 1_000_000,  # local, effectively unlimited
     }
 
-    RPM_LIMITS: dict[str, int] = {
-        "synthesis_primary": 5,
-        "agent_workhorse": 15,
+    # Per-bucket daily allocation. Buckets exist for cost attribution and for the
+    # graceful-degradation ladder (synthesis exhausting first drops synthesis to
+    # the agent model rather than killing the pipeline).
+    #
+    # CRITICAL INVARIANT: for any upstream model, the sum of the bucket
+    # allocations spending against it must not exceed MODEL_DAILY_LIMITS for that
+    # model. This is the same class of bug that _get_rate_limiter fixed for RPM,
+    # one level down: both buckets resolve to gemini-3.1-flash-lite, so 480 + 480
+    # permitted 960 requests/day against a real 500 RPD cap — the client-side
+    # budget would have reported healthy remaining quota while the provider
+    # returned 429s. It stayed latent while verification ran on local Ollama and
+    # only two agents touched Gemini; routing verification to the cloud roughly
+    # doubled cloud calls per query and made it reachable.
+    #
+    # The split reflects MEASURED traffic, not an estimate. Three queries against
+    # the sample data room (two answered, one refused) spent 2 synthesis calls and
+    # 12 agent calls — roughly 1:4, since a refused query never reaches synthesis
+    # while still paying for query intelligence, rewrites and validation. The
+    # allocation is sized so neither bucket starves the other: at 1 synthesis and
+    # 4 agent calls per answered query, both exhaust at ~96 queries/day.
+    # Enforced by test_budget_allocation_respects_model_cap.
+    DAILY_LIMITS: dict[str, int] = {
+        "synthesis_primary": 96,
+        "agent_workhorse": 384,  # 96 + 384 = 480, leaving a 20 RPD buffer under 500
     }
 
     # DO NOT instantiate RateLimiter at class definition time.

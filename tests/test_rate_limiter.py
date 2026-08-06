@@ -103,3 +103,66 @@ class TestSharedModelRateLimiter:
         model = BudgetTracker.BUCKET_MODELS["synthesis_primary"]
 
         assert limiter.rpm_limit == BudgetTracker.MODEL_RPM_LIMITS[model]
+
+
+class TestQuotaAllocationInvariants:
+    """
+    Client-side quotas must never exceed what the provider actually enforces.
+
+    Both budget buckets spend against the same upstream Gemini model, so any
+    per-bucket ceiling has to be checked against the shared model cap rather than
+    trusted on its own. Getting this wrong is silent in the worst way: the budget
+    tracker reports healthy remaining quota while the provider returns 429s.
+    """
+
+    def test_budget_allocation_respects_model_cap(self):
+        """Summed bucket allocations must fit inside each model's real daily cap."""
+        from collections import defaultdict
+        from src.llm.budget_tracker import BudgetTracker
+
+        allocated = defaultdict(int)
+        for bucket, limit in BudgetTracker.DAILY_LIMITS.items():
+            model = BudgetTracker.BUCKET_MODELS.get(bucket, bucket)
+            allocated[model] += limit
+
+        for model, total in allocated.items():
+            cap = BudgetTracker.MODEL_DAILY_LIMITS.get(model)
+            assert cap is not None, f"No provider daily cap declared for {model}"
+            assert total <= cap, (
+                f"Buckets allocate {total} requests/day against {model}, "
+                f"whose provider cap is {cap}. Client-side budget would report "
+                f"remaining quota while the API returns 429."
+            )
+
+    def test_every_bucket_declares_an_upstream_model(self):
+        """A bucket with no declared model silently bypasses the shared-cap check."""
+        from src.llm.budget_tracker import BudgetTracker
+
+        for bucket in BudgetTracker.DAILY_LIMITS:
+            assert bucket in BudgetTracker.BUCKET_MODELS, (
+                f"Bucket {bucket!r} has no BUCKET_MODELS entry, so its spend is "
+                f"not counted against any model's cap."
+            )
+
+    def test_buckets_sharing_a_model_share_one_rate_limiter(self):
+        """
+        Rate limiting is per upstream model, not per bucket.
+
+        Separate limiters per bucket would permit the sum of their RPMs against a
+        single provider quota.
+        """
+        from src.llm.budget_tracker import BudgetTracker
+
+        tracker = BudgetTracker.__new__(BudgetTracker)
+        tracker._rate_limiters = {}
+
+        buckets_on_same_model = [
+            b for b, m in BudgetTracker.BUCKET_MODELS.items()
+            if m == "gemini/gemini-3.1-flash-lite"
+        ]
+        assert len(buckets_on_same_model) >= 2, "Expected shared-model buckets"
+
+        limiters = {id(tracker._get_rate_limiter(b)) for b in buckets_on_same_model}
+        assert len(limiters) == 1, (
+            "Buckets on the same upstream model must share one RateLimiter"
+        )
