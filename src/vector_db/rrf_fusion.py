@@ -129,10 +129,20 @@ def reciprocal_rank_fusion(
     )
 
     if not dense_results and not sparse_results:
-        logger.error(
-            "reciprocal_rank_fusion failed: both result lists empty",
+        # "Nothing matched" is a legitimate retrieval outcome, not a programming
+        # error — a query can be well-formed and simply have no answer in the
+        # data room, and restrictive metadata filters can empty the candidate set
+        # on their own. Raising here turned that into a 500; returning empty lets
+        # the Quality Assessor see zero chunks and take the refusal path, which
+        # is the behaviour the pipeline is designed around.
+        #
+        # Found by a control question ("headcount by international office") whose
+        # answer genuinely does not exist in the corpus.
+        logger.info(
+            "reciprocal_rank_fusion: no candidates from either retriever — "
+            "returning empty for the refusal path",
         )
-        raise ValueError("Both dense and sparse results are empty — cannot perform RRF")
+        return []
 
     scores: dict[str, float] = {}
 

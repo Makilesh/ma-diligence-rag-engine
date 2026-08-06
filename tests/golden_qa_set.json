@@ -11,146 +11,421 @@
       "id": "fin_01",
       "query": "What was Aurora's total revenue in FY2023 and how does it compare to FY2022?",
       "query_type": "financial",
-      "expected_answer_contains": ["$452.8", "$387.1", "17.0%", "growth"],
-      "expected_citations": [{"source_pattern": "aurora_financials", "page_or_section": "Income Statement"}]
+      "expected_answer_contains": [
+        "$452.8",
+        "$387.1",
+        "17.0%",
+        "growth"
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "aurora_financials",
+          "page_or_section": "Income Statement"
+        }
+      ]
     },
     {
       "id": "fin_02",
       "query": "What is the EBITDA and Adjusted EBITDA for FY2023?",
       "query_type": "financial",
-      "expected_answer_contains": ["$92.8", "$97.3", "restructuring", "$4.5"],
-      "expected_citations": [{"source_pattern": "aurora_financials", "page_or_section": "Key Financial Metrics"}]
+      "expected_answer_contains": [
+        "$92.8",
+        "$97.3",
+        "restructuring",
+        "$4.5"
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "aurora_financials",
+          "page_or_section": "Key Financial Metrics"
+        }
+      ]
     },
     {
       "id": "fin_03",
       "query": "What is the company's free cash flow for FY2023 and what were the components?",
       "query_type": "financial",
-      "expected_answer_contains": ["$64.2", "$78.4", "operations", "$14.2", "capital expenditures"],
-      "expected_citations": [{"source_pattern": "aurora_financials", "page_or_section": "Key Financial Metrics"}]
+      "expected_answer_contains": [
+        "$64.2",
+        "$78.4",
+        "operations",
+        "$14.2",
+        "capital expenditures"
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "aurora_financials",
+          "page_or_section": "Key Financial Metrics"
+        }
+      ]
     },
     {
       "id": "fin_04",
       "query": "What is the Net Debt/EBITDA leverage ratio and how has it changed?",
       "query_type": "financial",
-      "expected_answer_contains": ["0.2x", "0.7x", "$20.6", "improved", "deleveraged"],
-      "expected_citations": [{"source_pattern": "aurora_financials", "page_or_section": "Key Financial Metrics"}]
+      "expected_answer_contains": [
+        "0.2x",
+        "0.7x",
+        "$20.6",
+        "improved",
+        "deleveraged"
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "aurora_financials",
+          "page_or_section": "Key Financial Metrics"
+        }
+      ]
     },
     {
       "id": "fin_05",
       "query": "What are the terms of the company's revolving credit facility?",
       "query_type": "financial",
-      "expected_answer_contains": ["$150", "JPMorgan", "SOFR", "225", "June 30, 2026", "3.5x"],
-      "expected_citations": [{"source_pattern": "aurora_financials", "page_or_section": "Note 7"}]
+      "expected_answer_contains": [
+        "$150",
+        "JPMorgan",
+        "SOFR",
+        "225",
+        "June 30, 2026",
+        "3.5x"
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "aurora_financials",
+          "page_or_section": "Note 7"
+        }
+      ]
     },
     {
       "id": "legal_01",
       "query": "What is the per share merger consideration and what premium does it represent?",
       "query_type": "legal",
-      "expected_answer_contains": ["$58.00", "42%", "$40.85", "90-day"],
-      "expected_citations": [{"source_pattern": "merger_agreement", "page_or_section": "Section 1.2"}]
+      "expected_answer_contains": [
+        "$58.00",
+        "42%",
+        "$40.85",
+        "90-day"
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "merger_agreement",
+          "page_or_section": "Section 1.2"
+        }
+      ]
     },
     {
       "id": "legal_02",
       "query": "What are the termination fee provisions?",
       "query_type": "legal",
-      "expected_answer_contains": ["$20.88", "3.0%", "$13.92", "2.0%", "Superior Proposal", "Company Breach"],
-      "expected_citations": [{"source_pattern": "merger_agreement", "page_or_section": "Section 7.2"}]
+      "expected_answer_contains": [
+        "$20.88",
+        "3.0%",
+        "$13.92",
+        "2.0%",
+        "Superior Proposal",
+        "Company Breach"
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "merger_agreement",
+          "page_or_section": "Section 7.2"
+        }
+      ]
     },
     {
       "id": "legal_03",
       "query": "What are the indemnification caps and deductible?",
       "query_type": "legal",
-      "expected_answer_contains": ["$69.6", "10%", "$174.0", "25%", "$3.48", "0.5%", "Fundamental"],
-      "expected_citations": [{"source_pattern": "merger_agreement", "page_or_section": "Article VIII"}]
+      "expected_answer_contains": [
+        "$69.6",
+        "10%",
+        "$174.0",
+        "25%",
+        "$3.48",
+        "0.5%",
+        "Fundamental"
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "merger_agreement",
+          "page_or_section": "Article VIII"
+        }
+      ]
     },
     {
       "id": "legal_04",
       "query": "What pending litigation does the company face?",
       "query_type": "legal",
-      "expected_answer_contains": ["DataFlow Systems", "patent infringement", "$3.5 million", "$8.0 million", "Northern District of California"],
-      "expected_citations": [{"source_pattern": "merger_agreement", "page_or_section": "Section 3.15"}]
+      "expected_answer_contains": [
+        "DataFlow Systems",
+        "patent infringement",
+        "$3.5 million",
+        "$8.0 million",
+        "Northern District of California"
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "merger_agreement",
+          "page_or_section": "Section 3.15"
+        }
+      ]
     },
     {
       "id": "legal_05",
       "query": "What change of control provisions exist in the company's material contracts?",
       "query_type": "legal",
-      "expected_answer_contains": ["Northstar Defense", "$12.4M", "60-day", "Pacific Data", "$8.7M", "terminate", "90 days"],
-      "expected_citations": [{"source_pattern": "merger_agreement", "page_or_section": "Section 9.2"}]
+      "expected_answer_contains": [
+        "Northstar Defense",
+        "$12.4M",
+        "60-day",
+        "Pacific Data",
+        "$8.7M",
+        "terminate",
+        "90 days"
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "merger_agreement",
+          "page_or_section": "Section 9.2"
+        }
+      ]
     },
     {
       "id": "comp_01",
-      "query": "Compare the three bidders — what were their offer ranges and certainty levels?",
+      "query": "Compare the three bidders \u2014 what were their offer ranges and certainty levels?",
       "query_type": "comparative",
-      "expected_answer_contains": ["Vertex", "$55", "$60", "HIGH", "Meridian", "$50", "$54", "MEDIUM", "Atlas", "$48", "$52", "LOW"],
-      "expected_citations": [{"source_pattern": "board_deck", "page_or_section": "Slide 3"}]
+      "expected_answer_contains": [
+        "Vertex",
+        "$55",
+        "$60",
+        "HIGH",
+        "Meridian",
+        "$50",
+        "$54",
+        "MEDIUM",
+        "Atlas",
+        "$48",
+        "$52",
+        "LOW"
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "board_deck",
+          "page_or_section": "Slide 3"
+        }
+      ]
     },
     {
       "id": "comp_02",
       "query": "How do the different valuation methodologies compare?",
       "query_type": "comparative",
-      "expected_answer_contains": ["DCF", "$47", "$63", "Precedent", "$46", "$62", "LBO", "$50", "$61", "Comparable"],
-      "expected_citations": [{"source_pattern": "board_deck", "page_or_section": "Slide 4"}]
+      "expected_answer_contains": [
+        "DCF",
+        "$47",
+        "$63",
+        "Precedent",
+        "$46",
+        "$62",
+        "LBO",
+        "$50",
+        "$61",
+        "Comparable"
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "board_deck",
+          "page_or_section": "Slide 4"
+        }
+      ]
     },
     {
       "id": "comp_03",
       "query": "Compare Aurora's gross margin and operating margin between FY2022 and FY2023.",
       "query_type": "comparative",
-      "expected_answer_contains": ["60.0%", "59.1%", "15.0%", "13.3%", "improved"],
-      "expected_citations": [{"source_pattern": "aurora_financials", "page_or_section": "Income Statement"}]
+      "expected_answer_contains": [
+        "60.0%",
+        "59.1%",
+        "15.0%",
+        "13.3%",
+        "improved"
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "aurora_financials",
+          "page_or_section": "Income Statement"
+        }
+      ]
     },
     {
       "id": "sum_01",
       "query": "Summarize the board's recommendation regarding the strategic alternatives.",
       "query_type": "summary",
-      "expected_answer_contains": ["Vertex Capital", "preferred bidder", "all-cash", "Meridian", "backup", "Atlas", "decline", "unanimous", "7-0"],
-      "expected_citations": [{"source_pattern": "board_deck", "page_or_section": "Slide 5"}]
+      "expected_answer_contains": [
+        "Vertex Capital",
+        "preferred bidder",
+        "all-cash",
+        "Meridian",
+        "backup",
+        "Atlas",
+        "decline",
+        "unanimous",
+        "7-0"
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "board_deck",
+          "page_or_section": "Slide 5"
+        }
+      ]
     },
     {
       "id": "sum_02",
       "query": "What are the key risk factors identified for this transaction?",
       "query_type": "summary",
-      "expected_answer_contains": ["DataFlow", "patent litigation", "customer consent", "Northstar", "Pacific Data", "key employee", "CTO", "$4.5M", "HSR"],
-      "expected_citations": [{"source_pattern": "board_deck", "page_or_section": "Slide 6"}]
+      "expected_answer_contains": [
+        "DataFlow",
+        "patent litigation",
+        "customer consent",
+        "Northstar",
+        "Pacific Data",
+        "key employee",
+        "CTO",
+        "$4.5M",
+        "HSR"
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "board_deck",
+          "page_or_section": "Slide 6"
+        }
+      ]
     },
     {
       "id": "mh_01",
       "query": "What is the relationship between the FY2023 restructuring charge and the Adjusted EBITDA? Where did the restructuring charge come from?",
       "query_type": "multi_hop",
-      "expected_answer_contains": ["$4.5", "restructuring", "Austin development center", "32 employees", "$92.8", "$97.3", "add back"],
+      "expected_answer_contains": [
+        "$4.5",
+        "restructuring",
+        "Austin development center",
+        "32 employees",
+        "$92.8",
+        "$97.3",
+        "add back"
+      ],
       "expected_citations": [
-        {"source_pattern": "aurora_financials", "page_or_section": "Key Financial Metrics"},
-        {"source_pattern": "board_deck", "page_or_section": "Speaker Notes"}
+        {
+          "source_pattern": "aurora_financials",
+          "page_or_section": "Key Financial Metrics"
+        },
+        {
+          "source_pattern": "board_deck",
+          "page_or_section": "Speaker Notes"
+        }
       ]
     },
     {
       "id": "mh_02",
       "query": "What indemnification exposure is tied to the financial statement representations, and how long do those representations survive?",
       "query_type": "multi_hop",
-      "expected_answer_contains": ["$174.0", "25%", "Fundamental Representations", "Section 3.5", "thirty-six", "36 months"],
+      "expected_answer_contains": [
+        "$174.0",
+        "25%",
+        "Fundamental Representations",
+        "Section 3.5",
+        "thirty-six",
+        "36 months"
+      ],
       "expected_citations": [
-        {"source_pattern": "merger_agreement", "page_or_section": "Section 8.1"},
-        {"source_pattern": "merger_agreement", "page_or_section": "Section 8.2"}
+        {
+          "source_pattern": "merger_agreement",
+          "page_or_section": "Section 8.1"
+        },
+        {
+          "source_pattern": "merger_agreement",
+          "page_or_section": "Section 8.2"
+        }
       ]
     },
     {
       "id": "mh_03",
       "query": "How does the DataFlow litigation exposure compare to the merger's indemnification deductible?",
       "query_type": "multi_hop",
-      "expected_answer_contains": ["$3.5", "$8.0", "DataFlow", "$3.48", "deductible", "exceeds"],
+      "expected_answer_contains": [
+        "$3.5",
+        "$8.0",
+        "DataFlow",
+        "$3.48",
+        "deductible",
+        "exceeds"
+      ],
       "expected_citations": [
-        {"source_pattern": "merger_agreement", "page_or_section": "Section 3.15"},
-        {"source_pattern": "merger_agreement", "page_or_section": "Section 8.3"}
+        {
+          "source_pattern": "merger_agreement",
+          "page_or_section": "Section 3.15"
+        },
+        {
+          "source_pattern": "merger_agreement",
+          "page_or_section": "Section 8.3"
+        }
       ]
     },
     {
       "id": "mh_04",
       "query": "What is the implied EV/EBITDA multiple of the Vertex deal based on the agreed price and Aurora's FY2023 EBITDA?",
       "query_type": "multi_hop",
-      "expected_answer_contains": ["$696", "$92.8", "7.5x"],
+      "expected_answer_contains": [
+        "$696",
+        "$92.8",
+        "7.5x"
+      ],
       "expected_citations": [
-        {"source_pattern": "merger_agreement", "page_or_section": "Section 1.2"},
-        {"source_pattern": "aurora_financials", "page_or_section": "Key Financial Metrics"}
+        {
+          "source_pattern": "merger_agreement",
+          "page_or_section": "Section 1.2"
+        },
+        {
+          "source_pattern": "aurora_financials",
+          "page_or_section": "Key Financial Metrics"
+        }
       ]
+    },
+    {
+      "id": "ctrl_01",
+      "query": "What environmental remediation liabilities has Aurora disclosed for its manufacturing sites?",
+      "query_type": "legal",
+      "expect_refusal": true,
+      "why_unanswerable": "No environmental or site-liability disclosure exists anywhere in the corpus.",
+      "expected_answer_contains": [],
+      "expected_citations": []
+    },
+    {
+      "id": "ctrl_02",
+      "query": "What were Aurora's quarterly revenue figures for Q1 and Q2 of FY2024?",
+      "query_type": "financial",
+      "expect_refusal": true,
+      "why_unanswerable": "Financials cover FY2022-FY2023 only; no FY2024 quarterly data exists.",
+      "expected_answer_contains": [],
+      "expected_citations": []
+    },
+    {
+      "id": "ctrl_03",
+      "query": "How many employees does Aurora have in each of its international offices?",
+      "query_type": "summary",
+      "expect_refusal": true,
+      "why_unanswerable": "No headcount-by-geography breakdown appears in any document.",
+      "expected_answer_contains": [],
+      "expected_citations": []
+    },
+    {
+      "id": "ctrl_04",
+      "query": "Compare Aurora's customer churn rate against its three closest competitors.",
+      "query_type": "comparative",
+      "expect_refusal": true,
+      "why_unanswerable": "No churn metrics and no competitor financials are in the data room.",
+      "expected_answer_contains": [],
+      "expected_citations": []
     }
-  ]
+  ],
+  "control_questions_note": "ctrl_* entries are unanswerable from this corpus by construction. They measure refusal precision: the engine must decline them. Answering one is a hallucination, and is a worse failure than refusing an answerable query."
 }

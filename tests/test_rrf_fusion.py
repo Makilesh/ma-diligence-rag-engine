@@ -88,12 +88,19 @@ class TestReciprocalRankFusion:
         ids_sparse = [r[0] for r in result_sparse_heavy[:3]]
         assert ids_dense != ids_sparse or len(sample_dense_results) == len(sample_sparse_results)
 
-    def test_rrf_empty_raises(self):
-        """Both lists empty raises ValueError."""
+    def test_rrf_empty_returns_empty(self):
+        """
+        Both lists empty returns [] rather than raising.
+
+        "Nothing matched" is a legitimate retrieval outcome — a well-formed query
+        whose answer is not in the data room, or a metadata filter that emptied
+        the candidate set. Raising turned that into a 500; returning empty lets
+        the Quality Assessor see zero chunks and take the refusal path the
+        pipeline is designed around.
+        """
         from src.vector_db.rrf_fusion import reciprocal_rank_fusion
 
-        with pytest.raises(ValueError, match="empty"):
-            reciprocal_rank_fusion([], [])
+        assert reciprocal_rank_fusion([], []) == []
 
     def test_rrf_one_empty_list(self, sample_dense_results):
         """One empty list still works — results from non-empty list only."""
