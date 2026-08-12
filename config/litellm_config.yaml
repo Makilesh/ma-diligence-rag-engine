@@ -24,10 +24,11 @@
 #   gemini-3.5-flash           5    250K       20    synthesis
 #   gemini-3-flash             5    250K       20    synthesis
 #   gemini-2.5-flash           5    250K       20    synthesis
-#   gemini-3.5-flash-lite     15    250K      500    agents (only volume model)
+#   gemini-3.5-flash-lite     15    250K      500    agents (volume tier)
+#   gemini-3.1-flash-lite     15    250K      500    agents (volume tier)
 #   gemini-2.5-flash-lite     10    250K       20    agents (overflow)
 #
-# Exactly one model can sustain traffic. Every reasoning-grade model is capped
+# Only the Lite tier can sustain traffic. Every reasoning-grade model is capped
 # at 20 requests/day, which is the single fact that dictates the routing below.
 
 routing:
@@ -41,6 +42,7 @@ routing:
     - gemini/gemini-3-flash
     - gemini/gemini-2.5-flash
     - gemini/gemini-3.5-flash-lite
+    - gemini/gemini-3.1-flash-lite
     - ollama/qwen2.5:14b
 
   # ~4 calls per query doing classification, rewriting, quality assessment and
@@ -50,6 +52,7 @@ routing:
   # unavailable to synthesis, which is where that quality actually matters.
   agent_ladder:
     - gemini/gemini-3.5-flash-lite
+    - gemini/gemini-3.1-flash-lite
     - gemini/gemini-2.5-flash-lite
     - ollama/qwen2.5:14b
 
@@ -64,7 +67,7 @@ routing:
 # Selection drains one key on a given model before trying the next key on the
 # SAME model, and only steps down a rung once every key is spent — so answer
 # quality degrades last, not first. With two keys that is ~152 reasoning-grade
-# syntheses before any downgrade, then ~950 lite calls, then local.
+# syntheses before any downgrade, then ~1,900 lite calls, then local.
 
 sampling:
   synthesis:

@@ -21,13 +21,15 @@ dictates the whole routing strategy:
     gemini-3.5-flash           5    250K       20
     gemini-3-flash             5    250K       20
     gemini-2.5-flash           5    250K       20
-    gemini-3.5-flash-lite     15    250K      500     <- the only one with volume
+    gemini-3.5-flash-lite     15    250K      500     <- volume
+    gemini-3.1-flash-lite     15    250K      500     <- volume
     gemini-2.5-flash-lite     10    250K       20
 
-Exactly one model can sustain real traffic. Every reasoning-grade model is
-capped at 20 requests/day. A pipeline that spends ~4 agent calls and 1 synthesis
-call per query therefore cannot put agent traffic on a reasoning model at all —
-five queries would exhaust it. This is why routing is split into two ladders:
+Only the Lite tier has volume, and only two models in it. Every reasoning-grade
+model is capped at 20 requests/day. A pipeline that spends ~4 agent calls and 1
+synthesis call per query therefore cannot put agent traffic on a reasoning model
+at all — five queries would exhaust it. This is why routing is split into two
+ladders:
 
   * AGENT_LADDER   — high volume, low reasoning demand (query classification,
                      rewriting, quality assessment, validation). Must sit on the
@@ -71,6 +73,7 @@ MODEL_LIMITS: dict[str, ModelLimits] = {
     "gemini/gemini-3-flash":        ModelLimits(rpm=5,  tpm=250_000, rpd=20,  reasoning=True),
     "gemini/gemini-2.5-flash":      ModelLimits(rpm=5,  tpm=250_000, rpd=20,  reasoning=True),
     "gemini/gemini-3.5-flash-lite": ModelLimits(rpm=15, tpm=250_000, rpd=500, reasoning=False),
+    "gemini/gemini-3.1-flash-lite": ModelLimits(rpm=15, tpm=250_000, rpd=500, reasoning=False),
     "gemini/gemini-2.5-flash-lite": ModelLimits(rpm=10, tpm=250_000, rpd=20,  reasoning=False),
     # Local fallback. Not provider-metered; the numbers just mean "effectively
     # unlimited" so the same accounting code path works without special-casing.
@@ -94,6 +97,7 @@ SYNTHESIS_LADDER: list[str] = [
     "gemini/gemini-3-flash",
     "gemini/gemini-2.5-flash",
     "gemini/gemini-3.5-flash-lite",
+    "gemini/gemini-3.1-flash-lite",
     LOCAL_MODEL,
 ]
 
@@ -104,6 +108,7 @@ SYNTHESIS_LADDER: list[str] = [
 # five queries and then be unavailable to synthesis, which actually needs them.
 AGENT_LADDER: list[str] = [
     "gemini/gemini-3.5-flash-lite",
+    "gemini/gemini-3.1-flash-lite",
     "gemini/gemini-2.5-flash-lite",
     LOCAL_MODEL,
 ]
