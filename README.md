@@ -124,10 +124,13 @@ The Gemini free tier is lopsided in a way that dictates the entire routing desig
 | `gemini-3.5-flash` | 5 | 20 | Synthesis |
 | `gemini-3-flash` | 5 | 20 | Synthesis |
 | `gemini-2.5-flash` | 5 | 20 | Synthesis |
-| `gemini-3.5-flash-lite` | 15 | **500** | Agents — the only model with volume |
+| `gemini-3.5-flash-lite` | 15 | **500** | Agents — volume tier |
+| `gemini-3.1-flash-lite` | 15 | **500** | Agents — volume tier |
 | `gemini-2.5-flash-lite` | 10 | 20 | Agent overflow |
 
-**Exactly one model can sustain traffic.** Every reasoning-grade model is capped at 20 requests/day. A query spends ~4 agent calls (classification, rewriting, quality assessment, validation) and 1 synthesis call — so putting agent traffic on a reasoning model would drain it in five queries, and it would then be unavailable to synthesis, which is the only place reasoning quality reaches the user.
+**Only the Lite tier can sustain traffic.** Every reasoning-grade model is capped at 20 requests/day. A query spends ~4 agent calls (classification, rewriting, quality assessment, validation) and 1 synthesis call — so putting agent traffic on a reasoning model would drain it in five queries, and it would then be unavailable to synthesis, which is the only place reasoning quality reaches the user.
+
+Per API key that works out to **969 agent calls/day (~242 queries)** and **76 syntheses on reasoning-grade models** before any downgrade.
 
 Hence two ladders, both defined in [`src/llm/model_registry.py`](src/llm/model_registry.py):
 
