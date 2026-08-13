@@ -224,14 +224,15 @@ The set is **41 questions: 35 answerable** across financial, legal, comparative,
 | Metric | Result |
 |---|---|
 | Completed without an unhandled exception | 41/41 |
-| Answerable questions answered | 34/35 |
-| Mean fact recall | 78.2% |
-| Answers containing every expected fact | 20/35 |
-| Citation-source match | 28/35 |
+| Answerable questions answered | 35/35 |
+| Mean fact recall | 86.6% |
+| Answers containing every expected fact | 24/35 |
+| Citation-source match | 32/35 |
+| Answers flagged as unsupported by the validator | 0/35 |
 | Control questions where the engine did **not** fabricate | 6/6 |
-| Mean latency per query | 35.3s |
+| Mean latency per query | 27.1s |
 
-Per-type recall: financial 90%, comparative 82%, legal 77%, multi-hop 72%, summary 67%. Synthesis runs at temperature 0.1, so recall moves a few points between runs. Full per-query breakdown, including every answer verbatim, in [`RESULTS.md`](RESULTS.md).
+Per-type recall: legal 100%, financial 88%, multi-hop 84%, comparative 80%, summary 72%. Synthesis runs at temperature 0.1, so recall moves a few points between runs. Full per-query breakdown, including every answer verbatim, in [`RESULTS.md`](RESULTS.md).
 
 **Three defects found by measurement rather than inspection.** Each was invisible to code review — the pipeline ran, returned plausible output, and logged no error:
 
@@ -239,7 +240,9 @@ Per-type recall: financial 90%, comparative 82%, legal 77%, multi-hop 72%, summa
 2. **An LLM's guessed `document_category` was applied as a hard filter.** When the guess was wrong, the answer was outside the search space and the rewrite loop could not recover it. Now relaxed on retry.
 3. **The hallucination validator saw less evidence than the writer.** It judged each chunk truncated to 500 characters while the synthesizer used the full chunk plus parent context, so it flagged correctly-sourced figures as unsupported — including several answers with 100% fact recall. Giving it the same context the writer had eliminated the false flags entirely.
 
-**The refusal path is a deliberate safety feature, not something tuned away.** On all 6 control questions the engine declined to invent the missing figure — and notably by *partial* answer rather than blanket refusal: asked to compare churn against competitors, it reported the retention and competitor data that exist and explicitly stated that churn is not in the data room. The single unanswered question is a genuine retrieval failure, correctly refused rather than guessed.
+**The refusal path is a deliberate safety feature, not something tuned away.** On all 6 control questions the engine declined to invent the missing figure — and notably by *partial* answer rather than blanket refusal: asked to compare churn against competitors, it reported the retention and competitor data that exist and explicitly stated that churn is not in the data room.
+
+**Where it is still weak, and why that is the right failure.** The two lowest-scoring answers both come from the same limitation: a query needing facts from two documents retrieves one facet and misses the other. Asked for the implied EV/EBITDA multiple, the engine found FY2023 EBITDA but not the per-share price, and answered *"cannot be calculated because the agreed purchase price is not provided in the context"* — rather than inventing a multiple. Asked for the credit facility terms it returned the commitment, dates and drawn balance but missed the agent bank, the SOFR margin and the leverage covenant, which sit in later sections of the same document. Both are recall failures that the design converts into visible gaps instead of confident errors. Sub-query decomposition is the fix and is on the roadmap.
 
 **Three times the measurement was wrong rather than the system.** Each was caught by inspecting answers the metric had marked as failures: a binary refused/answered flag scored a correct partial answer as a hallucination; the golden set docked recall for writing "thirty-six months" instead of "36 months"; and markdown bold markers broke substring matching, so `contains **no information** regarding` was scored as a fabrication. Fact matching and refusal detection now normalise emphasis and accept equivalent surface forms. Re-scoring the same answers with the corrected matcher changed recall by roughly two points and moved control precision from 5/6 to 6/6 — a reminder that on a small set the harness is as likely to be wrong as the pipeline.
 
