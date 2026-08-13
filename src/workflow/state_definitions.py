@@ -36,6 +36,11 @@ class AgentState(TypedDict):
     # ==================== Parsed Signals ====================
     parsed_intent: dict
     extracted_filters: dict  # {fiscal_year, document_category, is_current_version, ...}
+    # Atomic sub-questions for multi-hop / comparative queries, each asking for
+    # one distinct fact. Distinct from parsed_intent["query_expansions"], which
+    # are rephrasings of the whole question. Retrieval runs one pass per entry
+    # and guarantees each a share of the final context — see retrieval_executor.
+    sub_questions: list[str]
 
     # ==================== Retrieval ====================
     retrieval_config: dict  # From deterministic lookup — NOT from an LLM call

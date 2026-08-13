@@ -81,10 +81,30 @@ async def query_intelligence_node(state: AgentState) -> dict:
         },
     )
 
+    # Decomposition is only meaningful where the answer spans several facts.
+    # Accepting it for pointed queries would multiply retrieval passes for no
+    # gain, so it is gated on query type as well as on the model returning any.
+    sub_questions = result.get("sub_questions") or []
+    if not isinstance(sub_questions, list):
+        sub_questions = []
+    sub_questions = [
+        s.strip() for s in sub_questions
+        if isinstance(s, str) and s.strip()
+    ][:MAX_SUB_QUESTIONS]
+    if query_type not in DECOMPOSABLE_QUERY_TYPES:
+        sub_questions = []
+
+    if sub_questions:
+        logger.info(
+            "Agent 1: query decomposed into sub-questions",
+            extra={"query_type": query_type, "count": len(sub_questions)},
+        )
+
     return {
         "query_type": query_type,
         "parsed_intent": result,
         "extracted_filters": extracted_filters,
+        "sub_questions": sub_questions,
         "current_query": result.get("reformulated_query", query),
         "rewrite_iteration": 0,
         "agent_trace": [
