@@ -44,9 +44,14 @@ class AgentState(TypedDict):
 
     # ==================== Retrieval ====================
     retrieval_config: dict  # From deterministic lookup — NOT from an LLM call
+    # Retained for shape compatibility but no longer populated: with sub-question
+    # decomposition there are N dense/sparse/fused rankings per query, one per
+    # retrieval pass, so a single list would be arbitrary. retrieval_passes
+    # carries the equivalent diagnostic signal.
     dense_results: list[dict]
     sparse_results: list[dict]
     fused_results: list[dict]
+    retrieval_passes: list[dict]  # [{query, candidates}] — one entry per pass
     reranked_results: list[dict]
     expanded_context: list[dict]  # Parent + sibling chunks after expansion
 

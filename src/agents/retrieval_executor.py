@@ -262,11 +262,33 @@ async def retrieval_executor_node(state: AgentState) -> dict:
     else:
         pass_config = config
 
+    # A sub-question must not inherit the parent's document_category.
+    #
+    # That filter is Agent 1's guess at which document answers the question as a
+    # whole. A sub-question exists precisely because it asks for a *different*
+    # fact, which usually lives somewhere else — so applying the parent's guess
+    # to it re-creates the problem decomposition was meant to solve.
+    #
+    # Measured: "implied EV/EBITDA multiple" decomposed correctly into share
+    # price, share count and FY2023 EBITDA, but every pass inherited one category
+    # filter and all three returned chunks from the same document. The engine
+    # then reported it could not compute the multiple — decomposition had done
+    # its job and the filter had thrown the result away.
+    #
+    # deal_id, version and PII filters still apply to every pass: those are
+    # isolation and compliance constraints, not relevance hints.
+    sub_question_filters = {
+        k: v for k, v in metadata_filters.items() if k != "document_category"
+    }
+
+    def _filters_for(index: int) -> dict:
+        return metadata_filters if index == 0 else sub_question_filters
+
     # Passes are independent, so run them concurrently. The embedding and
     # reranking thread pools are bounded, so this queues rather than oversubscribes.
     per_query_results = await asyncio.gather(*[
-        _retrieve_for_query(q, pass_config, deal_id, metadata_filters)
-        for q in retrieval_queries
+        _retrieve_for_query(q, pass_config, deal_id, _filters_for(i))
+        for i, q in enumerate(retrieval_queries)
     ])
 
     if len(retrieval_queries) == 1:

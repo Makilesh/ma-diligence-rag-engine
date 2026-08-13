@@ -340,3 +340,153 @@ class TestCitationSelection:
 
         assert _select_cited_chunks("", self._chunks()) == []
         assert _select_cited_chunks(None, self._chunks()) == []
+
+
+class TestSubQuestionDecomposition:
+    """
+    Multi-hop queries must retrieve each facet separately and keep all of them.
+
+    The failure this addresses: asked for an implied EV/EBITDA multiple, the
+    engine retrieved EBITDA passages but not the share price, because the
+    reranker scores every candidate against the whole question and a passage
+    holding only a price scores poorly against "what multiple is implied". Query
+    expansion cannot fix it — rephrasing the question five ways still never asks
+    for the price.
+    """
+
+    @staticmethod
+    def _chunk(cid, score, source="d.txt"):
+        return {"chunk_id": cid, "reranker_score": score, "source_file": source,
+                "text": cid}
+
+    def test_weaker_facet_survives_a_dominant_one(self):
+        """
+        The core guarantee.
+
+        Facet A's passages all outscore facet B's. A global top-3 would return
+        only A — which is precisely the original bug. The quota merge must keep
+        B represented.
+        """
+        from src.agents.retrieval_executor import _merge_by_quota
+
+        ebitda = [self._chunk("e1", 0.99), self._chunk("e2", 0.97),
+                  self._chunk("e3", 0.95)]
+        price = [self._chunk("p1", 0.42), self._chunk("p2", 0.31)]
+
+        merged = _merge_by_quota([ebitda, price], final_top_k=3)
+        ids = {c["chunk_id"] for c in merged}
+
+        assert len(merged) == 3
+        assert ids & {"p1", "p2"}, "the weaker facet must not be crowded out"
+        assert ids & {"e1", "e2", "e3"}
+
+    def test_global_top_k_would_have_dropped_it(self):
+        """Documents why a plain union is not sufficient."""
+        from src.agents.retrieval_executor import _merge_by_quota
+
+        ebitda = [self._chunk("e1", 0.99), self._chunk("e2", 0.97),
+                  self._chunk("e3", 0.95)]
+        price = [self._chunk("p1", 0.42)]
+
+        naive = sorted(ebitda + price,
+                       key=lambda c: c["reranker_score"], reverse=True)[:3]
+        assert "p1" not in {c["chunk_id"] for c in naive}
+
+        merged = _merge_by_quota([ebitda, price], final_top_k=3)
+        assert "p1" in {c["chunk_id"] for c in merged}
+
+    def test_duplicates_keep_their_best_score(self):
+        """A passage found by two sub-questions is ranked by its strongest match."""
+        from src.agents.retrieval_executor import _merge_by_quota
+
+        a = [self._chunk("shared", 0.40)]
+        b = [self._chunk("shared", 0.90)]
+
+        merged = _merge_by_quota([a, b], final_top_k=5)
+        assert len(merged) == 1
+        assert merged[0]["reranker_score"] == 0.90
+
+    def test_respects_the_context_budget(self):
+        from src.agents.retrieval_executor import _merge_by_quota
+
+        lists = [[self._chunk(f"{p}{i}", 0.5) for i in range(10)]
+                 for p in ("a", "b", "c")]
+        assert len(_merge_by_quota(lists, final_top_k=6)) == 6
+
+    def test_handles_empty_and_uneven_passes(self):
+        """A sub-question that retrieved nothing must not break the merge."""
+        from src.agents.retrieval_executor import _merge_by_quota
+
+        merged = _merge_by_quota([[], [self._chunk("x", 0.5)], []], final_top_k=4)
+        assert [c["chunk_id"] for c in merged] == ["x"]
+        assert _merge_by_quota([], final_top_k=4) == []
+        assert _merge_by_quota([[], []], final_top_k=4) == []
+
+    def test_single_pass_is_unchanged(self):
+        """Pointed queries must behave exactly as before decomposition existed."""
+        from src.agents.retrieval_executor import _merge_by_quota
+
+        only = [self._chunk("a", 0.9), self._chunk("b", 0.8), self._chunk("c", 0.7)]
+        merged = _merge_by_quota([only], final_top_k=2)
+        assert [c["chunk_id"] for c in merged] == ["a", "b"]
+
+    def test_decomposition_is_gated_by_query_type(self):
+        """
+        Pointed lookups must not be decomposed.
+
+        Each sub-question costs a full retrieval pass, so decomposing a question
+        answerable from one passage buys nothing and multiplies latency.
+        """
+        from src.agents.query_intelligence import DECOMPOSABLE_QUERY_TYPES
+
+        assert "multi_hop" in DECOMPOSABLE_QUERY_TYPES
+        assert "comparative" in DECOMPOSABLE_QUERY_TYPES
+        assert "financial" not in DECOMPOSABLE_QUERY_TYPES
+        assert "legal" not in DECOMPOSABLE_QUERY_TYPES
+        assert "summary" not in DECOMPOSABLE_QUERY_TYPES
+
+    @pytest.mark.asyncio
+    async def test_sub_questions_do_not_inherit_the_category_filter(self, monkeypatch):
+        """
+        A sub-question targets a different fact, usually in a different document.
+
+        Applying the parent's document_category guess to it re-creates the very
+        problem decomposition solves. Measured: an EV/EBITDA query decomposed
+        correctly into price, share count and EBITDA, but all three passes
+        inherited one category filter and returned chunks from a single document.
+        """
+        import numpy as np
+        import src.agents.retrieval_executor as rx
+
+        seen: list[dict] = []
+
+        async def fake_retrieve(query, config, deal_id, metadata_filters):
+            seen.append({"query": query, "filters": dict(metadata_filters)})
+            return []
+
+        monkeypatch.setattr(rx, "_retrieve_for_query", fake_retrieve)
+        monkeypatch.setattr(rx, "expand_context",
+                            lambda **kw: _coro([]))
+
+        await rx.retrieval_executor_node({
+            "current_query": "implied EV/EBITDA multiple",
+            "query_type": "multi_hop",
+            "parsed_intent": {},
+            "deal_id": "d1",
+            "include_pii": False,
+            "rewrite_iteration": 0,
+            "retrieval_config": {},
+            "extracted_filters": {"document_category": "financial"},
+            "sub_questions": ["What is the per-share price?", "What is FY2023 EBITDA?"],
+        })
+
+        assert len(seen) == 3, "parent query plus one pass per sub-question"
+
+        # Parent keeps the filter — it buys precision on the question as asked.
+        assert seen[0]["filters"].get("document_category") == "financial"
+
+        # Sub-questions must be free to search the whole data room.
+        for pass_ in seen[1:]:
+            assert "document_category" not in pass_["filters"]
+            # but isolation and compliance filters still apply
+            assert pass_["filters"]["include_pii"] is False

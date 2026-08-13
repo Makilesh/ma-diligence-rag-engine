@@ -266,10 +266,12 @@ async def run_query(
         "query_type": "summary",  # Will be overwritten by Agent 1
         "parsed_intent": {},
         "extracted_filters": {},
+        "sub_questions": [],
         "retrieval_config": {},
         "dense_results": [],
         "sparse_results": [],
         "fused_results": [],
+        "retrieval_passes": [],
         "reranked_results": [],
         "expanded_context": [],
         "context_quality_score": 0.0,
