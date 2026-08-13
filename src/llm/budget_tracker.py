@@ -96,8 +96,12 @@ class BudgetTracker:
     # scattered across three constants.
     SLOT_SEPARATOR = "::"
 
-    @staticmethod
-    def _load_api_keys() -> list[str]:
+    # Shortest plausible provider API key. Purely a fragment filter — it does
+    # not validate a key, it rejects things that cannot possibly be one.
+    MIN_API_KEY_LENGTH = 30
+
+    @classmethod
+    def _load_api_keys(cls) -> list[str]:
         """
         Collects Gemini API keys from the environment, in priority order.
 
@@ -132,7 +136,28 @@ class BudgetTracker:
 
         seen: set[str] = set()
         ordered = [k for k in keys if not (k in seen or seen.add(k))]
-        return ordered
+
+        # Drop fragments loudly rather than routing to them.
+        #
+        # Comma-splitting is only safe if no key contains a comma. A malformed or
+        # truncated paste produces a short fragment that looks like a key to the
+        # selector, which then allocates it quota, rotates onto it, and burns a
+        # request discovering it is invalid — on every rung of the ladder. A
+        # length floor cannot validate a key, but it catches the fragment case
+        # that actually occurs, and warning beats silently ignoring input the
+        # user believed they had configured.
+        valid, rejected = [], []
+        for k in ordered:
+            (valid if len(k) >= cls.MIN_API_KEY_LENGTH else rejected).append(k)
+
+        for k in rejected:
+            logger.warning(
+                "Ignoring malformed API key entry — too short to be a valid key. "
+                "Check for a stray comma or a truncated paste in GEMINI_API_KEYS.",
+                extra={"length": len(k), "starts_with": k[:6]},
+            )
+
+        return valid
 
     def _slot(self, key_index: int, model: str) -> str:
         """Composite accounting identifier for one (API key, model) pair."""
