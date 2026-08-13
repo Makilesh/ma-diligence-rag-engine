@@ -217,22 +217,21 @@ python tests/run_end_to_end_validation.py
 
 ## Results & Validation
 
-Validated against a synthetic data room (financial statements, merger agreement, board deck) using a hand-built golden Q&A set.
+Validated against a synthetic data room of **9 documents (~66K tokens)** — financial statements, merger agreement, board deck, quality of earnings report, customer contracts, employment and retention schedule, IP portfolio and litigation schedule, credit agreement, and a regulatory/privacy memo — using a hand-built golden Q&A set.
 
-The set is **23 questions: 19 answerable** across financial, legal, comparative, summary and multi-hop, plus **4 unanswerable control questions** whose answers are absent from the corpus by construction. The controls exist so the answer rate is falsifiable — without them, "never refuses" and "always finds the answer" look identical.
+The set is **41 questions: 35 answerable** across financial, legal, comparative, summary and multi-hop, plus **6 unanswerable control questions** whose answers are absent from the corpus by construction. Ten of the answerable questions are multi-hop, requiring facts combined across two or more documents. The controls exist so the answer rate is falsifiable — without them, "never refuses" and "always finds the answer" look identical.
 
 | Metric | Result |
 |---|---|
-| Completed without an unhandled exception | 23/23 |
-| Answerable questions answered | 17/19 |
-| Mean fact recall | 81.4% |
-| Answers containing every expected fact | 13/19 |
-| Citation-source match | 16/19 |
-| Answers flagged by the hallucination validator | 0/19 |
-| Control questions where the engine did **not** fabricate | 4/4 |
-| Mean latency per query | 41.5s |
+| Completed without an unhandled exception | 41/41 |
+| Answerable questions answered | 34/35 |
+| Mean fact recall | 78.2% |
+| Answers containing every expected fact | 20/35 |
+| Citation-source match | 28/35 |
+| Control questions where the engine did **not** fabricate | 6/6 |
+| Mean latency per query | 35.3s |
 
-Per-type recall: legal and comparative 100%, financial 76%, multi-hop 64%, summary 56%. Synthesis runs at temperature 0.1, so recall moves a few points between runs. Full per-query breakdown, including every answer verbatim, in [`RESULTS.md`](RESULTS.md).
+Per-type recall: financial 90%, comparative 82%, legal 77%, multi-hop 72%, summary 67%. Synthesis runs at temperature 0.1, so recall moves a few points between runs. Full per-query breakdown, including every answer verbatim, in [`RESULTS.md`](RESULTS.md).
 
 **Three defects found by measurement rather than inspection.** Each was invisible to code review — the pipeline ran, returned plausible output, and logged no error:
 
@@ -240,11 +239,13 @@ Per-type recall: legal and comparative 100%, financial 76%, multi-hop 64%, summa
 2. **An LLM's guessed `document_category` was applied as a hard filter.** When the guess was wrong, the answer was outside the search space and the rewrite loop could not recover it. Now relaxed on retry.
 3. **The hallucination validator saw less evidence than the writer.** It judged each chunk truncated to 500 characters while the synthesizer used the full chunk plus parent context, so it flagged correctly-sourced figures as unsupported — including several answers with 100% fact recall. Giving it the same context the writer had eliminated the false flags entirely.
 
-**The refusal path is a deliberate safety feature, not something tuned away.** On all 4 control questions the engine declined to invent the missing figure — and notably by *partial* answer rather than blanket refusal: asked to compare churn against competitors, it reported the retention and competitor data that exist and explicitly stated that churn is not in the data room. The 2 unanswered questions are genuine retrieval failures, correctly refused rather than guessed.
+**The refusal path is a deliberate safety feature, not something tuned away.** On all 6 control questions the engine declined to invent the missing figure — and notably by *partial* answer rather than blanket refusal: asked to compare churn against competitors, it reported the retention and competitor data that exist and explicitly stated that churn is not in the data room. The single unanswered question is a genuine retrieval failure, correctly refused rather than guessed.
 
-**On latency.** Synthesis now runs on `gemini-3.6-flash`, which is capped at 5 RPM — so the rate limiter paces harder than it did when synthesis sat on a 15 RPM Lite model, and mean latency is ~41s. That is a deliberate trade: better reasoning on the one call whose quality reaches the user, paid for in wall-clock. `VERIFICATION_BACKEND=local` moves the two verification agents back to Qwen2.5-14B — quota-free but slower, and requires a 12GB-VRAM host. Both paths are live, and the cloud path falls back to local automatically when quota is exhausted.
+**Three times the measurement was wrong rather than the system.** Each was caught by inspecting answers the metric had marked as failures: a binary refused/answered flag scored a correct partial answer as a hallucination; the golden set docked recall for writing "thirty-six months" instead of "36 months"; and markdown bold markers broke substring matching, so `contains **no information** regarding` was scored as a fabrication. Fact matching and refusal detection now normalise emphasis and accept equivalent surface forms. Re-scoring the same answers with the corrected matcher changed recall by roughly two points and moved control precision from 5/6 to 6/6 — a reminder that on a small set the harness is as likely to be wrong as the pipeline.
 
-**Scope, stated plainly:** this is a 3-document synthetic data room (~23K tokens). These numbers show the pipeline works end to end and that the refusal path holds; they are not evidence of behaviour at data-room scale. Expanding the corpus is the top roadmap item.
+**On latency.** Synthesis runs on `gemini-3.6-flash`, capped at 5 RPM, so the rate limiter paces harder than it would on a 15 RPM Lite model. That is a deliberate trade: better reasoning on the one call whose quality reaches the user, paid for in wall-clock. `VERIFICATION_BACKEND=local` moves the two verification agents back to Qwen2.5-14B — quota-free but slower, requiring a 12GB-VRAM host. Both paths are live, and the cloud path falls back to local automatically when quota is exhausted.
+
+**Scope, stated plainly:** this is a synthetic data room of 9 documents (~66K tokens), not a real one. It is large enough that retrieval must discriminate across documents — the multi-hop questions each require combining two or more — but a production data room is orders of magnitude larger, and these numbers should not be read as evidence of behaviour at that scale.
 
 ---
 

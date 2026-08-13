@@ -33,11 +33,26 @@ FULL_REFUSAL_PATTERN = re.compile(
 # naive metric scores it as a hallucination. What actually matters is whether the
 # engine invented the missing figure, so that is what gets measured.
 ABSENCE_ACKNOWLEDGEMENT_PATTERN = re.compile(
-    r"do(?:es)? not contain|not contain(?:ed)?|no information (?:on|about|regarding)"
-    r"|not (?:disclosed|provided|available|specified|present|included)"
-    r"|not found in the (?:provided )?document",
+    r"do(?:es)? not contain|not contain(?:ed)?"
+    r"|no (?:information|mention|mentions|disclosure|disclosures|reference|record|records|data)"
+    r"|not (?:disclosed|provided|available|specified|present|included|addressed)"
+    r"|not found in the (?:provided )?document"
+    r"|entirely absent|are absent|is absent",
     re.IGNORECASE,
 )
+
+# Markdown emphasis has to come out before matching. The model bolds the
+# operative phrase, so "contains **no information** regarding" is not a
+# contiguous substring anything a plain pattern can match — and a control
+# question the engine had correctly declined got scored as a fabrication purely
+# because of the asterisks. That is the third time a metric here measured
+# formatting rather than behaviour, so normalisation now lives in one place.
+_MARKDOWN_EMPHASIS = re.compile(r"[*_`]+")
+
+
+def normalise_for_matching(text: str) -> str:
+    """Strips markdown emphasis and collapses whitespace for substring matching."""
+    return " ".join(_MARKDOWN_EMPHASIS.sub("", text or "").split())
 
 
 def fact_present(fact, answer: str) -> bool:
@@ -60,16 +75,17 @@ def fact_present(fact, answer: str) -> bool:
     Returns:
         True if the fact (in any accepted form) is present.
     """
-    haystack = " ".join(answer.lower().split())
+    haystack = normalise_for_matching(answer).lower()
     variants = [fact] if isinstance(fact, str) else list(fact)
-    return any(" ".join(str(v).lower().split()) in haystack for v in variants)
+    return any(normalise_for_matching(str(v)).lower() in haystack for v in variants)
 
 
 def declines_to_fabricate(answer: str) -> bool:
     """True if the answer either refuses outright or names the missing data."""
+    clean = normalise_for_matching(answer)
     return bool(
-        FULL_REFUSAL_PATTERN.search(answer)
-        or ABSENCE_ACKNOWLEDGEMENT_PATTERN.search(answer)
+        FULL_REFUSAL_PATTERN.search(clean)
+        or ABSENCE_ACKNOWLEDGEMENT_PATTERN.search(clean)
     )
 
 
