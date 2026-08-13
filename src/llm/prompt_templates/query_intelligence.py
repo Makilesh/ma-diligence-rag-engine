@@ -36,6 +36,7 @@ You MUST return a JSON object with the following schema:
   "requires_cross_document": true|false,
   "document_scope": ["financial", "legal"],
   "query_expansions": ["expansion1", "expansion2", "expansion3"],
+  "sub_questions": ["atomic question 1", "atomic question 2"],
   "reformulated_query": "clearer version of the query",
   "ambiguities": []
 }
@@ -43,12 +44,39 @@ You MUST return a JSON object with the following schema:
 RULES:
 1. query_type must be one of: financial, legal, comparative, summary, multi_hop
 2. Generate 2-4 query_expansions that rephrase the query to catch different vocabulary
-3. Set requires_numerical_precision=true for any question involving specific numbers, amounts, percentages, or financial metrics
-4. Set requires_cross_document=true for questions that explicitly compare information across different documents
-5. metadata_filters should narrow the search — set fiscal_year when the query mentions a specific year
-6. NEVER include "include_pii" in metadata_filters — this is a compliance violation
-7. reformulated_query should be a clearer, more precise version of the original query
-8. If the query is ambiguous, list the ambiguities but still provide your best interpretation
+
+2a. sub_questions — DECOMPOSITION. This is different from query_expansions and the
+   difference matters. An expansion restates the SAME question in other words. A
+   sub_question asks for ONE DISTINCT FACT that the answer depends on.
+
+   Populate sub_questions ONLY for multi_hop and comparative queries, where the
+   answer requires facts that live in different places. Return [] otherwise.
+
+   Each sub_question must:
+     - ask for exactly one fact, retrievable from a single passage
+     - stand alone, without pronouns referring to the parent question
+     - name the entity or document explicitly
+
+   Example — "What is the implied EV/EBITDA multiple of the Vertex deal based on
+   the agreed price and Aurora's FY2023 EBITDA?"
+     GOOD sub_questions:
+       ["What is the per-share merger consideration in the Vertex transaction?",
+        "How many fully diluted shares does Aurora have outstanding?",
+        "What was Aurora's FY2023 EBITDA?"]
+     BAD (these are expansions, not decomposition):
+       ["What is the EV/EBITDA multiple?", "What multiple is implied by the deal?"]
+
+   A rephrasing of the whole question is useless here: asking "what multiple is
+   implied" five different ways never asks for the share price, so the passage
+   holding the price is never retrieved and the answer cannot be computed.
+
+3. Generate 2-4 query_expansions that rephrase the query to catch different vocabulary
+4. Set requires_numerical_precision=true for any question involving specific numbers, amounts, percentages, or financial metrics
+5. Set requires_cross_document=true for questions that explicitly compare information across different documents
+6. metadata_filters should narrow the search — set fiscal_year when the query mentions a specific year
+7. NEVER include "include_pii" in metadata_filters — this is a compliance violation
+8. reformulated_query should be a clearer, more precise version of the original query
+9. If the query is ambiguous, list the ambiguities but still provide your best interpretation
 """
 
 QUERY_INTELLIGENCE_USER_TEMPLATE = """Analyze this M&A due diligence query:
