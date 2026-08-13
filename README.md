@@ -221,29 +221,30 @@ Validated against a synthetic data room (financial statements, merger agreement,
 
 The set is **23 questions: 19 answerable** across financial, legal, comparative, summary and multi-hop, plus **4 unanswerable control questions** whose answers are absent from the corpus by construction. The controls exist so the answer rate is falsifiable — without them, "never refuses" and "always finds the answer" look identical.
 
-| Metric | Before | After |
-|---|---|---|
-| Completed without an unhandled exception | 16/19 | **23/23** |
-| Answerable questions answered | 6/19 | **18/19** |
-| Mean fact recall | 35.2% | **81.1%** |
-| Citation-source match | 6/16 | **17/19** |
-| Control questions where the engine did **not** fabricate | *not measured* | **4/4** |
-| Answers flagged by the hallucination validator | 11/19 | **2/19** |
-| Mean latency per query | 55.1s | **18.2s** |
+| Metric | Result |
+|---|---|
+| Completed without an unhandled exception | 23/23 |
+| Answerable questions answered | 17/19 |
+| Mean fact recall | 81.4% |
+| Answers containing every expected fact | 13/19 |
+| Citation-source match | 16/19 |
+| Answers flagged by the hallucination validator | 0/19 |
+| Control questions where the engine did **not** fabricate | 4/4 |
+| Mean latency per query | 41.5s |
 
-"Before" is this same harness against the previous quality gate and model routing; "After" is the current pipeline. Both were run on a freshly wiped index with identical documents. Synthesis runs at temperature 0.1, so recall varies by a few points between runs — a second clean run of the same build scored 86.7% recall and 19/19 answered.
+Per-type recall: legal and comparative 100%, financial 76%, multi-hop 64%, summary 56%. Synthesis runs at temperature 0.1, so recall moves a few points between runs. Full per-query breakdown, including every answer verbatim, in [`RESULTS.md`](RESULTS.md).
 
-**What actually moved the numbers** — three defects, each found by measurement rather than inspection:
+**Three defects found by measurement rather than inspection.** Each was invisible to code review — the pipeline ran, returned plausible output, and logged no error:
 
 1. **The quality gate was calibrated against a score distribution nobody had measured.** It averaged cross-encoder scores across the whole retrieved set and required `min(top_5) >= 0.2`. Cross-encoder outputs are bimodal (relevant 0.24–0.99, noise ~0.006), so retrieving more candidates made context look *worse*, and two questions with genuinely good context scored 0.638/0.645 and were refused anyway. Re-derived the dimensions and thresholds from a labelled sweep over the golden set.
 2. **An LLM's guessed `document_category` was applied as a hard filter.** When the guess was wrong, the answer was outside the search space and the rewrite loop could not recover it. Now relaxed on retry.
-3. **The hallucination validator saw less evidence than the writer.** It judged each chunk truncated to 500 characters while the synthesizer used the full chunk plus parent context, so it flagged correctly-sourced figures as unsupported — 10 of 19 answers were marked "failed" including several with 100% fact recall. Giving it the same context dropped flagged answers from 11 to 2.
+3. **The hallucination validator saw less evidence than the writer.** It judged each chunk truncated to 500 characters while the synthesizer used the full chunk plus parent context, so it flagged correctly-sourced figures as unsupported — including several answers with 100% fact recall. Giving it the same context the writer had eliminated the false flags entirely.
 
-**The refusal path is still a deliberate safety feature**, not something tuned away. On all 4 control questions the engine declined to invent the missing figure — and notably it did so by *partial* answer rather than blanket refusal: asked to compare churn against competitors, it reported the retention and competitor data that exist and explicitly stated that churn is not in the data room. The remaining unanswered question is a genuine retrieval failure, correctly refused.
+**The refusal path is a deliberate safety feature, not something tuned away.** On all 4 control questions the engine declined to invent the missing figure — and notably by *partial* answer rather than blanket refusal: asked to compare churn against competitors, it reported the retention and competitor data that exist and explicitly stated that churn is not in the data room. The 2 unanswered questions are genuine retrieval failures, correctly refused rather than guessed.
 
-Latency fell from ~55s to ~18s primarily by routing the two verification agents from local Qwen2.5-14B to Gemini (`VERIFICATION_BACKEND=cloud`, the default). Setting `VERIFICATION_BACKEND=local` restores the original hybrid design: slower and quota-free, requiring a 12GB-VRAM host. Both paths are live and the cloud path falls back to local automatically when the daily quota is exhausted.
+**On latency.** Synthesis now runs on `gemini-3.6-flash`, which is capped at 5 RPM — so the rate limiter paces harder than it did when synthesis sat on a 15 RPM Lite model, and mean latency is ~41s. That is a deliberate trade: better reasoning on the one call whose quality reaches the user, paid for in wall-clock. `VERIFICATION_BACKEND=local` moves the two verification agents back to Qwen2.5-14B — quota-free but slower, and requires a 12GB-VRAM host. Both paths are live, and the cloud path falls back to local automatically when quota is exhausted.
 
-Full per-query breakdown: [`RESULTS.md`](RESULTS.md).
+**Scope, stated plainly:** this is a 3-document synthetic data room (~23K tokens). These numbers show the pipeline works end to end and that the refusal path holds; they are not evidence of behaviour at data-room scale. Expanding the corpus is the top roadmap item.
 
 ---
 
