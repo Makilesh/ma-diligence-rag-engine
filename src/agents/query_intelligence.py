@@ -20,6 +20,17 @@ from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
+# Query types whose answers span several facts, and so benefit from being
+# decomposed into sub-questions before retrieval. Pointed financial or legal
+# lookups are answered from a single passage; decomposing them would multiply
+# retrieval passes for nothing.
+DECOMPOSABLE_QUERY_TYPES = {"multi_hop", "comparative"}
+
+# Ceiling on sub-questions. Each one costs a full retrieval pass (embed, hybrid
+# search, rerank) and takes a share of the final context budget, so an
+# over-eager decomposition would both slow the query and starve each facet.
+MAX_SUB_QUESTIONS = 4
+
 
 async def query_intelligence_node(state: AgentState) -> dict:
     """
