@@ -3,8 +3,14 @@
   "deal_name": "Vertex Capital Partners acquisition of Aurora Technologies Inc.",
   "source_documents": [
     "aurora_financials_fy2023.txt",
+    "board_deck_strategic_review_mar2024.txt",
+    "credit_agreement_summary.txt",
+    "customer_contracts_schedule.txt",
+    "employment_and_retention_agreements.txt",
+    "ip_portfolio_and_litigation_schedule.txt",
     "merger_agreement_v2_final.txt",
-    "board_deck_strategic_review_mar2024.txt"
+    "quality_of_earnings_report_fy2023.txt",
+    "regulatory_and_data_privacy_memo.txt"
   ],
   "golden_qa_pairs": [
     {
@@ -66,9 +72,7 @@
       "expected_answer_contains": [
         "0.2x",
         "0.7x",
-        "$20.6",
-        "improved",
-        "deleveraged"
+        "$20.6"
       ],
       "expected_citations": [
         {
@@ -158,7 +162,11 @@
       "query_type": "legal",
       "expected_answer_contains": [
         "DataFlow Systems",
-        "patent infringement",
+        [
+          "patent infringement",
+          "patent",
+          "infringement"
+        ],
         "$3.5 million",
         "$8.0 million",
         "Northern District of California"
@@ -246,8 +254,7 @@
         "60.0%",
         "59.1%",
         "15.0%",
-        "13.3%",
-        "improved"
+        "13.3%"
       ],
       "expected_citations": [
         {
@@ -333,8 +340,11 @@
         "25%",
         "Fundamental Representations",
         "Section 3.5",
-        "thirty-six",
-        "36 months"
+        [
+          "thirty-six",
+          "36 months",
+          "3 years"
+        ]
       ],
       "expected_citations": [
         {
@@ -425,7 +435,306 @@
       "why_unanswerable": "No churn metrics and no competitor financials are in the data room.",
       "expected_answer_contains": [],
       "expected_citations": []
+    },
+    {
+      "id": "fin_06",
+      "query_type": "financial",
+      "query": "What is Aurora's Adjusted EBITDA for FY2023 and how does it differ from reported EBITDA?",
+      "expected_answer_contains": [
+        "$99.0",
+        "$92.8",
+        "$6.2"
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "quality_of_earnings",
+          "page_or_section": "Adjusted EBITDA Bridge"
+        }
+      ]
+    },
+    {
+      "id": "fin_07",
+      "query_type": "financial",
+      "query": "What working capital peg did the quality of earnings report recommend at closing?",
+      "expected_answer_contains": [
+        "$55.8",
+        "peg"
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "quality_of_earnings",
+          "page_or_section": "Working Capital"
+        }
+      ]
+    },
+    {
+      "id": "fin_08",
+      "query_type": "financial",
+      "query": "How much of Aurora's FY2023 revenue is recurring?",
+      "expected_answer_contains": [
+        "$331.7",
+        "73.3%"
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "quality_of_earnings",
+          "page_or_section": "Revenue Quality"
+        }
+      ]
+    },
+    {
+      "id": "legal_06",
+      "query_type": "legal",
+      "query": "Which customer contracts require consent for the change of control, and what revenue do they represent?",
+      "expected_answer_contains": [
+        "Northstar Financial Group",
+        "Pacific Data Systems",
+        "$92.8",
+        "20.5%"
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "customer_contracts",
+          "page_or_section": "Change of Control"
+        }
+      ]
+    },
+    {
+      "id": "legal_07",
+      "query_type": "legal",
+      "query": "What open source licensing risk was identified and what will remediation cost?",
+      "expected_answer_contains": [
+        "AGPL",
+        "$340,000"
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "ip_portfolio",
+          "page_or_section": "Open Source"
+        }
+      ]
+    },
+    {
+      "id": "legal_08",
+      "query_type": "legal",
+      "query": "What happens to the revolving credit facility when the merger closes?",
+      "expected_answer_contains": [
+        "35%",
+        "$85",
+        [
+          "immediately due",
+          "due and payable"
+        ]
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "credit_agreement",
+          "page_or_section": "Change of Control"
+        }
+      ]
+    },
+    {
+      "id": "comp_04",
+      "query_type": "comparative",
+      "query": "Compare Aurora's reported and adjusted EBITDA margins for FY2022 and FY2023.",
+      "expected_answer_contains": [
+        "20.5%",
+        "19.2%",
+        "21.9%",
+        "19.1%"
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "quality_of_earnings",
+          "page_or_section": "Adjusted EBITDA Bridge"
+        }
+      ]
+    },
+    {
+      "id": "comp_05",
+      "query_type": "comparative",
+      "query": "Compare the change of control severance multiples across Aurora's executive officers.",
+      "expected_answer_contains": [
+        "3.0x",
+        "2.5x",
+        "2.0x",
+        "1.5x",
+        "Elena Marsh"
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "employment_and_retention",
+          "page_or_section": "Severance"
+        }
+      ]
+    },
+    {
+      "id": "sum_03",
+      "query_type": "summary",
+      "query": "Summarize the regulatory approvals required to close this transaction.",
+      "expected_answer_contains": [
+        "Hart-Scott-Rodino",
+        "$260,000",
+        "30 calendar days"
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "regulatory_and_data_privacy",
+          "page_or_section": "Antitrust"
+        }
+      ]
+    },
+    {
+      "id": "sum_04",
+      "query_type": "summary",
+      "query": "Summarize the key person dependency risk at Aurora.",
+      "expected_answer_contains": [
+        "James Wu",
+        "12",
+        [
+          "non-competition",
+          "non-compete"
+        ]
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "employment_and_retention",
+          "page_or_section": "Key Person"
+        }
+      ]
+    },
+    {
+      "id": "mh_05",
+      "query_type": "multi_hop",
+      "query": "What is the implied EV/EBITDA multiple on adjusted EBITDA rather than reported EBITDA?",
+      "expected_answer_contains": [
+        "$696",
+        "$99.0",
+        "$92.8"
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "quality_of_earnings",
+          "page_or_section": "Adjusted EBITDA"
+        }
+      ]
+    },
+    {
+      "id": "mh_06",
+      "query_type": "multi_hop",
+      "query": "What is the total cash required at closing for executive severance, the retention pool, and repaying the revolver?",
+      "expected_answer_contains": [
+        [
+          "$9,065,750",
+          "$9.1"
+        ],
+        [
+          "$6,500,000",
+          "$6.5"
+        ],
+        "$85"
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "employment_and_retention",
+          "page_or_section": "Severance"
+        }
+      ]
+    },
+    {
+      "id": "mh_07",
+      "query_type": "multi_hop",
+      "query": "The quality of earnings report adds back DataFlow legal fees. What is the litigation status and is that add-back safe?",
+      "expected_answer_contains": [
+        "$2.8",
+        "qualified",
+        "$3.5 million",
+        "$8.0 million"
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "ip_portfolio",
+          "page_or_section": "DataFlow"
+        }
+      ]
+    },
+    {
+      "id": "mh_08",
+      "query_type": "multi_hop",
+      "query": "How does the key person risk around Dr. Wu relate to the DataFlow patent litigation?",
+      "expected_answer_contains": [
+        "James Wu",
+        "DataFlow",
+        [
+          "first inventor",
+          "12"
+        ]
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "ip_portfolio",
+          "page_or_section": "DataFlow"
+        }
+      ]
+    },
+    {
+      "id": "mh_09",
+      "query_type": "multi_hop",
+      "query": "What is the Section 280G excise tax exposure and which executives trigger it?",
+      "expected_answer_contains": [
+        "280G",
+        "$2.4 million",
+        "Marsh",
+        "Wu",
+        "Chen"
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "employment_and_retention",
+          "page_or_section": "Golden Parachute"
+        }
+      ]
+    },
+    {
+      "id": "mh_10",
+      "query_type": "multi_hop",
+      "query": "Customer consents are not a condition to closing. Which customers does that expose the buyer to, and how much revenue is at risk?",
+      "expected_answer_contains": [
+        "Northstar",
+        "Pacific Data",
+        "$92.8",
+        [
+          "not a condition",
+          "no condition",
+          "bears the risk"
+        ]
+      ],
+      "expected_citations": [
+        {
+          "source_pattern": "regulatory_and_data_privacy",
+          "page_or_section": "Conditions to Closing"
+        }
+      ]
+    },
+    {
+      "id": "ctrl_05",
+      "query_type": "financial",
+      "expect_refusal": true,
+      "why_unanswerable": "No FY2024 or forward-looking projections exist anywhere in the corpus.",
+      "query": "What is Aurora's projected revenue for FY2025 under management's operating plan?",
+      "expected_answer_contains": [],
+      "expected_citations": []
+    },
+    {
+      "id": "ctrl_06",
+      "query_type": "legal",
+      "expect_refusal": true,
+      "why_unanswerable": "No product warranty or recall history appears in any document.",
+      "query": "What product warranty claims or recalls has Aurora experienced in the last three years?",
+      "expected_answer_contains": [],
+      "expected_citations": []
     }
   ],
-  "control_questions_note": "ctrl_* entries are unanswerable from this corpus by construction. They measure refusal precision: the engine must decline them. Answering one is a hallucination, and is a worse failure than refusing an answerable query."
+  "control_questions_note": "ctrl_* entries are unanswerable from this corpus by construction. They measure refusal precision: the engine must decline them. Answering one is a hallucination, and is a worse failure than refusing an answerable query.",
+  "fact_matching_note": "An entry may be a list of equivalent surface forms; any one counts. This keeps the set measuring grounding rather than phrasing \u2014 an answer saying 'thirty-six months' should not lose recall for not writing '36 months'. Interpretive adjectives ('improved', 'deleveraged') were removed: they test word choice, not whether the figure was retrieved."
 }
