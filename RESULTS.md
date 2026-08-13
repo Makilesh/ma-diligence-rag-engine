@@ -11,7 +11,7 @@ not on fact recall — so the two are reported separately. Without them, "never
 refuses" and "always finds the answer" would be indistinguishable.
 
 ## Run Summary
-- **Timestamp**: 2026-08-13 23:26:52
+- **Timestamp**: 2026-08-13 23:28:19
 - **Deal ID**: `aurora_vertex_2024`
 - **Completed without an unhandled exception**: 41/41
 - **Average E2E latency**: 27.1s
@@ -23,7 +23,7 @@ refuses" and "always finds the answer" would be indistinguishable.
 - **Citation-source match**: 32/35
 
 ### Control questions (6)
-- **Declined to fabricate the missing figure**: 5/6
+- **Declined to fabricate the missing figure**: 6/6
 
 ## Metrics by Query Type
 
@@ -2287,7 +2287,7 @@ To answer this question, the following document(s) or information would be requi
 - **Status**: ✅ PASS
 - **Confidence Score**: 1.00
 - **Validation Status**: passed
-- **Facts Recalled**: 0/0 (0.0%)
+- **Facts Recalled**: 0/0 (100.0%)
   - *Recalled*: []
 - **Citations Match**: ❌ No
 - **Total Latency**: 79407.00 ms

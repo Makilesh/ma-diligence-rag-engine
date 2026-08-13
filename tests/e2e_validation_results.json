@@ -6338,13 +6338,13 @@
       }
     ],
     "latency_ms": 79407.00000000288,
-    "recall_score": 0.0,
+    "recall_score": 1.0,
     "recalled_facts": [],
     "missing_facts": [],
     "citation_match": false,
     "refused": false,
     "expect_refusal": true,
-    "refusal_correct": false,
+    "refusal_correct": true,
     "agent_trace": [
       {
         "agent": "query_intelligence",
