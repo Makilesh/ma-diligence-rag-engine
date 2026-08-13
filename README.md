@@ -225,14 +225,13 @@ The set is **41 questions: 35 answerable** across financial, legal, comparative,
 |---|---|
 | Completed without an unhandled exception | 41/41 |
 | Answerable questions answered | 35/35 |
-| Mean fact recall | 86.6% |
-| Answers containing every expected fact | 24/35 |
-| Citation-source match | 32/35 |
+| Mean fact recall | 71–87% (see note on variance below) |
+| Citation-source match | 28/35 |
 | Answers flagged as unsupported by the validator | 0/35 |
 | Control questions where the engine did **not** fabricate | 6/6 |
-| Mean latency per query | 27.1s |
+| Mean latency per query | 27–32s |
 
-Per-type recall: legal 100%, financial 88%, multi-hop 84%, comparative 80%, summary 72%. Synthesis runs at temperature 0.1, so recall moves a few points between runs. Full per-query breakdown, including every answer verbatim, in [`RESULTS.md`](RESULTS.md).
+Recall is given as a range deliberately. Three runs of the identical 41 questions against an identical index scored 86.6%, 73.9% and 71.0% — the spread is driven by which synthesis model served the run as daily quota drained, not by any code change (see below). Reporting a single figure from the best run would be the more flattering choice and the less honest one. Full per-query breakdown, including every answer verbatim, in [`RESULTS.md`](RESULTS.md).
 
 **Three defects found by measurement rather than inspection.** Each was invisible to code review — the pipeline ran, returned plausible output, and logged no error:
 
@@ -242,7 +241,16 @@ Per-type recall: legal 100%, financial 88%, multi-hop 84%, comparative 80%, summ
 
 **The refusal path is a deliberate safety feature, not something tuned away.** On all 6 control questions the engine declined to invent the missing figure — and notably by *partial* answer rather than blanket refusal: asked to compare churn against competitors, it reported the retention and competitor data that exist and explicitly stated that churn is not in the data room.
 
-**Where it is still weak, and why that is the right failure.** The two lowest-scoring answers both come from the same limitation: a query needing facts from two documents retrieves one facet and misses the other. Asked for the implied EV/EBITDA multiple, the engine found FY2023 EBITDA but not the per-share price, and answered *"cannot be calculated because the agreed purchase price is not provided in the context"* — rather than inventing a multiple. Asked for the credit facility terms it returned the commitment, dates and drawn balance but missed the agent bank, the SOFR margin and the leverage covenant, which sit in later sections of the same document. Both are recall failures that the design converts into visible gaps instead of confident errors. Sub-query decomposition is the fix and is on the roadmap.
+**Sub-question decomposition.** Multi-hop and comparative queries are split by Agent 1 into atomic sub-questions, each retrieved in its own pass and reranked against *itself*. This matters because the reranker scores every candidate against the whole question: a passage holding only a share price scores poorly against "what is the implied EV/EBITDA multiple", so it never survives to the context. Query expansion cannot fix that — rephrasing the question five ways still never asks for the price.
+
+Two details make it work rather than merely exist:
+
+- **Sub-questions do not inherit the parent's `document_category` filter.** They exist to look somewhere else; applying the parent's guess to them re-creates the problem. Measured: the EV/EBITDA query decomposed correctly into price, share count and EBITDA, but every pass inherited one filter and all three returned chunks from the same document.
+- **It is additive, not a redistribution.** Splitting a fixed `final_top_k` across passes cost the parent query most of its slots, and a comparative question whose answer sat in one table the parent had already found went from 20% to 0% coverage. The parent keeps its full budget; sub-questions add a small allocation on top.
+
+Measured in isolation — retrieval only, no synthesis, so model choice cannot influence it — **fact coverage in the retrieved context rose from 64.2% to 84.7% (+20.4pp) across the 15 decomposable questions, with no regressions.** `comp_02` went 10% → 100%, `mh_06` 33% → 100%, `mh_07` 50% → 100%.
+
+**Why the end-to-end number is measured separately from that.** Answer recall across runs is dominated by which synthesis model served the run, and that drifts within a day as the top rung's 20-request daily quota drains. Three runs of the same 41 questions scored 86.6%, 73.9% and 71.0% as the mix shifted from mostly `gemini-3.6-flash` to mostly `gemini-3.5-flash` — and question types that are **never** decomposed moved in lockstep (legal 100% → 73%, summary 72% → 50%). Cross-run end-to-end comparison at this sample size therefore cannot attribute a change to a retrieval improvement, which is why the decomposition result above is measured on retrieval alone.
 
 **Three times the measurement was wrong rather than the system.** Each was caught by inspecting answers the metric had marked as failures: a binary refused/answered flag scored a correct partial answer as a hallucination; the golden set docked recall for writing "thirty-six months" instead of "36 months"; and markdown bold markers broke substring matching, so `contains **no information** regarding` was scored as a fabrication. Fact matching and refusal detection now normalise emphasis and accept equivalent surface forms. Re-scoring the same answers with the corrected matcher changed recall by roughly two points and moved control precision from 5/6 to 6/6 — a reminder that on a small set the harness is as likely to be wrong as the pipeline.
 
