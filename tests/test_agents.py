@@ -490,3 +490,45 @@ class TestSubQuestionDecomposition:
             assert "document_category" not in pass_["filters"]
             # but isolation and compliance filters still apply
             assert pass_["filters"]["include_pii"] is False
+
+    @pytest.mark.asyncio
+    async def test_decomposition_never_shrinks_the_parent_budget(self, monkeypatch):
+        """
+        Decomposition must add evidence, never displace it.
+
+        Splitting a fixed final_top_k across passes cost the parent query most of
+        its slots. Measured on comp_05: the one chunk holding the full severance
+        table was squeezed out and fact coverage fell 20% -> 0%. The parent now
+        keeps its whole budget and sub-questions add on top.
+        """
+        import src.agents.retrieval_executor as rx
+
+        captured = {}
+
+        async def fake_retrieve(query, config, deal_id, metadata_filters):
+            captured.setdefault("k", config["final_top_k"])
+            # Distinct ids per query — identical ids would dedupe and mask the
+            # very allocation this test is checking.
+            slug = query.replace(" ", "_")
+            return [{"chunk_id": f"{slug}-{i}", "reranker_score": 0.9 - i / 100,
+                     "source_file": "d.txt", "text": "x"} for i in range(20)]
+
+        monkeypatch.setattr(rx, "_retrieve_for_query", fake_retrieve)
+        monkeypatch.setattr(rx, "expand_context", lambda **kw: _coro([]))
+
+        out = await rx.retrieval_executor_node({
+            "current_query": "parent", "query_type": "multi_hop",
+            "parsed_intent": {}, "deal_id": "d1", "include_pii": False,
+            "rewrite_iteration": 0,
+            "retrieval_config": {"final_top_k": 10},
+            "extracted_filters": {},
+            "sub_questions": ["sub one", "sub two"],
+        })
+
+        chunks = out["reranked_results"]
+        # Parent keeps 10; each of 2 sub-questions adds 2 => 14, not 10.
+        assert len(chunks) == 14, f"expected additive budget, got {len(chunks)}"
+
+        parent_ids = {c["chunk_id"] for c in chunks
+                      if c["chunk_id"].startswith("parent-")}
+        assert len(parent_ids) == 10, "parent must retain its full allocation"

@@ -247,20 +247,37 @@ async def retrieval_executor_node(state: AgentState) -> dict:
 
     final_top_k = config.get("final_top_k", 10)
 
-    if len(retrieval_queries) > 1:
-        # Widen the per-pass budget so each facet can actually field candidates,
-        # then let the quota merge decide the final composition.
-        per_pass_k = max(
-            MIN_CHUNKS_PER_SUB_QUESTION,
-            final_top_k // len(retrieval_queries) + 1,
-        )
-        pass_config = {**config, "final_top_k": per_pass_k}
+    # Decomposition is ADDITIVE, not a redistribution of a fixed budget.
+    #
+    # Splitting final_top_k across the passes was the obvious design and it is
+    # wrong: the parent query loses most of its slots, so a question whose answer
+    # sat in one passage the parent already found can end up losing it. Measured
+    # on comp_05 (comparing severance multiples across executives): the single
+    # chunk holding the whole table was squeezed out and fact coverage went from
+    # 20% to 0% — decomposition made a question worse that it should not have
+    # touched at all.
+    #
+    # So the parent keeps its full budget and each sub-question adds a small
+    # fixed allocation on top. Decomposition can then only add evidence, never
+    # displace it; the cost is a slightly larger synthesis context on the
+    # minority of queries that decompose.
+    if sub_questions:
+        parent_k = final_top_k
+        sub_k = MIN_CHUNKS_PER_SUB_QUESTION
+        merged_budget = parent_k + sub_k * len(sub_questions)
         logger.info(
             "Agent 3: decomposed retrieval",
-            extra={"sub_questions": len(sub_questions), "per_pass_k": per_pass_k},
+            extra={"sub_questions": len(sub_questions),
+                   "parent_k": parent_k, "per_sub_k": sub_k,
+                   "context_budget": merged_budget},
         )
     else:
-        pass_config = config
+        parent_k = sub_k = final_top_k
+        merged_budget = final_top_k
+
+    # Each pass fetches the larger of the two budgets; truncation to the correct
+    # per-pass share happens at merge time.
+    pass_config = {**config, "final_top_k": max(parent_k, sub_k)}
 
     # A sub-question must not inherit the parent's document_category.
     #
@@ -294,10 +311,11 @@ async def retrieval_executor_node(state: AgentState) -> dict:
     if len(retrieval_queries) == 1:
         reranked = per_query_results[0][:final_top_k]
     else:
-        reranked = _merge_by_quota(
-            [r[:pass_config["final_top_k"]] for r in per_query_results],
-            final_top_k=final_top_k,
-        )
+        # Parent first at full budget, then each sub-question's small allocation.
+        capped = [per_query_results[0][:parent_k]] + [
+            r[:sub_k] for r in per_query_results[1:]
+        ]
+        reranked = _merge_by_quota(capped, final_top_k=merged_budget)
         # Present the merged context best-first; the round-robin order exists to
         # guarantee coverage during selection, not to dictate reading order.
         reranked.sort(key=lambda c: c["reranker_score"], reverse=True)
