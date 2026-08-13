@@ -32,12 +32,23 @@ FULL_REFUSAL_PATTERN = re.compile(
 # partial answer is better due-diligence behaviour than a blanket refusal, but a
 # naive metric scores it as a hallucination. What actually matters is whether the
 # engine invented the missing figure, so that is what gets measured.
+# LIMITATION, stated plainly: this enumerates phrasings, so it will keep missing
+# constructions nobody thought of. Every miss so far has been in the same
+# direction — a correct decline scored as a fabrication — which understates the
+# engine rather than flattering it, so the bias is at least the safe one. Two
+# were caught by reading answers the metric had failed: "contains **no
+# information** regarding" (markdown broke the match) and "contains **no
+# evidence, disclosure, or mention** of" (the noun was not in the list).
+# Anything measuring generated prose with a regex has this property; the guard is
+# to read the answers behind a control failure rather than trust the count.
 ABSENCE_ACKNOWLEDGEMENT_PATTERN = re.compile(
     r"do(?:es)? not contain|not contain(?:ed)?"
-    r"|no (?:information|mention|mentions|disclosure|disclosures|reference|record|records|data)"
-    r"|not (?:disclosed|provided|available|specified|present|included|addressed)"
+    r"|no (?:information|evidence|mention|mentions|disclosure|disclosures"
+    r"|reference|references|record|records|data|indication|details)"
+    r"|not (?:disclosed|provided|available|specified|present|included|addressed|mentioned)"
     r"|not found in the (?:provided )?document"
-    r"|entirely absent|are absent|is absent",
+    r"|do(?:es)? not (?:disclose|mention|address|specify|provide)"
+    r"|cannot be determined|entirely absent|are absent|is absent",
     re.IGNORECASE,
 )
 
