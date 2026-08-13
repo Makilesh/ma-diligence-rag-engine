@@ -336,3 +336,114 @@ class TestQuotaRefusalHandling:
         t = self._tracker([])
         await t.mark_slot_exhausted(-1, LOCAL_MODEL)
         assert t._mock_budgets == {}
+
+
+class TestInvalidKeyHandling:
+    """
+    A rejected credential must retire the key, not fail the request.
+
+    Distinct from quota exhaustion: an exhausted key recovers at the daily
+    reset, whereas a bad key is unusable for every model until someone fixes
+    the config. Measured cost of not handling it: a run with four configured
+    keys lost 16 of 35 questions to one invalid key.
+    """
+
+    def test_recognises_credential_rejections(self):
+        from src.llm.litellm_wrapper import is_auth_error
+
+        class AuthenticationError(Exception):
+            pass
+
+        assert is_auth_error(AuthenticationError("bad key"))
+        assert is_auth_error(Exception("API key not valid"))
+        assert is_auth_error(Exception('reason: "ACCESS_TOKEN_TYPE_UNSUPPORTED"'))
+        assert is_auth_error(Exception("PERMISSION_DENIED"))
+
+    def test_auth_and_quota_errors_are_distinguished(self):
+        """Confusing the two would retire a key that merely ran out for the day."""
+        from src.llm.litellm_wrapper import is_auth_error, is_quota_error
+
+        quota = Exception("429 RESOURCE_EXHAUSTED")
+        auth = Exception("API key not valid")
+
+        assert is_quota_error(quota) and not is_auth_error(quota)
+        assert is_auth_error(auth) and not is_quota_error(auth)
+
+    @staticmethod
+    def _tracker(keys):
+        from src.llm.budget_tracker import BudgetTracker
+
+        t = BudgetTracker.__new__(BudgetTracker)
+        t._api_keys = list(keys)
+        t._rate_limiters = {}
+        t._is_mock = True
+        t._mock_budgets = {}
+        return t
+
+    @pytest.mark.asyncio
+    async def test_retired_key_is_never_selected_again(self):
+        from src.llm.model_registry import SYNTHESIS_LADDER
+
+        t = self._tracker(["bad", "good"])
+        first = await t._select_from_ladder(SYNTHESIS_LADDER, "synthesis")
+        assert first.key_index == 0
+
+        t.mark_key_unusable(first.key_index)
+
+        for _ in range(5):
+            choice = await t._select_from_ladder(SYNTHESIS_LADDER, "synthesis")
+            assert choice.key_index != 0, "retired key must not be offered again"
+
+    @pytest.mark.asyncio
+    async def test_retiring_preserves_indices_of_other_keys(self):
+        """
+        Blanking rather than removing keeps key_index stable.
+
+        In-flight requests already hold a key_index; compacting the list would
+        silently repoint those at a different credential.
+        """
+        t = self._tracker(["bad", "good"])
+        t.mark_key_unusable(0)
+
+        assert len(t._api_keys) == 2
+        assert t._api_keys[1] == "good"
+
+    @pytest.mark.asyncio
+    async def test_all_keys_retired_falls_back_to_local(self):
+        from src.llm.model_registry import AGENT_LADDER, LOCAL_MODEL
+
+        t = self._tracker(["bad1", "bad2"])
+        t.mark_key_unusable(0)
+        t.mark_key_unusable(1)
+
+        choice = await t._select_from_ladder(AGENT_LADDER, "agent")
+        assert choice.model == LOCAL_MODEL
+
+    def test_retiring_out_of_range_index_is_safe(self):
+        t = self._tracker(["k"])
+        t.mark_key_unusable(-1)
+        t.mark_key_unusable(99)
+        assert t._api_keys == ["k"]
+
+
+class TestMalformedKeyRejection:
+    """Fragments from a comma-split or truncated paste must not enter rotation."""
+
+    def test_short_fragments_are_dropped(self, monkeypatch):
+        from src.llm.budget_tracker import BudgetTracker
+
+        valid = "A" * 40
+        monkeypatch.setenv("GEMINI_API_KEYS", f"{valid},v_WED6ccc2rA")
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+        keys = BudgetTracker._load_api_keys()
+        assert keys == [valid]
+
+    def test_wellformed_keys_are_kept(self, monkeypatch):
+        from src.llm.budget_tracker import BudgetTracker
+
+        a, b = "A" * 39, "B" * 53
+        monkeypatch.setenv("GEMINI_API_KEYS", f"{a},{b}")
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+        assert BudgetTracker._load_api_keys() == [a, b]

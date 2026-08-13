@@ -10,7 +10,7 @@ Temp: 0.1 | Tokens: 3000 | JSON mode: OFF (prose answer)
 import json
 import re
 
-from src.llm.litellm_wrapper import call_prose_agent, is_quota_error
+from src.llm.litellm_wrapper import call_prose_agent, is_quota_error, is_auth_error
 from src.llm.budget_tracker import BudgetTracker
 from src.llm.prompt_templates.answer_synthesizer import (
     ANSWER_SYNTHESIZER_SYSTEM_PROMPT,
@@ -23,7 +23,7 @@ logger = setup_logger(__name__)
 
 # How many ladder rungs to try before giving up on a query. Bounded so a
 # provider-wide outage cannot walk the entire ladder on every request.
-MAX_LADDER_FALLBACKS = 4
+MAX_LADDER_FALLBACKS = 6
 
 
 def _format_context_for_synthesis(chunks: list[dict]) -> str:
@@ -235,6 +235,10 @@ async def answer_synthesizer_node(state: AgentState) -> dict:
             break
         except Exception as e:
             last_error = e
+            if choice.key_index >= 0 and is_auth_error(e):
+                # Bad credential — retire the key entirely and try another.
+                tracker.mark_key_unusable(choice.key_index)
+                continue
             if is_quota_error(e) and choice.key_index >= 0:
                 await tracker.mark_slot_exhausted(choice.key_index, model)
                 logger.warning(

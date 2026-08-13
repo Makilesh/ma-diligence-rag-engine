@@ -33,7 +33,7 @@ RETRY_BACKOFF_SECONDS = 2.0
 
 # Ladder rungs to try before giving up. Bounded so a provider-wide outage
 # cannot walk the whole ladder on every request.
-MAX_LADDER_FALLBACKS = 4
+MAX_LADDER_FALLBACKS = 6
 
 # Rate limits are enforced over a rolling minute, so a 429 needs a longer pause
 # than a generic transport error before the next attempt is worth making.
@@ -57,6 +57,32 @@ def is_quota_error(exc: Exception) -> bool:
         or "429" in text
         or "resource_exhausted" in text
         or "quota" in text
+    )
+
+
+def is_auth_error(exc: Exception) -> bool:
+    """
+    True when the provider rejected the credential itself.
+
+    Distinct from a quota refusal in an important way: an exhausted key recovers
+    at the next daily reset, whereas a rejected credential is unusable for every
+    model until someone fixes the configuration. The caller therefore retires the
+    whole key rather than one (key, model) slot.
+
+    Worth handling rather than letting it fail the request: a run with four
+    configured keys lost 16 of 35 questions because one key was invalid — one
+    entry in GEMINI_API_KEYS had been split by a stray comma into two fragments —
+    and every request routed to it died instead of moving to a working key.
+    """
+    name = type(exc).__name__.lower()
+    text = str(exc).lower()
+    return (
+        "authentication" in name
+        or "api key not valid" in text
+        or "api_key_invalid" in text
+        or "access_token_type_unsupported" in text
+        or "unauthenticated" in text
+        or "permission_denied" in text
     )
 
 
@@ -354,6 +380,9 @@ async def call_verification_agent(
             )
         except Exception as e:
             last_error = e
+            if choice.key_index >= 0 and is_auth_error(e):
+                tracker.mark_key_unusable(choice.key_index)
+                continue
             if is_quota_error(e) and choice.key_index >= 0:
                 await tracker.mark_slot_exhausted(choice.key_index, choice.model)
                 logger.warning(

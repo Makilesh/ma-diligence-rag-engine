@@ -339,6 +339,8 @@ class BudgetTracker:
             if is_local(model):
                 break
             for key_index, api_key in enumerate(self._api_keys):
+                if not api_key:  # retired by mark_key_unusable
+                    continue
                 slot = self._slot(key_index, model)
                 if not await self._budget_available(slot):
                     continue
@@ -352,6 +354,8 @@ class BudgetTracker:
             if is_local(model):
                 break
             for key_index, api_key in enumerate(self._api_keys):
+                if not api_key:  # retired by mark_key_unusable
+                    continue
                 slot = self._slot(key_index, model)
                 if not await self._budget_available(slot):
                     continue
@@ -455,6 +459,40 @@ class BudgetTracker:
             # Never let bookkeeping failure break the caller's fallback path.
             logger.error("Failed to persist exhausted slot",
                          extra={"slot": slot, "error": str(e)})
+
+    def mark_key_unusable(self, key_index: int) -> None:
+        """
+        Retires a credential the provider rejected, for the life of the process.
+
+        Unlike quota exhaustion, which is per (key, model) and clears at the next
+        daily reset, a rejected credential is bad for every model until the
+        configuration is fixed. Retiring the key stops every subsequent selection
+        from routing to it.
+
+        Measured cost of not doing this: a run with four configured keys lost 16
+        of 35 questions to a single invalid key — one entry in GEMINI_API_KEYS had
+        been split by a stray comma into two fragments — because each request that
+        landed on it failed outright instead of rotating to a working key.
+
+        The key is blanked rather than removed from the list so that key_index
+        values already held by in-flight requests keep pointing at the same
+        position.
+
+        Args:
+            key_index: Position of the rejected key. Negative values (local) are
+                ignored.
+        """
+        if key_index < 0 or key_index >= len(self._api_keys):
+            return
+        if not self._api_keys[key_index]:
+            return
+
+        logger.error(
+            "API key rejected by provider — retiring it for this process. "
+            "Check GEMINI_API_KEYS for a truncated or comma-split entry.",
+            extra={"key_index": key_index},
+        )
+        self._api_keys[key_index] = ""
 
     async def get_budget_status(self) -> dict:
         """
