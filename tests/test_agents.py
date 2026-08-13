@@ -268,3 +268,75 @@ class TestProgressiveFilterRelaxation:
 
 async def _coro(value):
     return value
+
+
+class TestCitationSelection:
+    """
+    Citations must name the passages the answer used, not every chunk from a
+    document the answer happened to mention.
+    """
+
+    @staticmethod
+    def _chunks():
+        return [
+            {"chunk_id": "a", "source_file": "merger.txt", "page_number": 1},
+            {"chunk_id": "b", "source_file": "merger.txt", "page_number": 7},
+            {"chunk_id": "c", "source_file": "financials.txt", "page_number": 3},
+        ]
+
+    def test_page_in_marker_narrows_to_that_passage(self):
+        """A marker naming p.7 must not drag in p.1 of the same document."""
+        from src.agents.answer_synthesizer import _select_cited_chunks
+
+        answer = "The cap is $174M [📄 merger.txt | FY2024 | p.7 | ARTICLE VIII]."
+        got = [c["chunk_id"] for c in _select_cited_chunks(answer, self._chunks())]
+        assert got == ["b"]
+
+    def test_multiple_markers_select_each_passage(self):
+        from src.agents.answer_synthesizer import _select_cited_chunks
+
+        answer = (
+            "Revenue was $452.8M [📄 financials.txt | FY2023 | p.3 | INCOME STATEMENT] "
+            "and the cap is $174M [📄 merger.txt | p.7 | ARTICLE VIII]."
+        )
+        got = {c["chunk_id"] for c in _select_cited_chunks(answer, self._chunks())}
+        assert got == {"b", "c"}
+
+    def test_marker_without_page_keeps_document_match(self):
+        """Excel/slide citations carry no page; the document match must stand."""
+        from src.agents.answer_synthesizer import _select_cited_chunks
+
+        answer = "See [📊 merger.txt | Sheet \"Cap\" | COMPUTED: indemnity cap]."
+        got = {c["chunk_id"] for c in _select_cited_chunks(answer, self._chunks())}
+        assert got == {"a", "b"}
+
+    def test_falls_back_when_no_marker_parsed(self):
+        """
+        A bare filename mention with no marker must still produce citations.
+
+        An over-broad citation list is recoverable; an empty one loses the
+        provenance the whole system exists to provide.
+        """
+        from src.agents.answer_synthesizer import _select_cited_chunks
+
+        answer = "According to merger.txt the cap is $174M."
+        got = {c["chunk_id"] for c in _select_cited_chunks(answer, self._chunks())}
+        assert got == {"a", "b"}
+
+    def test_uncited_documents_are_excluded(self):
+        from src.agents.answer_synthesizer import _select_cited_chunks
+
+        answer = "Revenue was $452.8M [📄 financials.txt | p.3 | INCOME STATEMENT]."
+        got = [c["chunk_id"] for c in _select_cited_chunks(answer, self._chunks())]
+        assert got == ["c"]
+
+    def test_no_citations_when_nothing_referenced(self):
+        from src.agents.answer_synthesizer import _select_cited_chunks
+
+        assert _select_cited_chunks("I could not find that.", self._chunks()) == []
+
+    def test_handles_empty_answer(self):
+        from src.agents.answer_synthesizer import _select_cited_chunks
+
+        assert _select_cited_chunks("", self._chunks()) == []
+        assert _select_cited_chunks(None, self._chunks()) == []

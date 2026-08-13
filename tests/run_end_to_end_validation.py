@@ -40,6 +40,31 @@ ABSENCE_ACKNOWLEDGEMENT_PATTERN = re.compile(
 )
 
 
+def fact_present(fact, answer: str) -> bool:
+    """
+    True if an expected fact appears in the answer.
+
+    A fact may be given as a list of equivalent surface forms, any one of which
+    counts — e.g. ["thirty-six months", "36 months"]. Without this, the golden
+    set measures phrasing rather than grounding: an answer saying "thirty-six
+    months" was scored as missing "36 months" and lost a sixth of its recall for
+    spelling a number in words. Same for a survival period written "3 years".
+
+    Whitespace is normalised so a fact that happens to wrap across a line in the
+    model's markdown still matches.
+
+    Args:
+        fact: An expected string, or a list of acceptable variants.
+        answer: The generated answer.
+
+    Returns:
+        True if the fact (in any accepted form) is present.
+    """
+    haystack = " ".join(answer.lower().split())
+    variants = [fact] if isinstance(fact, str) else list(fact)
+    return any(" ".join(str(v).lower().split()) in haystack for v in variants)
+
+
 def declines_to_fabricate(answer: str) -> bool:
     """True if the answer either refuses outright or names the missing data."""
     return bool(
@@ -155,10 +180,10 @@ async def run_queries(client: httpx.AsyncClient, golden_qa_pairs: list[dict]) ->
             recalled_facts = []
             missing_facts = []
             for fact in expected_contains:
-                if fact.lower() in answer.lower():
-                    recalled_facts.append(fact)
+                if fact_present(fact, answer):
+                    recalled_facts.append(fact if isinstance(fact, str) else fact[0])
                 else:
-                    missing_facts.append(fact)
+                    missing_facts.append(fact if isinstance(fact, str) else fact[0])
 
             if expect_refusal:
                 # No facts to recall; score the behaviour instead.
@@ -235,13 +260,33 @@ async def main():
         print("API is healthy! Proceeding with document ingestion.")
         
         # Step 2: Define files to ingest
+        # Ingest every document in the data room rather than a hardcoded list.
+        # A fixed list silently desynchronises from the corpus: documents added
+        # for new golden questions were never indexed, so those questions were
+        # scored as retrieval failures when the answer had simply never been
+        # loaded. Globbing keeps the two in step by construction.
         deal_dir = Path(__file__).parent.parent / "data" / "sample_deal"
+
+        # Explicit categories where the filename heuristic would mislabel.
+        # Anything unlisted is auto-detected by the ingestion classifier.
+        CATEGORY_OVERRIDES = {
+            "aurora_financials_fy2023.txt": "financial",
+            "quality_of_earnings_report_fy2023.txt": "financial",
+            "credit_agreement_summary.txt": "financial",
+            "merger_agreement_v2_final.txt": "legal",
+            "customer_contracts_schedule.txt": "legal",
+            "employment_and_retention_agreements.txt": "legal",
+            "ip_portfolio_and_litigation_schedule.txt": "legal",
+            "regulatory_and_data_privacy_memo.txt": "regulatory",
+            "board_deck_strategic_review_mar2024.txt": "board",
+        }
+
         files_info = [
-            {"path": deal_dir / "aurora_financials_fy2023.txt", "category": "financial"},
-            {"path": deal_dir / "merger_agreement_v2_final.txt", "category": "legal"},
-            {"path": deal_dir / "board_deck_strategic_review_mar2024.txt", "category": "board"},
+            {"path": p, "category": CATEGORY_OVERRIDES.get(p.name)}
+            for p in sorted(deal_dir.glob("*.txt"))
         ]
-        
+        print(f"Corpus: {len(files_info)} documents in {deal_dir}")
+
         doc_mappings = await ingest_files(client, files_info)
         print(f"\nIngestion completed. {len(doc_mappings)} documents indexed.")
         
@@ -263,40 +308,84 @@ async def main():
         print(f"\nResults saved to {output_path}")
         
         # Step 6: Generate RESULTS.md
+        write_results_md(results)
+
+
+def write_results_md(results: list[dict]) -> None:
+    """
+    Renders RESULTS.md from a completed results list.
+
+    Separated from the run loop so the report can be regenerated from a saved
+    e2e_validation_results.json — re-running the live eval costs ~30 minutes and
+    a chunk of daily quota, which is far too expensive to pay for a formatting
+    change to the report.
+    """
+    if True:
         results_md_path = Path(__file__).parent.parent / "RESULTS.md"
         
         total_queries = len(results)
         passed = sum(1 for r in results if r.get("status") == "passed")
         avg_latency = sum(r.get("latency_ms", 0.0) for r in results) / total_queries if total_queries else 0.0
-        avg_recall = sum(r.get("recall_score", 0.0) for r in results if r.get("status") == "passed") / passed if passed else 0.0
-        citation_matches = sum(1 for r in results if r.get("citation_match") is True)
-        
-        md_content = f"""# E2E RAG Pipeline Validation Results
 
-This document contains the actual execution results of the M&A Due Diligence Intelligence Engine run against the real **golden QA set**.
+        # Controls are scored on behaviour (did it avoid fabricating?), answerable
+        # questions on fact recall. Averaging the two together inflates recall,
+        # because every correctly-declined control contributes a 1.0 that has
+        # nothing to do with retrieval quality. Reported separately.
+        answerable = [r for r in results
+                      if r.get("status") == "passed" and not r.get("expect_refusal")]
+        controls = [r for r in results
+                    if r.get("status") == "passed" and r.get("expect_refusal")]
+
+        avg_recall = (sum(r.get("recall_score", 0.0) for r in answerable) / len(answerable)
+                      if answerable else 0.0)
+        citation_matches = sum(1 for r in answerable if r.get("citation_match") is True)
+        answered = sum(1 for r in answerable if not r.get("refused"))
+        perfect = sum(1 for r in answerable if r.get("recall_score") == 1.0)
+        controls_held = sum(1 for r in controls if r.get("refusal_correct"))
+
+        md_content = f"""# E2E Validation Results
+
+Generated by `tests/run_end_to_end_validation.py` against the golden Q&A set in
+`tests/golden_qa_set.json`, on a freshly wiped index. Every number here is
+computed from `tests/e2e_validation_results.json` — nothing is hand-entered.
+
+The set is **{len(answerable) + len(controls)} questions**: {len(answerable)} answerable, plus {len(controls)} unanswerable
+**control** questions whose answers are absent from the corpus by construction.
+Controls are scored on whether the engine avoided inventing the missing figure,
+not on fact recall — so the two are reported separately. Without them, "never
+refuses" and "always finds the answer" would be indistinguishable.
 
 ## Run Summary
 - **Timestamp**: {time.strftime('%Y-%m-%d %H:%M:%S')}
 - **Deal ID**: `{DEAL_ID}`
-- **Total Queries Evaluated**: {total_queries}
-- **Successfully Completed**: {passed}/{total_queries}
-- **Average E2E Latency**: {avg_latency:.2f} ms
-- **Average Grounding Fact Recall**: {avg_recall*100:.1f}%
-- **Citations Grounding Match**: {citation_matches}/{passed} ({citation_matches/passed*100:.1f}% of successful runs)
+- **Completed without an unhandled exception**: {passed}/{total_queries}
+- **Average E2E latency**: {avg_latency/1000:.1f}s
+
+### Answerable questions ({len(answerable)})
+- **Answered** (not refused): {answered}/{len(answerable)}
+- **Mean fact recall**: {avg_recall*100:.1f}%
+- **Answers with every expected fact present**: {perfect}/{len(answerable)}
+- **Citation-source match**: {citation_matches}/{len(answerable)}
+
+### Control questions ({len(controls)})
+- **Declined to fabricate the missing figure**: {controls_held}/{len(controls)}
 
 ## Metrics by Query Type
 
-| Query Type | Count | Success | Avg Recall | Avg Latency (ms) |
+Answerable questions only; controls are excluded so per-type recall reflects
+retrieval quality rather than refusal behaviour.
+
+| Query Type | Count | Answered | Avg Recall | Avg Latency (ms) |
 | --- | --- | --- | --- | --- |
 """
-        
+
         types = ["financial", "legal", "comparative", "summary", "multi_hop"]
         for t in types:
-            t_res = [r for r in results if r["query_type"] == t]
+            t_res = [r for r in answerable if r["query_type"] == t]
             if not t_res:
                 continue
-            t_passed = [r for r in t_res if r.get("status") == "passed"]
-            t_avg_recall = sum(r.get("recall_score", 0.0) for r in t_passed) / len(t_passed) if t_passed else 0.0
+            t_passed = [r for r in t_res if not r.get("refused")]
+            t_avg_recall = sum(r.get("recall_score", 0.0) for r in t_res) / len(t_res) if t_res else 0.0
             t_avg_latency = sum(r.get("latency_ms", 0.0) for r in t_res) / len(t_res)
             md_content += f"| {t.capitalize()} | {len(t_res)} | {len(t_passed)}/{len(t_res)} | {t_avg_recall*100:.1f}% | {t_avg_latency:.2f} |\n"
             

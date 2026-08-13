@@ -378,6 +378,59 @@ class BudgetTracker:
         """
         return await self._select_from_ladder(AGENT_LADDER, "agent")
 
+    async def mark_slot_exhausted(self, key_index: int, model: str) -> None:
+        """
+        Records that the provider has refused further calls on this (key, model).
+
+        Local counters drift from the provider's for reasons that cannot be
+        engineered away: the process restarts and the in-memory fallback resets
+        to zero while the provider's daily counter keeps running, another process
+        shares the key, or someone uses the key by hand. When that happens the
+        tracker believes it has quota it does not have, and every call to that
+        model returns 429.
+
+        Observed cost of not having this: a golden-set run opened with 19
+        consecutive synthesis failures — exactly gemini-3.6-flash's daily
+        allowance — because the previous run had already spent it. The gate had
+        passed the context with scores up to 0.945; the answers were lost purely
+        to a stale counter, and the run only recovered once the local counter
+        also hit its limit and the ladder moved on by itself.
+
+        Burning the local counter makes the provider's 429 authoritative, so the
+        next selection skips this rung immediately.
+
+        Args:
+            key_index: Position of the API key, or -1 for local (ignored).
+            model: Upstream model the provider refused.
+        """
+        if key_index < 0 or is_local(model):
+            return
+
+        slot = self._slot(key_index, model)
+        limit = self._slot_limit(slot)
+        today = datetime.now(timezone.utc).date().isoformat()
+
+        logger.warning(
+            "Provider refused further calls; marking slot exhausted for today",
+            extra={"model": model, "key_index": key_index},
+        )
+
+        if getattr(self, "_is_mock", False):
+            self._mock_budgets[slot] = {"used_today": limit, "reset_date": today}
+            return
+
+        try:
+            async with self._pool.acquire() as conn:
+                await conn.execute(
+                    "UPDATE api_budget SET used_today = $1, reset_date = $2::date "
+                    "WHERE model_key = $3",
+                    limit, today, slot,
+                )
+        except Exception as e:
+            # Never let bookkeeping failure break the caller's fallback path.
+            logger.error("Failed to persist exhausted slot",
+                         extra={"slot": slot, "error": str(e)})
+
     async def get_budget_status(self) -> dict:
         """
         Returns current budget status, aggregated per model across all keys.

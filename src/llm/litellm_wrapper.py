@@ -31,9 +31,33 @@ LOCAL_VERIFICATION_MODEL = LOCAL_MODEL
 MAX_RETRIES = 3
 RETRY_BACKOFF_SECONDS = 2.0
 
+# Ladder rungs to try before giving up. Bounded so a provider-wide outage
+# cannot walk the whole ladder on every request.
+MAX_LADDER_FALLBACKS = 4
+
 # Rate limits are enforced over a rolling minute, so a 429 needs a longer pause
 # than a generic transport error before the next attempt is worth making.
 RATE_LIMIT_BACKOFF_SECONDS = 20.0
+
+
+def is_quota_error(exc: Exception) -> bool:
+    """
+    True when the provider refused the call for rate or quota reasons.
+
+    Distinguishing this from a generic failure is what lets a caller move down
+    the model ladder instead of retrying a model the provider will keep refusing
+    all day. A per-minute limit and a per-day limit both surface as 429; the
+    caller treats them the same because in either case another rung is a better
+    bet than waiting.
+    """
+    name = type(exc).__name__.lower()
+    text = str(exc).lower()
+    return (
+        "ratelimit" in name
+        or "429" in text
+        or "resource_exhausted" in text
+        or "quota" in text
+    )
 
 
 async def call_structured_agent(
@@ -310,25 +334,43 @@ async def call_verification_agent(
     from src.llm.budget_tracker import BudgetTracker  # deferred: avoids import cycle
 
     tracker = await BudgetTracker.get_instance()
-    choice = await tracker.get_model_for_agent()
 
-    try:
-        return await call_structured_agent(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            model=choice.model,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            api_key=choice.api_key,
-        )
-    except Exception as e:
-        if choice.model == LOCAL_VERIFICATION_MODEL:
-            raise
+    # Descend the ladder on quota refusals rather than failing. The tracker's
+    # counters can lag the provider's (restarts reset the in-memory fallback,
+    # other processes share the key), so a rung it offers may already be closed.
+    last_error: Exception | None = None
+    choice = None
+
+    for _ in range(MAX_LADDER_FALLBACKS):
+        choice = await tracker.get_model_for_agent()
+        try:
+            return await call_structured_agent(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                model=choice.model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                api_key=choice.api_key,
+            )
+        except Exception as e:
+            last_error = e
+            if is_quota_error(e) and choice.key_index >= 0:
+                await tracker.mark_slot_exhausted(choice.key_index, choice.model)
+                logger.warning(
+                    "Verification rung refused by provider, descending the ladder",
+                    extra={"model": choice.model, "key_index": choice.key_index},
+                )
+                continue
+            break
+
+    if choice is not None and choice.model == LOCAL_VERIFICATION_MODEL:
+        raise last_error if last_error else RuntimeError("verification failed")
+
+    if True:
+        e = last_error
         logger.warning(
             "Cloud verification failed, falling back to local model",
-            extra={"error": str(e), "model": choice.model,
-                   "key_index": choice.key_index,
-                   "fallback": LOCAL_VERIFICATION_MODEL},
+            extra={"error": str(e), "fallback": LOCAL_VERIFICATION_MODEL},
         )
         return await call_structured_agent(
             system_prompt=system_prompt,

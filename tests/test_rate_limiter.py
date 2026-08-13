@@ -255,3 +255,84 @@ class TestKeyRotation:
         assert choice.model == LOCAL_MODEL
         assert choice.api_key is None
         assert choice.key_index == -1
+
+
+class TestQuotaRefusalHandling:
+    """
+    A provider 429 must move the request down the ladder, not fail it.
+
+    Local counters drift from the provider's - a restart resets the in-memory
+    fallback while the provider's daily counter keeps running, and other
+    processes may share the key. When that happens the tracker offers a rung the
+    provider has already closed. Measured cost of not handling it: a golden-set
+    run lost its first 19 answers to a model whose daily quota was already spent,
+    with context quality scores as high as 0.945.
+    """
+
+    def test_recognises_provider_quota_errors(self):
+        from src.llm.litellm_wrapper import is_quota_error
+
+        class RateLimitError(Exception):
+            pass
+
+        assert is_quota_error(RateLimitError("boom"))
+        assert is_quota_error(Exception("429 Too Many Requests"))
+        assert is_quota_error(Exception("RESOURCE_EXHAUSTED"))
+        assert is_quota_error(Exception(
+            'quotaId: "GenerateRequestsPerDayPerProjectPerModel-FreeTier"'
+        ))
+
+    def test_ignores_unrelated_errors(self):
+        """A parse error must not be mistaken for exhausted quota."""
+        from src.llm.litellm_wrapper import is_quota_error
+
+        assert not is_quota_error(ValueError("invalid JSON"))
+        assert not is_quota_error(ConnectionError("connection reset"))
+
+    @staticmethod
+    def _tracker(keys):
+        from src.llm.budget_tracker import BudgetTracker
+
+        t = BudgetTracker.__new__(BudgetTracker)
+        t._api_keys = keys
+        t._rate_limiters = {}
+        t._is_mock = True
+        t._mock_budgets = {}
+        return t
+
+    @pytest.mark.asyncio
+    async def test_marking_exhausted_skips_that_rung(self):
+        """After a refusal, selection must not return the same rung again."""
+        from src.llm.model_registry import SYNTHESIS_LADDER
+
+        t = self._tracker(["k1"])
+        first = await t._select_from_ladder(SYNTHESIS_LADDER, "synthesis")
+
+        await t.mark_slot_exhausted(first.key_index, first.model)
+
+        second = await t._select_from_ladder(SYNTHESIS_LADDER, "synthesis")
+        assert second.model != first.model, (
+            "a rung the provider refused must not be offered again"
+        )
+
+    @pytest.mark.asyncio
+    async def test_marking_exhausted_prefers_another_key_first(self):
+        """With a spare key, a refusal should rotate before downgrading."""
+        from src.llm.model_registry import SYNTHESIS_LADDER
+
+        t = self._tracker(["k1", "k2"])
+        first = await t._select_from_ladder(SYNTHESIS_LADDER, "synthesis")
+        await t.mark_slot_exhausted(first.key_index, first.model)
+
+        second = await t._select_from_ladder(SYNTHESIS_LADDER, "synthesis")
+        assert second.model == first.model
+        assert second.key_index != first.key_index
+
+    @pytest.mark.asyncio
+    async def test_marking_local_is_a_noop(self):
+        """The local model has no provider quota to exhaust."""
+        from src.llm.model_registry import LOCAL_MODEL
+
+        t = self._tracker([])
+        await t.mark_slot_exhausted(-1, LOCAL_MODEL)
+        assert t._mock_budgets == {}

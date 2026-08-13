@@ -8,8 +8,9 @@ Temp: 0.1 | Tokens: 3000 | JSON mode: OFF (prose answer)
 """
 
 import json
+import re
 
-from src.llm.litellm_wrapper import call_prose_agent
+from src.llm.litellm_wrapper import call_prose_agent, is_quota_error
 from src.llm.budget_tracker import BudgetTracker
 from src.llm.prompt_templates.answer_synthesizer import (
     ANSWER_SYNTHESIZER_SYSTEM_PROMPT,
@@ -19,6 +20,10 @@ from src.workflow.state_definitions import AgentState
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
+
+# How many ladder rungs to try before giving up on a query. Bounded so a
+# provider-wide outage cannot walk the entire ladder on every request.
+MAX_LADDER_FALLBACKS = 4
 
 
 def _format_context_for_synthesis(chunks: list[dict]) -> str:
@@ -60,6 +65,83 @@ def _format_context_for_synthesis(chunks: list[dict]) -> str:
         parts.append(part)
 
     return "\n\n".join(parts)
+
+
+# A citation marker is any bracketed group containing a pipe, which is the
+# format the synthesis prompt specifies:
+#   [📄 FileName | FiscalYear | p.PageNum | Section | Version]
+#   [📊 FileName | Sheet "Name" | COMPUTED: description]
+# Matching on the pipe avoids colliding with ordinary markdown links.
+_CITATION_MARKER = re.compile(r"\[([^\[\]]*\|[^\[\]]*)\]")
+_PAGE_IN_MARKER = re.compile(r"(?:p\.|pg\.|page\s*)(\d+)", re.IGNORECASE)
+
+
+def _select_cited_chunks(answer: str, chunks: list[dict]) -> list[dict]:
+    """
+    Returns the chunks the answer actually cited, in the order they were used.
+
+    The naive approach — treat a chunk as cited if its filename appears anywhere
+    in the answer — is document-level, not passage-level. When several retrieved
+    chunks come from one document, all of them are returned, so the citation
+    panel names sections the answer never touched. Observed on a live run: an
+    answer citing only "SECTION 8. INDEMNIFICATION" listed citations labelled
+    SECTION 7 and SECTION 5.
+
+    Narrowing by `section_heading` does not fix it either: that heading describes
+    the *chunk*, and a chunk routinely spans several sections, so the section the
+    model names is often absent from the chunk's metadata.
+
+    What does work is reading the markers the model already emits. It states the
+    file and, for paginated sources, the page it used. Matching on file plus page
+    resolves to the passage rather than the document.
+
+    Falls back to document-level matching when the model emitted no parseable
+    marker, because an over-broad citation list is still far better than none.
+
+    Args:
+        answer: Generated answer text containing inline citation markers.
+        chunks: Candidate context chunks with source_file / page_number.
+
+    Returns:
+        Cited chunks, de-duplicated, preserving retrieval order.
+    """
+    markers = []
+    for body in _CITATION_MARKER.findall(answer or ""):
+        page_match = _PAGE_IN_MARKER.search(body)
+        markers.append((body.lower(), int(page_match.group(1)) if page_match else None))
+
+    def cited_by_marker(chunk: dict) -> bool:
+        source = (chunk.get("source_file") or "").lower()
+        if not source:
+            return False
+        for body, page in markers:
+            if source not in body:
+                continue
+            chunk_page = chunk.get("page_number")
+            # A page in the marker narrows to that page; its absence means the
+            # model did not scope the citation, so the document match stands.
+            if page is not None and chunk_page is not None and int(chunk_page) != page:
+                continue
+            return True
+        return False
+
+    selected = [c for c in chunks if cited_by_marker(c)]
+
+    if not selected:
+        answer_text = answer or ""
+        selected = [
+            c for c in chunks
+            if c.get("source_file") and c["source_file"] in answer_text
+        ]
+
+    seen: set = set()
+    unique = []
+    for c in selected:
+        key = c.get("chunk_id") or id(c)
+        if key not in seen:
+            seen.add(key)
+            unique.append(c)
+    return unique
 
 
 async def answer_synthesizer_node(state: AgentState) -> dict:
@@ -121,19 +203,49 @@ async def answer_synthesizer_node(state: AgentState) -> dict:
     )
 
     tracker = await BudgetTracker.get_instance()
-    choice = await tracker.get_model_for_synthesis()
-    model = choice.model
 
-    try:
-        answer = await call_prose_agent(
-            system_prompt=ANSWER_SYNTHESIZER_SYSTEM_PROMPT,
-            user_prompt=user_prompt,
-            model=model,
-            temperature=0.1,
-            max_tokens=3000,
-            api_key=choice.api_key,
-        )
-    except Exception as e:
+    # Walk down the ladder on quota refusals.
+    #
+    # Selecting a model up front and failing the query when it 429s wastes the
+    # whole point of having a ladder. Local counters drift from the provider's
+    # (process restarts reset the in-memory fallback, other processes share the
+    # key), so the tracker will sometimes hand back a rung the provider has
+    # already closed. Measured: a golden-set run lost its first 19 answers this
+    # way — one per remaining unit of a quota that was in fact already spent —
+    # with context quality scores as high as 0.945.
+    #
+    # Each refusal marks that rung spent and re-selects, so the request lands on
+    # the next model rather than failing.
+    answer = None
+    last_error: Exception | None = None
+    model = ""
+
+    for _ in range(MAX_LADDER_FALLBACKS):
+        choice = await tracker.get_model_for_synthesis()
+        model = choice.model
+        try:
+            answer = await call_prose_agent(
+                system_prompt=ANSWER_SYNTHESIZER_SYSTEM_PROMPT,
+                user_prompt=user_prompt,
+                model=model,
+                temperature=0.1,
+                max_tokens=3000,
+                api_key=choice.api_key,
+            )
+            break
+        except Exception as e:
+            last_error = e
+            if is_quota_error(e) and choice.key_index >= 0:
+                await tracker.mark_slot_exhausted(choice.key_index, model)
+                logger.warning(
+                    "Synthesis rung refused by provider, descending the ladder",
+                    extra={"model": model, "key_index": choice.key_index},
+                )
+                continue
+            break
+
+    if answer is None:
+        e = last_error or RuntimeError("synthesis produced no answer")
         # Synthesis is the one place where an upstream failure would otherwise
         # take down the whole request. Degrade to an explicit refusal instead:
         # a reviewer who is told the engine could not answer is strictly better
@@ -161,18 +273,8 @@ async def answer_synthesizer_node(state: AgentState) -> dict:
             ],
         }
 
-    # Extract citations from the answer (basic extraction).
-    #
-    # KNOWN IMPRECISION: matching on source_file is document-level, not
-    # passage-level. When every retrieved chunk comes from the same document,
-    # all of them are returned, so the citation list can name sections the answer
-    # never used. Verified against a live run: an answer citing only "SECTION 8.
-    # INDEMNIFICATION" produced citations labelled SECTION 7 and SECTION 5.
-    # Narrowing by section_heading does not fix it — section_heading is the
-    # heading of the *chunk*, and a chunk routinely spans several sections, so
-    # the heading is simply absent from the answer. A real fix means either
-    # finer-grained heading metadata per chunk, or parsing the inline
-    # `[file | p.N | SECTION]` markers the synthesis prompt already emits.
+    # Citations are resolved from the inline markers the model emits, not from
+    # whether a filename appears anywhere in the answer. See _select_cited_chunks.
     #
     # The full chunk payload is carried through — not just chunk_id/source_file —
     # so the API can surface page, section, version and computed-metric provenance
@@ -189,8 +291,7 @@ async def answer_synthesizer_node(state: AgentState) -> dict:
             "is_redline": bool(c.get("is_redline", 0)),
             "superseded_by": c.get("superseded_by", "") or "",
         }
-        for c in chunks
-        if c.get("source_file") and c.get("source_file", "") in answer
+        for c in _select_cited_chunks(answer, chunks)
     ]
 
     logger.info(
