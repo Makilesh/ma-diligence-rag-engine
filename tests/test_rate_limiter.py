@@ -447,3 +447,126 @@ class TestMalformedKeyRejection:
         monkeypatch.delenv("GEMINI_API_KEY", raising=False)
 
         assert BudgetTracker._load_api_keys() == [a, b]
+
+
+class TestDateBindingToPostgres:
+    """
+    Anything bound to a DATE column must be a `date`, never an ISO string.
+
+    asyncpg encodes parameters using the type it infers from the statement, so
+    `reset_date = $1::date` demands a `datetime.date` and rejects a str with
+    "'str' object has no attribute 'toordinal'". The server-side `::date` cast
+    does not help — encoding happens first.
+
+    This went unnoticed for a long time for two compounding reasons: the
+    long-lived database still held reset_date as text from an older schema, so
+    string binding worked there, and every other test in this file sets
+    `_is_mock = True`, which skips SQL entirely. The result was a tracker that
+    passed its whole suite and then failed *every query* against a database
+    created fresh from the current schema. These tests exercise the SQL path
+    with a recording connection so the binding types are actually asserted.
+    """
+
+    class _Conn:
+        def __init__(self):
+            self.calls: list[tuple[str, tuple]] = []
+
+        async def execute(self, query, *args):
+            self.calls.append((query, args))
+            return "UPDATE 1"
+
+        async def fetchrow(self, query, *args):
+            self.calls.append((query, args))
+            return None
+
+    class _Acquire:
+        def __init__(self, conn):
+            self._conn = conn
+
+        async def __aenter__(self):
+            return self._conn
+
+        async def __aexit__(self, *exc):
+            return False
+
+    class _Pool:
+        def __init__(self, conn):
+            self._conn = conn
+
+        def acquire(self):
+            return TestDateBindingToPostgres._Acquire(self._conn)
+
+    @classmethod
+    def _tracker(cls):
+        from src.llm.budget_tracker import BudgetTracker
+
+        t = BudgetTracker.__new__(BudgetTracker)
+        t._api_keys = ["K" * 40]
+        t._rate_limiters = {}
+        t._is_mock = False
+        conn = cls._Conn()
+        t._pool = cls._Pool(conn)
+        return t, conn
+
+    @staticmethod
+    def _date_params(calls):
+        """
+        Arguments bound into a `::date` statement, split by how they encode.
+
+        Other parameters in the same statement (model_key, a counter) are
+        legitimately str and int, so the check cannot simply reject every string
+        — it looks for values that carry a date, and asserts none of them
+        arrives as text.
+        """
+        import re
+        from datetime import date
+
+        iso = re.compile(r"\d{4}-\d{2}-\d{2}")
+        dates, date_strings = [], []
+        for query, args in calls:
+            if "::date" not in query:
+                continue
+            for a in args:
+                if isinstance(a, date):
+                    dates.append(a)
+                elif isinstance(a, str) and iso.fullmatch(a):
+                    date_strings.append(a)
+        return dates, date_strings
+
+    @pytest.mark.asyncio
+    async def test_consume_binds_a_date_object(self):
+        t, conn = self._tracker()
+        slot = t._all_slots()[0]
+
+        await t._try_consume(slot)
+
+        dates, date_strings = self._date_params(conn.calls)
+        assert not date_strings, (
+            f"ISO strings bound to a DATE column: {date_strings!r} — asyncpg "
+            "raises \"'str' object has no attribute 'toordinal'\""
+        )
+        assert dates, "expected the daily-reset UPDATE to bind a date parameter"
+
+    @pytest.mark.asyncio
+    async def test_marking_exhausted_binds_a_date_object(self):
+        from src.llm.model_registry import SYNTHESIS_LADDER, is_local
+
+        t, conn = self._tracker()
+        model = next(m for m in SYNTHESIS_LADDER if not is_local(m))
+
+        await t.mark_slot_exhausted(0, model)
+
+        dates, date_strings = self._date_params(conn.calls)
+        assert not date_strings, (
+            f"ISO strings bound to a DATE column: {date_strings!r}"
+        )
+        assert dates, "expected the exhaustion UPDATE to bind a date parameter"
+
+    def test_utc_today_returns_a_date_not_a_string(self):
+        from datetime import date
+
+        from src.llm.budget_tracker import _utc_today, _utc_today_iso
+
+        assert isinstance(_utc_today(), date)
+        assert isinstance(_utc_today_iso(), str)
+        assert _utc_today_iso() == _utc_today().isoformat()
