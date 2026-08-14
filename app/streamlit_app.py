@@ -23,7 +23,7 @@ _PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
-from app.styles import inject_styles, pill
+from app.styles import inject_styles, pill, stat_row
 from app.components.deal_manager import render_deal_manager
 from app.components.document_uploader import render_document_uploader
 from app.components.query_interface import render_query_interface
@@ -90,6 +90,45 @@ def render_budget_panel() -> None:
             unsafe_allow_html=True,
         )
         st.progress(min(pct, 1.0))
+
+
+def render_deal_context(deal_id: str) -> None:
+    """
+    Renders a compact strip describing what is actually loaded for this deal.
+
+    Answers the first question anyone opening the tool has — "what is it
+    searching?" — before they type. It also makes an empty index obvious at a
+    glance: a deal showing 0 documents explains a refusal that would otherwise
+    look like a model failure.
+
+    Args:
+        deal_id: Currently selected deal.
+    """
+    deals = _get_json("/deals") or []
+    deal = next((d for d in deals if d.get("deal_id") == deal_id), None)
+    documents = _get_json(f"/deals/{deal_id}/documents") or []
+    signals = _get_json(f"/deals/{deal_id}/risk-signals") or []
+
+    doc_count = (deal or {}).get("document_count") or len(documents)
+    high_risk = sum(1 for s in signals if s.get("severity") == "high")
+
+    st.markdown(
+        stat_row(
+            [
+                ("Deal", deal_id),
+                ("Documents Indexed", str(doc_count)),
+                ("Risk Signals", str(len(signals))),
+                ("High Severity", str(high_risk)),
+            ]
+        ),
+        unsafe_allow_html=True,
+    )
+
+    if not doc_count:
+        st.warning(
+            "No documents are indexed for this deal yet — every question will be "
+            "refused until something is uploaded."
+        )
 
 
 def run_query(query: str, deal_id: str, include_pii: bool) -> dict | None:
@@ -211,6 +250,8 @@ def main():
     if not deal_id:
         st.info("👈 Enter or select a Deal ID in the sidebar to get started.")
         return
+
+    render_deal_context(deal_id)
 
     query_result = render_query_interface()
 

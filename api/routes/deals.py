@@ -214,6 +214,141 @@ def register_document(
         _deals[deal_id]["document_count"] = len(records)
 
 
+async def _scroll_deal_payloads(deal_id: str, fields: list[str]) -> list[dict]:
+    """
+    Reads selected payload fields for every chunk in a deal.
+
+    Only the named fields are fetched — pulling `text` back for a whole deal
+    would move megabytes to count documents.
+
+    Args:
+        deal_id: Deal to scan.
+        fields: Payload keys to return.
+
+    Returns:
+        List of payload dicts. Empty on any failure.
+    """
+    from qdrant_client.models import FieldCondition, Filter, MatchValue
+
+    from src.vector_db.qdrant_client import get_qdrant_client
+    from src.vector_db.constants import COLLECTION_NAME
+
+    client = get_qdrant_client()
+    payloads: list[dict] = []
+    offset = None
+    try:
+        while True:
+            points, offset = await client.scroll(
+                collection_name=COLLECTION_NAME,
+                scroll_filter=Filter(
+                    must=[FieldCondition(key="deal_id", match=MatchValue(value=deal_id))]
+                ),
+                with_payload=fields,
+                with_vectors=False,
+                limit=512,
+                offset=offset,
+            )
+            payloads.extend(p.payload or {} for p in points)
+            if offset is None:
+                break
+    except Exception as e:
+        logger.warning(f"Could not scroll deal payloads for {deal_id}: {e}")
+        return []
+    return payloads
+
+
+async def _reconstruct_documents(deal_id: str) -> list[dict]:
+    """
+    Rebuilds document records for a deal from the vector store.
+
+    `_documents` is process-local, so after any restart the version browser and
+    the risk dashboard went blank while the deal was still fully queryable — the
+    UI reported "no documents" for a deal that answered questions correctly.
+    Qdrant holds one payload per chunk carrying the document-level fields, so
+    the records can be reconstructed rather than lost.
+
+    Upload dates are not recoverable this way; they are left empty rather than
+    invented, and the version label falls back to chunk ordering.
+
+    Args:
+        deal_id: Deal to rebuild.
+
+    Returns:
+        Document records in the same shape `_documents` holds.
+    """
+    payloads = await _scroll_deal_payloads(
+        deal_id,
+        [
+            "doc_id",
+            "source_file",
+            "document_category",
+            "is_current_version",
+            "supersedes_doc_id",
+            "superseded_by",
+            "risk_signals",
+        ],
+    )
+
+    by_doc: dict[str, dict] = {}
+    for p in payloads:
+        doc_id = p.get("doc_id") or p.get("source_file", "unknown")
+        record = by_doc.setdefault(
+            doc_id,
+            {
+                "doc_id": doc_id,
+                "deal_id": deal_id,
+                "filename": p.get("source_file", "unknown"),
+                "document_category": p.get("document_category", "other"),
+                "chunks_created": 0,
+                "is_current_version": bool(p.get("is_current_version", 1)),
+                "supersedes_doc_id": p.get("supersedes_doc_id") or "",
+                "superseded_by": p.get("superseded_by") or "",
+                "upload_date": "",
+                "risk_signals": [],
+                "has_redline": False,
+            },
+        )
+        record["chunks_created"] += 1
+
+        # Risk signals are stored per chunk; collapse them to one entry per
+        # (document, signal type) so the dashboard counts documents at risk
+        # rather than chunks mentioning risk.
+        #
+        # Two shapes exist. The chunk payload holds bare type strings
+        # (["change_of_control"]) because that is all the retrieval filter needs,
+        # while the in-memory registry holds the extractor's full dicts with
+        # match counts and samples. Both have to normalise to the same record or
+        # the dashboard silently shows nothing — which is precisely what happened
+        # when only the dict shape was handled.
+        for signal in p.get("risk_signals") or []:
+            if isinstance(signal, str):
+                signal = {"signal_type": signal, "match_count": 1, "sample_matches": []}
+            elif not isinstance(signal, dict):
+                continue
+
+            sig_type = signal.get("signal_type", "other")
+            existing = next(
+                (s for s in record["risk_signals"] if s.get("signal_type") == sig_type),
+                None,
+            )
+            if existing is None:
+                record["risk_signals"].append(dict(signal))
+            else:
+                existing["match_count"] = existing.get("match_count", 0) + signal.get(
+                    "match_count", 0
+                )
+
+    return list(by_doc.values())
+
+
+async def _deal_documents(deal_id: str) -> list[dict]:
+    """Returns in-memory records when present, else rebuilds them from Qdrant."""
+    records = _documents.get(deal_id)
+    if records:
+        return records
+    return await _reconstruct_documents(deal_id)
+
+
 @router.get("/deals/{deal_id}/documents", response_model=list[DocumentRecord])
 async def list_deal_documents(deal_id: str):
     """
@@ -222,8 +357,12 @@ async def list_deal_documents(deal_id: str):
     Feeds the version browser: each record carries its position in the version
     chain (supersedes_doc_id / superseded_by / is_current_version).
     """
-    records = _documents.get(deal_id, [])
-    ordered = sorted(records, key=lambda r: r["upload_date"], reverse=True)
+    records = await _deal_documents(deal_id)
+    # Reconstructed records carry no upload_date, so fall back to filename for a
+    # stable order rather than letting an empty string shuffle the list.
+    ordered = sorted(
+        records, key=lambda r: (r.get("upload_date") or "", r["filename"]), reverse=True
+    )
     return [
         DocumentRecord(
             doc_id=r["doc_id"],
@@ -252,16 +391,21 @@ async def list_deal_risk_signals(deal_id: str):
     """
     signals: list[RiskSignal] = []
 
-    for record in _documents.get(deal_id, []):
+    for record in await _deal_documents(deal_id):
         for signal in record.get("risk_signals", []):
             signal_type = signal.get("signal_type", "other")
             match_count = signal.get("match_count", 0)
             samples = signal.get("sample_matches", [])
             sample_str = ", ".join(str(s) for s in samples if s)
 
-            description = f"{match_count} match(es)"
+            # Wording differs by source, deliberately. Records held in memory
+            # carry the extractor's own match count and sample text; records
+            # rebuilt from chunk payloads only know how many chunks carried the
+            # signal, so they must not claim to be counting regex matches.
             if sample_str:
-                description += f" — e.g. \"{sample_str[:120]}\""
+                description = f"{match_count} match(es) — e.g. \"{sample_str[:120]}\""
+            else:
+                description = f"{match_count} chunk(s) in this document matched"
 
             signals.append(
                 RiskSignal(

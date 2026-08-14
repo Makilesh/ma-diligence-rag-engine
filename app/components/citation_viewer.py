@@ -2,9 +2,52 @@
 Citation viewer component — renders citations with version warnings and computed flags.
 """
 
+import re
+
 import streamlit as st
 
 from app.styles import pill
+
+# A chunk's `section_heading` is whatever line the structural chunker judged to
+# be the heading, and on plain-text documents that is sometimes not a heading at
+# all — a rule of "=" characters used as a visual divider, or the first sentence
+# of a paragraph. Displaying those verbatim makes the citation list look broken
+# in exactly the place the product is asking to be trusted, so they are filtered
+# out and the citation falls back to file and page.
+#
+# This is presentation-only triage. The underlying imprecision is real and
+# documented (DECISIONS_LOG Decision 16); hiding the worst artefacts is not the
+# same as fixing heading granularity in the chunker.
+_SEPARATOR_RUN = re.compile(r"^[\s=_\-*~#.·•]+$")
+_MAX_HEADING_CHARS = 90
+
+
+def _clean_heading(section: str) -> str:
+    """
+    Returns a section heading worth showing, or "" if it is an artefact.
+
+    Args:
+        section: Raw `section_heading` from the chunk payload.
+
+    Returns:
+        Trimmed heading, or empty string when it should not be displayed.
+    """
+    if not section:
+        return ""
+
+    heading = section.strip()
+    if not heading or _SEPARATOR_RUN.match(heading):
+        return ""
+
+    # Long strings ending in sentence punctuation are prose that got captured as
+    # a heading, not a heading. Real headings here are short and label-like
+    # ("Section 8.2 — Indemnification Cap").
+    if len(heading) > _MAX_HEADING_CHARS and heading.endswith((".", ";", ",")):
+        return ""
+
+    # Trim decorative rules that trail a genuine heading.
+    heading = heading.strip("=_-*~ ").strip()
+    return heading
 
 
 def render_citations(citations: list[dict]) -> None:
@@ -39,7 +82,7 @@ def render_citations(citations: list[dict]) -> None:
     for i, cite in enumerate(citations, 1):
         source = cite.get("source_file", "Unknown")
         page = cite.get("page_number")
-        section = cite.get("section_heading", "")
+        section = _clean_heading(cite.get("section_heading", ""))
         is_current = cite.get("is_current_version", True)
         content_type = cite.get("content_type", "text")
 

@@ -33,6 +33,9 @@ def render_query_interface() -> tuple[str, bool] | None:
     # nothing. Assigning to the widget's own key before it is instantiated is the
     # supported way to set it.
     with st.expander("💡 Example queries — one per routed query type", expanded=False):
+        # Marker the stylesheet keys off to left-align these buttons; Streamlit
+        # centres button labels, which reads badly for full-sentence options.
+        st.markdown("<span class='dd-examples-marker'></span>", unsafe_allow_html=True)
         for category, example in EXAMPLE_QUERIES.items():
             col1, col2 = st.columns([1, 6])
             with col1:

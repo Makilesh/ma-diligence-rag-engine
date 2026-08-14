@@ -86,3 +86,53 @@ def test_every_example_query_is_selectable():
 
         box = next(t for t in at.text_area if t.key == "query_input")
         assert box.value == expected, f"{category} example did not load correctly"
+
+
+class TestCitationHeadingCleanup:
+    """
+    Section headings come from the chunker and are sometimes not headings.
+
+    A live answer rendered two citations as
+    "============================================================" and
+    "(a) by mutual written consent of Buyer and the Company;" — a divider rule
+    and a mid-sentence fragment. Both are honest reflections of the chunk
+    metadata and both make the citation list look broken precisely where the
+    product is asking to be trusted.
+    """
+
+    def test_separator_rules_are_dropped(self):
+        from app.components.citation_viewer import _clean_heading
+
+        for junk in ["=" * 60, "-----", "___", "***", "  ==  ", "····"]:
+            assert _clean_heading(junk) == "", f"{junk!r} should not be displayed"
+
+    def test_real_headings_are_kept(self):
+        from app.components.citation_viewer import _clean_heading
+
+        for good in [
+            "Section 8.2 — Indemnification Cap",
+            "CONSOLIDATED INCOME STATEMENT",
+            "Net Revenue Retention",
+        ]:
+            assert _clean_heading(good) == good
+
+    def test_prose_captured_as_a_heading_is_dropped(self):
+        from app.components.citation_viewer import _clean_heading
+
+        prose = (
+            "(a) by mutual written consent of Buyer and the Company, and subject "
+            "always to the provisions of Section 9.3 hereof, provided that notice "
+            "has been duly given."
+        )
+        assert _clean_heading(prose) == ""
+
+    def test_trailing_decoration_is_trimmed(self):
+        from app.components.citation_viewer import _clean_heading
+
+        assert _clean_heading("ARTICLE VIII ====") == "ARTICLE VIII"
+
+    def test_empty_and_none_are_safe(self):
+        from app.components.citation_viewer import _clean_heading
+
+        assert _clean_heading("") == ""
+        assert _clean_heading(None) == ""

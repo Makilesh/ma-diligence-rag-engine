@@ -355,6 +355,23 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.dd-answer-marker) td {{
     box-shadow: none;
 }}
 
+/* Example-query buttons hold a full sentence. Streamlit centres button labels,
+   which turns each one into a wide bar with text floating in the middle; as a
+   list of options they read far better flush-left. */
+div[data-testid="stExpander"]:has(.dd-examples-marker) .stButton > button {{
+    text-align: left;
+    justify-content: flex-start;
+    background: var(--dd-surface);
+    font-weight: 480;
+    color: var(--dd-muted);
+    padding: 0.55rem 0.85rem;
+}}
+div[data-testid="stExpander"]:has(.dd-examples-marker) .stButton > button p {{ text-align: left; width: 100%; }}
+div[data-testid="stExpander"]:has(.dd-examples-marker) .stButton > button:hover {{
+    color: var(--dd-text);
+    background: var(--dd-surface-3);
+}}
+
 /* ---------- Inputs ---------- */
 .stTextArea textarea, .stTextInput input {{
     background: var(--dd-surface) !important;
