@@ -1,0 +1,52 @@
+# Build context exclusions.
+#
+# `docker_data/` is the single reason this file has to exist: it is a live
+# bind-mount target held open by the running containers, so including it makes
+# the build fail outright with "open docker_data: Access is denied" on Windows
+# before a single layer is written. Everything else here is size and secrecy.
+
+# Live database state — locked while containers run, and never needed in an image
+docker_data/
+qdrant_local_db/
+qdrant_test_db/
+qdrant_test_db_v2/
+
+# Secrets — the image must receive keys via the environment, never baked in
+.env
+.env.*
+!.env.example
+
+# Local virtualenvs — the image installs its own dependencies
+.venv/
+venv/
+
+# VCS and editor state
+.git/
+.gitignore
+.github/
+.idea/
+.vscode/
+
+# Python caches and test artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Model / embedding caches — multi-GB, re-downloaded inside the image
+.cache/
+models/
+
+# Logs and scratch
+*.log
+logs/
+scratchpad/
+
+# Deal documents are mounted at runtime via the ./data volume, not copied in
+data/

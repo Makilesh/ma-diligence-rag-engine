@@ -52,6 +52,11 @@ services:
     environment:
       - QDRANT_URL=http://qdrant:6333
       - POSTGRES_URL=postgresql://manda_user:${POSTGRES_PASSWORD:-password}@postgres:5432/manda_rag
+      # Multi-key rotation is the primary path — the budget tracker spreads load
+      # across every key in GEMINI_API_KEYS and retires them individually. Passing
+      # only the singular GEMINI_API_KEY silently collapses the pool to one key,
+      # so the container hits a daily cap the host process would have survived.
+      - GEMINI_API_KEYS=${GEMINI_API_KEYS}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - OLLAMA_API_BASE=${OLLAMA_API_BASE:-http://host.docker.internal:11434}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
