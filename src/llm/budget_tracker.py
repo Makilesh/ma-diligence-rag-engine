@@ -23,7 +23,7 @@ RATE LIMITERS:
 import asyncio
 import os
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import asyncpg
 
@@ -39,6 +39,37 @@ from src.llm.rate_limiter import RateLimiter
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
+
+
+def _utc_today() -> date:
+    """
+    Today's date in UTC — the unit the daily quota resets on.
+
+    Returns a `date`, not a string, because asyncpg binds parameters by the
+    type it infers from the statement: `reset_date = $1::date` infers `date`
+    and rejects a str with the opaque "'str' object has no attribute
+    'toordinal'". The `::date` cast does not rescue it — the cast applies
+    server-side, after asyncpg has already had to encode the value.
+
+    This was invisible for a long time. The api_budget table in the running
+    database predated the DATE column in the schema and still held reset_date
+    as text, so string binding worked and every quota query passed. The bug
+    only appeared on a database created fresh from the current schema — which
+    means it was never a dev-only quirk: it broke every first deploy, and
+    every query with it, while the developer's own machine stayed green.
+    """
+    return datetime.now(timezone.utc).date()
+
+
+def _utc_today_iso() -> str:
+    """
+    Today's date as an ISO string, for comparison against ModelBudget.reset_date.
+
+    ModelBudget carries reset_date as a string, so the in-Python comparisons
+    (and the mock backend) need this form. Anything crossing into SQL must use
+    `_utc_today()` instead.
+    """
+    return _utc_today().isoformat()
 
 
 @dataclass(frozen=True)
@@ -437,7 +468,7 @@ class BudgetTracker:
 
         slot = self._slot(key_index, model)
         limit = self._slot_limit(slot)
-        today = datetime.now(timezone.utc).date().isoformat()
+        today = _utc_today()
 
         logger.warning(
             "Provider refused further calls; marking slot exhausted for today",
@@ -445,7 +476,11 @@ class BudgetTracker:
         )
 
         if getattr(self, "_is_mock", False):
-            self._mock_budgets[slot] = {"used_today": limit, "reset_date": today}
+            # The mock backend stores reset_date as a string, matching ModelBudget.
+            self._mock_budgets[slot] = {
+                "used_today": limit,
+                "reset_date": today.isoformat(),
+            }
             return
 
         try:
@@ -539,7 +574,7 @@ class BudgetTracker:
             True if budget is available for this model today.
         """
         budget = await self._load_budget(model_key)
-        today = datetime.now(timezone.utc).date().isoformat()
+        today = _utc_today_iso()
         if budget.reset_date != today:
             return True
         return budget.used_today < self._slot_limit(model_key)
@@ -560,14 +595,15 @@ class BudgetTracker:
         Returns:
             True if budget was consumed, False if exhausted.
         """
-        today = datetime.now(timezone.utc).date().isoformat()
+        today = _utc_today()
+        today_iso = today.isoformat()
         if getattr(self, "_is_mock", False):
             if model_key not in self._mock_budgets:
-                self._mock_budgets[model_key] = {"used_today": 0, "reset_date": today}
+                self._mock_budgets[model_key] = {"used_today": 0, "reset_date": today_iso}
             b = self._mock_budgets[model_key]
-            if b["reset_date"] < today:
+            if b["reset_date"] < today_iso:
                 b["used_today"] = 0
-                b["reset_date"] = today
+                b["reset_date"] = today_iso
             if b["used_today"] < self._slot_limit(model_key):
                 b["used_today"] += 1
                 logger.info(
@@ -618,7 +654,7 @@ class BudgetTracker:
         Returns:
             ModelBudget dataclass with used_today and reset_date.
         """
-        today = datetime.now(timezone.utc).date().isoformat()
+        today = _utc_today_iso()
         if getattr(self, "_is_mock", False):
             if model_key not in self._mock_budgets:
                 self._mock_budgets[model_key] = {"used_today": 0, "reset_date": today}
@@ -646,7 +682,7 @@ class BudgetTracker:
                     model_key=model_key,
                     daily_limit=self._slot_limit(model_key),
                     used_today=0,
-                    reset_date=datetime.now(timezone.utc).date().isoformat(),
+                    reset_date=_utc_today_iso(),
                 )
             return ModelBudget(
                 model_key=row["model_key"],

@@ -5,7 +5,9 @@ Manages startup/shutdown of Qdrant client, BudgetTracker, and LangGraph.
 Immutable audit log on every query.
 """
 
+import asyncio
 import os
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -17,6 +19,19 @@ from src.workflow.orchestrator import get_compiled_graph, close_checkpointer
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
+
+# Windows defaults asyncio to ProactorEventLoop, which psycopg refuses to run
+# on, so AsyncPostgresSaver raises at startup and checkpointing degrades to
+# MemorySaver. See run_api.py for the full account.
+#
+# This covers callers that import the app before any loop exists (tests,
+# scripts, `python -c`). It does NOT cover `uvicorn api.main:app`, because
+# uvicorn imports the app from inside Server.serve(), by which point its loop is
+# already running and a policy change has no effect — that path needs
+# run_api.py. Setting it in both places is deliberate: neither one covers the
+# other's entry.
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 # Module-level reference to compiled graph
 _app_graph = None
