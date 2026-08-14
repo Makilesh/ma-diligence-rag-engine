@@ -13,7 +13,14 @@ langchain-core>=0.2.0,<0.3.0
 litellm>=1.40.0,<2.0.0
 
 # Vector database
-qdrant-client[async]>=1.9.0,<2.0.0
+# The range must track the server image in docker-compose.yml. Qdrant enforces
+# "major versions match, minor differs by at most 1" and the client warns when
+# it does not — but a warning is all you get, and the failure that follows is
+# silent and total. `>=1.9.0,<2.0.0` against a server pinned to v1.12.1 resolved
+# to client 1.18.0, whose gRPC vector encoding the old server could not read:
+# every ingest failed with "expected dim: 1024, got 0" while REST worked, so the
+# system looked healthy and indexed nothing.
+qdrant-client[async]>=1.17.0,<1.20.0
 
 # Embeddings and reranking
 sentence-transformers>=2.7.0,<3.0.0

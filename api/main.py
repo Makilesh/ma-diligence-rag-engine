@@ -12,7 +12,11 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from src.vector_db.qdrant_client import get_qdrant_client, close_qdrant_client
+from src.vector_db.qdrant_client import (
+    get_qdrant_client,
+    close_qdrant_client,
+    assert_server_compatible,
+)
 from src.vector_db.collection_manager import setup_collections
 from src.llm.budget_tracker import BudgetTracker
 from src.workflow.orchestrator import get_compiled_graph, close_checkpointer
@@ -48,6 +52,9 @@ async def lifespan(app: FastAPI):
 
     # Initialize Qdrant
     client = get_qdrant_client()
+    # Before anything writes: a client/server skew makes every gRPC upsert fail
+    # while leaving reads and health checks working, so it must stop startup.
+    await assert_server_compatible(client)
     await setup_collections(client)
 
     # Initialize budget tracker
