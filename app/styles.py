@@ -198,7 +198,10 @@ div[data-testid="stExpander"] {{
 }}
 div[data-testid="stExpander"] summary:hover {{ color: var(--dd-accent); }}
 
-div[data-testid="stVerticalBlockBorderWrapper"] {{
+/* `st.container(border=True)` draws its outline on the inner stVerticalBlock in
+   current Streamlit — there is no stVerticalBlockBorderWrapper element, so a
+   rule written against that name silently does nothing. */
+div[data-testid="stVerticalBlock"][class*="border"] {{
     border-radius: var(--dd-radius);
 }}
 
@@ -215,20 +218,30 @@ div[data-testid="stVerticalBlockBorderWrapper"] {{
 
 /* Answer bodies are model markdown — tighten the rhythm so long answers with
    headings and lists stay readable rather than sprawling.
-   `:has(.dd-answer-marker)` selects the bordered container that answer_display
-   drops an empty marker span into; see the comment there for why the obvious
-   wrapper-div approach cannot work under Streamlit. */
-#dd-answer, div[data-testid="stVerticalBlockBorderWrapper"]:has(.dd-answer-marker) {{
-    border-color: var(--dd-border) !important;
+
+   These selectors are anchored on the empty marker span that answer_display
+   emits, for two reasons. Wrapping the answer in a <div> does not work at all:
+   Streamlit renders every markdown call into its own DOM node, so an unclosed
+   div is closed by the parser before the answer arrives. And a bare
+   `:has(.dd-answer-marker)` is wrong in the other direction — `:has()` matches
+   every ancestor, so the gold border would land on the page container too.
+
+   So: the direct-child combinator pins the container rule to the innermost
+   block, and the adjacent-sibling combinator pins the typography to the one
+   element container that follows the marker — the answer itself.
+
+   Container test-ids are version-sensitive. These were read off the running
+   DOM (Streamlit 1.5x renders `stVerticalBlock` / `stElementContainer`; there
+   is no `stVerticalBlockBorderWrapper`). If a Streamlit upgrade makes the
+   answer lose its styling, this is the first place to look. */
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .dd-answer-marker) {{
     border-left: 3px solid var(--dd-accent) !important;
     border-radius: var(--dd-radius) !important;
     background: var(--dd-surface) !important;
     box-shadow: var(--dd-shadow);
 }}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.dd-answer-marker) h1,
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.dd-answer-marker) h2,
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.dd-answer-marker) h3,
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.dd-answer-marker) h4 {{
+
+div[data-testid="stElementContainer"]:has(.dd-answer-marker) + div[data-testid="stElementContainer"] :is(h1, h2, h3, h4) {{
     font-size: 0.98rem;
     font-weight: 640;
     letter-spacing: 0.01em;
@@ -236,28 +249,33 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.dd-answer-marker) h4 {{
     margin: 1.2rem 0 0.5rem;
     padding: 0;
 }}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.dd-answer-marker) li {{
+div[data-testid="stElementContainer"]:has(.dd-answer-marker) + div[data-testid="stElementContainer"] :is(h1, h2, h3, h4):first-child {{
+    margin-top: 0;
+}}
+div[data-testid="stElementContainer"]:has(.dd-answer-marker) + div[data-testid="stElementContainer"] li {{
     margin-bottom: 0.3rem;
     line-height: 1.62;
 }}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.dd-answer-marker) p {{
+div[data-testid="stElementContainer"]:has(.dd-answer-marker) + div[data-testid="stElementContainer"] p {{
     line-height: 1.68;
 }}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.dd-answer-marker) table {{
+div[data-testid="stElementContainer"]:has(.dd-answer-marker) + div[data-testid="stElementContainer"] table {{
     border-collapse: collapse;
     width: 100%;
-    font-size: 0.87rem;
+    font-size: 0.86rem;
     font-variant-numeric: tabular-nums;
+    display: block;
+    overflow-x: auto;
 }}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.dd-answer-marker) th {{
+div[data-testid="stElementContainer"]:has(.dd-answer-marker) + div[data-testid="stElementContainer"] th {{
     background: var(--dd-surface-3);
     color: var(--dd-muted);
     text-transform: uppercase;
     font-size: 0.7rem;
     letter-spacing: 0.06em;
+    white-space: nowrap;
 }}
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.dd-answer-marker) th,
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.dd-answer-marker) td {{
+div[data-testid="stElementContainer"]:has(.dd-answer-marker) + div[data-testid="stElementContainer"] :is(th, td) {{
     border: 1px solid var(--dd-border);
     padding: 0.45rem 0.7rem;
     text-align: left;
@@ -358,7 +376,7 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.dd-answer-marker) td {{
 /* Example-query buttons hold a full sentence. Streamlit centres button labels,
    which turns each one into a wide bar with text floating in the middle; as a
    list of options they read far better flush-left. */
-div[data-testid="stExpander"]:has(.dd-examples-marker) .stButton > button {{
+div[data-testid="stExpanderDetails"]:has(.dd-examples-marker) .stButton > button {{
     text-align: left;
     justify-content: flex-start;
     background: var(--dd-surface);
@@ -366,8 +384,8 @@ div[data-testid="stExpander"]:has(.dd-examples-marker) .stButton > button {{
     color: var(--dd-muted);
     padding: 0.55rem 0.85rem;
 }}
-div[data-testid="stExpander"]:has(.dd-examples-marker) .stButton > button p {{ text-align: left; width: 100%; }}
-div[data-testid="stExpander"]:has(.dd-examples-marker) .stButton > button:hover {{
+div[data-testid="stExpanderDetails"]:has(.dd-examples-marker) .stButton > button p {{ text-align: left; width: 100%; }}
+div[data-testid="stExpanderDetails"]:has(.dd-examples-marker) .stButton > button:hover {{
     color: var(--dd-text);
     background: var(--dd-surface-3);
 }}
