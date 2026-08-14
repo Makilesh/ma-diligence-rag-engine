@@ -197,18 +197,21 @@ Run only the databases in Docker and run the application services locally on you
 docker compose up postgres qdrant -d
 
 # Start the FastAPI backend server (in a new terminal window)
-uvicorn api.main:app --reload
+python run_api.py
 
 # Start the Streamlit frontend dashboard (in a separate terminal window)
 streamlit run app/streamlit_app.py
 ```
 
+`run_api.py` rather than `uvicorn api.main:app` because **on Windows the latter loses durable checkpointing**. uvicorn hands asyncio an explicit `ProactorEventLoop` factory, psycopg refuses to run on that loop, and `AsyncPostgresSaver` fails at startup — the orchestrator then degrades to in-memory checkpoints, so a restart loses session state. Setting the event loop policy does not help, because a loop *factory* overrides the policy; `run_api.py` builds a `SelectorEventLoop` itself and hands uvicorn a server to run on it. On Linux the default loop is already selector-based, so the container path is unaffected and `uvicorn api.main:app` remains correct there.
+
 ### 5. Running Tests & E2E Validation
 ```bash
-# Execute pytest suite (93 tests covering async safety, agents, quotas, and RRF)
+# Execute pytest suite (125 tests covering async safety, agents, quotas, RRF,
+# sub-question decomposition, and SQL parameter binding)
 pytest
 
-# Execute the live E2E validation against the 23-question golden set
+# Execute the live E2E validation against the 41-question golden set
 # (requires the API running and at least one Gemini key configured)
 python tests/run_end_to_end_validation.py
 ```
@@ -225,13 +228,16 @@ The set is **41 questions: 35 answerable** across financial, legal, comparative,
 |---|---|
 | Completed without an unhandled exception | 41/41 |
 | Answerable questions answered | 35/35 |
-| Mean fact recall | 71–87% (see note on variance below) |
-| Citation-source match | 28/35 |
+| Mean fact recall | 86% on a full-quota run; 71–87% across runs (see below) |
+| Answers with every expected fact present | 24/35 |
+| Citation-source match | 33/35 |
 | Answers flagged as unsupported by the validator | 0/35 |
 | Control questions where the engine did **not** fabricate | 6/6 |
-| Mean latency per query | 27–32s |
+| Mean latency per query | 30s |
 
-Recall is given as a range deliberately. Three runs of the identical 41 questions against an identical index scored 86.6%, 73.9% and 71.0% — the spread is driven by which synthesis model served the run as daily quota drained, not by any code change (see below). Reporting a single figure from the best run would be the more flattering choice and the less honest one. Full per-query breakdown, including every answer verbatim, in [`RESULTS.md`](RESULTS.md).
+Recall is reported with its dependency stated, because that dependency turned out to be the largest single factor. Four runs of the identical 41 questions against an identical index scored 86.6%, 73.9%, 71.0% and 85.9%, and the ordering is explained not by code changes but by **which synthesis model served the run**: the 85.9% run had 38 of 41 answers written by `gemini-3.6-flash` on fresh daily quota, while the 71.0% run had drained to `gemini-3.5-flash` for most of its answers. Quoting the best figure alone would be the more flattering choice and the less honest one. Full per-query breakdown, including every answer verbatim, in [`RESULTS.md`](RESULTS.md).
+
+Per-type recall on the full-quota run: legal 98.2%, multi-hop 85.2%, summary 83.3%, financial 83.8%, comparative 73.0%.
 
 **Three defects found by measurement rather than inspection.** Each was invisible to code review — the pipeline ran, returned plausible output, and logged no error:
 
@@ -250,7 +256,9 @@ Two details make it work rather than merely exist:
 
 Measured in isolation — retrieval only, no synthesis, so model choice cannot influence it — **fact coverage in the retrieved context rose from 64.2% to 84.7% (+20.4pp) across the 15 decomposable questions, with no regressions.** `comp_02` went 10% → 100%, `mh_06` 33% → 100%, `mh_07` 50% → 100%.
 
-**Why the end-to-end number is measured separately from that.** Answer recall across runs is dominated by which synthesis model served the run, and that drifts within a day as the top rung's 20-request daily quota drains. Three runs of the same 41 questions scored 86.6%, 73.9% and 71.0% as the mix shifted from mostly `gemini-3.6-flash` to mostly `gemini-3.5-flash` — and question types that are **never** decomposed moved in lockstep (legal 100% → 73%, summary 72% → 50%). Cross-run end-to-end comparison at this sample size therefore cannot attribute a change to a retrieval improvement, which is why the decomposition result above is measured on retrieval alone.
+**Why the end-to-end number is measured separately from that.** Answer recall across runs is dominated by which synthesis model served the run, and that drifts within a day as the top rung's 20-request daily quota drains. Four runs of the same 41 questions scored 86.6%, 73.9%, 71.0% and 85.9% as the mix shifted between `gemini-3.6-flash` and `gemini-3.5-flash` — and question types that are **never** decomposed moved in lockstep (legal 100% → 73% → 98%, summary 72% → 50% → 83%). The fourth run tested the explanation rather than just restating it: run on fresh quota, 38 of its 41 answers were written by `gemini-3.6-flash`, and recall returned to the top of the range. Cross-run end-to-end comparison at this sample size therefore cannot attribute a change to a retrieval improvement, which is why the decomposition result above is measured on retrieval alone.
+
+End-to-end, decomposition does show up where it should: `mh_05` — "what is the implied EV/EBITDA multiple on adjusted rather than reported EBITDA", the question that previously returned *"cannot be calculated"* — now answers at 100% fact recall, and multi-hop as a category reached 85.2%.
 
 **Three times the measurement was wrong rather than the system.** Each was caught by inspecting answers the metric had marked as failures: a binary refused/answered flag scored a correct partial answer as a hallucination; the golden set docked recall for writing "thirty-six months" instead of "36 months"; and markdown bold markers broke substring matching, so `contains **no information** regarding` was scored as a fabrication. Fact matching and refusal detection now normalise emphasis and accept equivalent surface forms. Re-scoring the same answers with the corrected matcher changed recall by roughly two points and moved control precision from 5/6 to 6/6 — a reminder that on a small set the harness is as likely to be wrong as the pipeline.
 
@@ -289,6 +297,14 @@ Measured in isolation — retrieval only, no synthesis, so model choice cannot i
 
 **"Nothing matched" is a valid outcome, not an exception.** RRF raised `ValueError` when both retrievers returned empty, turning a legitimate no-results query into a 500. It now returns an empty list so the Quality Assessor sees zero chunks and takes the refusal path the pipeline is built around.
 
+**Three bugs that only existed on a clean environment.** Rebuilding the stack from scratch — new containers, empty volumes — surfaced failures that a long-lived development machine had been hiding, and all three shared a shape: total, silent, and invisible to the tests.
+
+- **A dependency range that allowed an incompatible pair.** `requirements.txt` permitted `qdrant-client>=1.9.0,<2.0.0` while `docker-compose.yml` pinned the server to `v1.12.1`; pip resolved 1.18.0. Qdrant's contract is at most one minor version of skew. Over gRPC the newer client's vector encoding was unreadable by the old server, so *every* ingest failed — while REST, health checks, collection creation and search all worked. The harness dutifully ran 41 questions against an empty index and reported 0% recall, which looks exactly like a catastrophic regression in the engine. The client detects this and raises a `UserWarning`; a JSON log handler swallows it. Now: versions pinned to each other, `assert_server_compatible()` **raises** at startup before anything writes, and the harness aborts if fewer documents ingest than the corpus contains.
+- **Schema drift hid a broken SQL binding.** The budget tracker passed `date.today().isoformat()` into `reset_date = $1::date`. asyncpg encodes by inferred type and rejects a string, and the server-side cast happens too late to help. It had never failed because the long-lived database still stored that column as text from an older schema revision — and every tracker test sets `_is_mock = True`, skipping SQL entirely. Green suite, and not a single query could complete against a correctly-created database. It broke every *first* deploy, which is the one nobody has logs for.
+- **Durable checkpointing had never worked on Windows.** Covered above; the point here is that the only evidence was one `WARNING` line, and the system kept running perfectly well without the durability it claimed to have.
+
+The common lesson is that a green test suite plus a healthy `/health` endpoint plus plausible output is not evidence that the system works. All three failures were downstream of state that the development machine happened to have and a fresh one does not.
+
 More decisions and trade-offs are logged in [`DECISIONS_LOG.md`](DECISIONS_LOG.md).
 
 ---
@@ -305,7 +321,7 @@ src/
   vector_db/           Qdrant client, hybrid search, RRF fusion, reranker
   workflow/            LangGraph state machine, orchestrator, conditional edges
   utils/               Logging, token counting, audit log, metrics
-tests/                 93 tests + golden Q&A set + live E2E runner
+tests/                 125 tests + golden Q&A set + live E2E runner
 config/                Qdrant, LiteLLM, and chunking YAML configs
 ```
 
