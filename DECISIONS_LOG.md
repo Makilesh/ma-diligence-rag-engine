@@ -155,3 +155,52 @@ All architecture decisions that deviated from or resolved ambiguities in p4.md a
 - **Context**: Clicking an example query filled the text area visually but left the Search button disabled. The handler wrote to a separate `query_text` key passed as `value=`; once a keyed widget exists Streamlit serves its stored state and ignores `value=`, so the widget still returned an empty string and `disabled=not query` stayed true. Found by driving the real UI, not by reading the code - the DOM and the widget state disagreed.
 - **Resolution**: Write directly to `st.session_state["query_input"]` (the text area's own key) and call `st.rerun()`.
 - **Impact**: app/components/query_interface.py
+
+## Decision 24: Sub-question decomposition for multi-hop and comparative queries
+- **Date**: Session 7
+- **Context**: Query expansion generated paraphrases of the *same* question. For a question whose answer requires combining facts from different documents, that is structurally incapable of working: "what is the implied EV/EBITDA multiple?" rephrased five ways still never asks for the per-share price or the share count, so the passages holding them were never retrieved and the engine correctly reported it could not compute the multiple.
+- **Resolution**: Agent 1 now emits `sub_questions` alongside `query_expansions`, gated to `DECOMPOSABLE_QUERY_TYPES = {multi_hop, comparative}` and capped at `MAX_SUB_QUESTIONS = 4`. Each sub-question gets its own retrieval pass, **reranked against itself** — that is the whole mechanism: a passage containing only a share price scores near zero against the parent question and high against "what is the per-share merger consideration?". Results merge round-robin by rank so every facet is represented, then re-sort by score.
+- **Two sub-bugs, both found by running it rather than reading it**:
+  - Sub-questions inherited the parent's `document_category` filter, so all three passes of the EV/EBITDA query returned chunks from the *same* document. Decomposition had worked and the filter discarded the benefit. Sub-questions exist precisely to look elsewhere, so they now drop that filter (Decision 18 relaxes the same filter for a related reason).
+  - Splitting a fixed `final_top_k` across passes starved the parent query: comp_05 (severance multiples) went from 20% to **0%** fact coverage because the one table the parent had already found was squeezed out. The budget is now additive — the parent keeps its full `final_top_k` and sub-questions add on top.
+- **Measured on retrieval alone, not end-to-end**: mean fact coverage in retrieved context **64.2% → 84.7% (+20.4pp)** across the 15 decomposable golden questions, **zero regressions** (comp_02 10%→100%, mh_06 33%→100%, mh_07 50%→100%, mh_04 33%→67%). End-to-end recall could not attribute the change — see Decision 25.
+- **Guarded by**: quota-merge, additive-budget, and filter-inheritance tests in `tests/test_agents.py`.
+- **Impact**: query_intelligence.py, retrieval_executor.py, prompt_templates/query_intelligence.py, state_definitions.py, orchestrator.py
+
+## Decision 25: Report end-to-end recall as a range, because the benchmark measures quota state
+- **Date**: Session 7
+- **Context**: Three runs of the identical 41-question set scored 86.6%, 73.9% and 71.0%. The obvious reading was that Decision 24 had backfired. It had not. Question types that are **never decomposed** moved in lockstep — legal 100%→78%→73%, summary 72%→69%→50% — while the synthesis model mix drifted from mostly `gemini-3.6-flash` to mostly `gemini-3.5-flash` as the 20-request daily quota on the stronger model drained.
+- **Resolution**: Report recall as a range (**71–87%**) with the cause stated, rather than the single flattering figure from the best run, and measure Decision 24 on retrieval alone where model choice cannot interfere.
+- **Why this is the finding, not the caveat**: the headline metric was substantially a function of what time of day the run started. Any single number quoted from it — including the good one — would have been an artifact. A benchmark that silently varies by 15 points with the provider's rate limiter is measuring the rate limiter.
+- **Impact**: README.md, RESULTS.md, scratchpad A/B harness
+
+## Decision 26: Durable checkpointing was dead on Windows — uvicorn hardcodes the Proactor loop
+- **Date**: Session 7
+- **Context**: Every startup logged `Failed to initialize PostgresSaver: Psycopg cannot use the 'ProactorEventLoop'` and fell back to `MemorySaver`. One WARNING line was the only evidence that crash recovery and session resume did not exist. An earlier fix (holding the `AsyncPostgresSaver` context open in an `AsyncExitStack`) was necessary and insufficient — the connection could never open in the first place.
+- **Why the obvious fix fails**: setting `asyncio.set_event_loop_policy(WindowsSelectorEventLoopPolicy())` does nothing. uvicorn 0.49's `loops/asyncio.py` returns `asyncio.ProactorEventLoop` as an explicit loop **factory**, and a factory overrides the policy. It also loads the ASGI app from inside `Server.serve()`, so module-scope code in `api.main` runs when the loop already exists. Both routes are closed.
+- **Resolution**: `run_api.py` constructs the loop itself — `asyncio.Runner(loop_factory=asyncio.SelectorEventLoop)` — and hands uvicorn a `Server` to run on it. Linux is untouched and keeps uvloop, since its default loop is already selector-based. Result: `LangGraph state machine compiled with PostgresSaver` for the first time.
+- **Trade-off**: the selector loop caps around 512 sockets and cannot spawn subprocesses. This process talks HTTP to Qdrant and Postgres and spawns nothing, so neither binds; `--reload` is off for that reason.
+- **Impact**: run_api.py (new), api/main.py
+
+## Decision 27: Bind dates as dates — schema drift hid a total failure behind a green test suite
+- **Date**: Session 7
+- **Context**: On a Postgres volume created fresh from the current schema, **every** query failed with `invalid input for query argument $1: '2026-08-14' ('str' object has no attribute 'toordinal')`. The budget tracker passed `date.today().isoformat()` into `reset_date = $1::date`; asyncpg encodes by the type it infers from the statement, and the server-side `::date` cast happens after encoding, so it cannot rescue a str.
+- **Why it survived**: the long-lived development database still held `reset_date` as text from an older schema revision, so string binding worked there, and every existing tracker test sets `_is_mock = True`, which skips SQL entirely. The suite was green while the code could not complete a single query against a correctly-created database. This is the failure mode worth naming: it was never a dev-only quirk — it broke every *first* deploy, and only the first, which is the one nobody has logs for.
+- **Resolution**: `_utc_today()` returns a `date` for anything crossing into SQL; `_utc_today_iso()` returns the string form for the in-Python comparisons and the mock backend.
+- **Guarded by**: `TestDateBindingToPostgres`, which drives the real SQL path through a recording connection and asserts no ISO-shaped string is ever bound to a `::date` parameter. Verified to fail against the pre-fix behaviour before being kept.
+- **Impact**: budget_tracker.py, tests/test_rate_limiter.py
+
+## Decision 28: Container packaging — exclude live state, pass the whole key pool
+- **Date**: Session 7
+- **Context**: `docker compose up` failed outright: with no `.dockerignore`, the build context included `docker_data/`, a bind-mount target held open by the running containers, so the build died on `open docker_data: Access is denied` before writing a layer. Separately, the `api` service passed only `GEMINI_API_KEY` while the budget tracker's primary path reads `GEMINI_API_KEYS` — the container silently collapsed a five-key rotation pool to one key and would hit a daily cap the host process survives.
+- **Resolution**: Added `.dockerignore` (live DB state, secrets, virtualenvs, VCS, caches, and `data/` which is mounted at runtime); compose now passes `GEMINI_API_KEYS` alongside the legacy singular form.
+- **Impact**: .dockerignore (new), docker-compose.yml
+
+## Decision 29: Pin the Qdrant client to the server — a version skew failed every write in silence
+- **Date**: Session 7
+- **Context**: On a clean environment, all 9 documents failed to ingest with `Vector dimension error: expected dim: 1024, got 0` and `Conversion between sparse and regular vectors failed`, and the harness then ran all 41 questions against an empty index and scored 0% recall on every one. `requirements.txt` allowed `qdrant-client>=1.9.0,<2.0.0`, which resolved to 1.18.0, while `docker-compose.yml` pinned the server to `v1.12.1` — six minor versions apart, against a documented contract of at most one.
+- **Diagnosis**: probing the same upsert over both transports isolated it immediately — `prefer_grpc=True` failed, `prefer_grpc=False` succeeded. The newer client's gRPC vector encoding was unreadable by the older server. REST, health checks, collection creation and search all worked, so every signal short of the actual write said the system was fine.
+- **Why it was invisible**: the client *does* detect this and raises a `UserWarning`, which a JSON log handler swallows. Nothing downstream treats an empty index as an error — retrieval returns no chunks, the quality gate scores 0.00, and the engine correctly refuses. A total ingestion failure and a genuinely unanswerable corpus are indistinguishable in the output.
+- **Resolution**: server pinned to `v1.18.0`, client range narrowed to `>=1.17.0,<1.20.0`, with the coupling stated in both files. `assert_server_compatible()` now runs before anything writes and **raises** on a skew rather than logging. The eval harness aborts when fewer documents ingest than the corpus contains, instead of producing a full results file measuring the ingestion failure.
+- **Migration note**: Qdrant 1.18 cannot read segments written by 1.12 (`unknown variant 'on_disk'`), so the volume had to be recreated. It held zero points, so nothing was lost — on a populated deployment this would require a re-index.
+- **Impact**: requirements.txt, docker-compose.yml, src/vector_db/qdrant_client.py, api/main.py, tests/run_end_to_end_validation.py

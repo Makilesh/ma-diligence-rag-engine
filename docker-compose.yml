@@ -26,7 +26,12 @@ services:
 
   # ==================== Vector Database ====================
   qdrant:
-    image: qdrant/qdrant:v1.12.1
+    # Must stay within one minor version of the qdrant-client pin in
+    # requirements.txt. At v1.12.1 against client 1.18 every ingest failed:
+    # the newer client's gRPC vector encoding was unreadable by the old server,
+    # which reported "expected dim: 1024, got 0" and "Conversion between sparse
+    # and regular vectors failed" while REST on the same pair worked fine.
+    image: qdrant/qdrant:v1.18.0
     container_name: manda-qdrant
     ports:
       - "6333:6333"  # REST API

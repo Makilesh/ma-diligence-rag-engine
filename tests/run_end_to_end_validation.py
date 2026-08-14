@@ -316,7 +316,22 @@ async def main():
 
         doc_mappings = await ingest_files(client, files_info)
         print(f"\nIngestion completed. {len(doc_mappings)} documents indexed.")
-        
+
+        # Abort rather than measure nothing. A Qdrant client/server version skew
+        # made every upsert fail while the API stayed healthy; the harness
+        # printed "0 documents indexed" and then ran all 41 questions against an
+        # empty index, producing a full results file of 0% recall that looked
+        # like a catastrophic regression in the engine. An evaluation whose
+        # corpus failed to load has no result to report — including a bad one.
+        if len(doc_mappings) < len(files_info):
+            print(
+                f"\nABORTING: only {len(doc_mappings)}/{len(files_info)} documents "
+                f"ingested. Every query would be scored against an incomplete "
+                f"index, so the run would measure the ingestion failure rather "
+                f"than the engine. Fix ingestion and re-run."
+            )
+            return
+
         # Step 3: Load golden QA set
         qa_path = Path(__file__).parent / "golden_qa_set.json"
         with open(qa_path, "r", encoding="utf-8") as f:
