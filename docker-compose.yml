@@ -41,10 +41,17 @@ services:
     environment:
       QDRANT__SERVICE__GRPC_PORT: 6334
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
+      # The Qdrant image ships no curl and no wget, so the obvious
+      # `curl -f .../healthz` check failed every single time — 1932 consecutive
+      # failures on one container. Because `api` waits on
+      # `condition: service_healthy`, that silently made the fully containerized
+      # `docker compose up` path unable to ever start the API or the UI.
+      # bash is present, so use its /dev/tcp redirection to probe the port.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/6333"]
       interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
   # ==================== FastAPI Application ====================
   api:
