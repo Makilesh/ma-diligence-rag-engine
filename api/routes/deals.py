@@ -62,10 +62,85 @@ async def create_deal(request: DealCreateRequest):
     return DealResponse(**_deals[deal_id])
 
 
+async def _discover_indexed_deals() -> dict[str, int]:
+    """
+    Finds deals that exist in the vector store, with their document counts.
+
+    `_deals` only knows about deals created through `POST /deals` in *this*
+    process. That leaves two ways for real, queryable data to be invisible in
+    the UI: anything ingested directly against a deal_id (which is how the
+    evaluation harness loads the corpus), and everything at all after a restart,
+    since the registry is in-memory while Qdrant is on disk. Both produced the
+    same dead end — 131 indexed chunks, and a sidebar reading "No deals found."
+
+    Qdrant is the source of truth for what is actually searchable, so ask it.
+
+    Returns:
+        Mapping of deal_id to distinct document count. Empty on any failure —
+        the endpoint still returns the in-memory deals.
+    """
+    from src.vector_db.qdrant_client import get_qdrant_client
+    from src.vector_db.constants import COLLECTION_NAME
+
+    client = get_qdrant_client()
+    try:
+        deal_facet = await client.facet(
+            collection_name=COLLECTION_NAME, key="deal_id", limit=1000
+        )
+    except Exception as e:
+        logger.warning(f"Could not enumerate deals from the vector store: {e}")
+        return {}
+
+    discovered: dict[str, int] = {}
+    for hit in deal_facet.hits:
+        deal_id = str(hit.value)
+        try:
+            from qdrant_client.models import FieldCondition, Filter, MatchValue
+
+            file_facet = await client.facet(
+                collection_name=COLLECTION_NAME,
+                key="source_file",
+                facet_filter=Filter(
+                    must=[FieldCondition(key="deal_id", match=MatchValue(value=deal_id))]
+                ),
+                limit=1000,
+            )
+            discovered[deal_id] = len(file_facet.hits)
+        except Exception:
+            # Chunk count is a poor stand-in for document count, but a deal that
+            # is listed with the wrong count is far better than one that is
+            # missing entirely.
+            discovered[deal_id] = 0
+    return discovered
+
+
 @router.get("/deals", response_model=list[DealResponse])
 async def list_deals():
-    """Lists all deals."""
-    return [DealResponse(**d) for d in _deals.values()]
+    """
+    Lists every deal that is queryable — registered in this process or indexed.
+
+    Deals created via `POST /deals` keep their name and description; deals found
+    only in the vector store are listed under their deal_id so they can still be
+    selected.
+    """
+    deals = {d["deal_id"]: dict(d) for d in _deals.values()}
+
+    for deal_id, doc_count in (await _discover_indexed_deals()).items():
+        if deal_id in deals:
+            # Prefer the live index count over the registry's, which drifts on
+            # restart while the vector store does not.
+            if doc_count:
+                deals[deal_id]["document_count"] = doc_count
+            continue
+        deals[deal_id] = {
+            "deal_id": deal_id,
+            "deal_name": deal_id,
+            "description": "Discovered in the vector store",
+            "document_count": doc_count,
+            "status": "active",
+        }
+
+    return [DealResponse(**d) for d in deals.values()]
 
 
 @router.get("/deals/{deal_id}", response_model=DealResponse)

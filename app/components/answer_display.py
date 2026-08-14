@@ -4,7 +4,7 @@ Answer display component — renders answer with confidence badge and validation
 
 import streamlit as st
 
-from app.styles import escape_currency, pill
+from app.styles import escape_currency, pill, stat_row
 
 
 def render_answer(
@@ -29,16 +29,20 @@ def render_answer(
         latency_ms: Total pipeline latency.
         rewrite_iterations: Number of query rewrites performed.
     """
-    # Header metrics
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Confidence", f"{confidence_score:.0%}")
-    with col2:
-        st.metric("Query Type", (query_type or "—").replace("_", " ").title())
-    with col3:
-        st.metric("Latency", f"{latency_ms / 1000:.1f}s")
-    with col4:
-        st.metric("Rewrites", str(rewrite_iterations))
+    # Header metrics. A compact strip rather than st.metric cards: these are
+    # context for the answer below, not the subject of the page, and four full
+    # cards pushed the answer itself below the fold.
+    st.markdown(
+        stat_row(
+            [
+                ("Confidence", f"{confidence_score:.0%}"),
+                ("Query Type", (query_type or "—").replace("_", " ").title()),
+                ("Latency", f"{latency_ms / 1000:.1f}s"),
+                ("Rewrites", str(rewrite_iterations)),
+            ]
+        ),
+        unsafe_allow_html=True,
+    )
 
     # Validation status banner — the pipeline's own verdict on its own answer
     st.write("")
@@ -63,8 +67,15 @@ def render_answer(
 
     # Answer body — a bordered container rather than raw HTML, so the model's
     # markdown (lists, tables, emphasis) still renders correctly.
+    #
+    # The empty marker span is how the stylesheet finds this container. Wrapping
+    # the answer in an opening <div> and closing it in a later st.markdown call
+    # does not work: Streamlit renders every markdown call into its own DOM
+    # container, so the parser closes the div immediately and the answer ends up
+    # outside it. A marker plus `:has()` targets the real container instead.
     st.write("")
     with st.container(border=True):
+        st.markdown("<span class='dd-answer-marker'></span>", unsafe_allow_html=True)
         st.markdown(escape_currency(answer))
 
     if hallucination_flags:

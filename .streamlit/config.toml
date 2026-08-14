@@ -1,20 +1,25 @@
 # Streamlit theme + server config for the M&A Due Diligence Intelligence Engine.
 # Loaded automatically when Streamlit is started from the project root, and
 # baked into the UI image by Dockerfile.streamlit.
+#
+# These four colours are duplicated in app/styles.py. Streamlit reads this file
+# before any Python runs, so the widgets it paints itself (buttons, inputs,
+# sliders) take their base colour from here while everything else comes from the
+# injected stylesheet — change both together or the two will drift apart.
 
 [theme]
 base = "dark"
-primaryColor = "#D4A574"            # muted gold — accent for actions and focus
-backgroundColor = "#0E1117"         # near-black canvas
-secondaryBackgroundColor = "#171B26" # cards, sidebar, expanders
-textColor = "#E8EAED"
+primaryColor = "#E0B36A"             # warm gold — actions, focus, provenance
+backgroundColor = "#0B0E14"          # deep ink canvas
+secondaryBackgroundColor = "#12151F" # cards, sidebar, expanders
+textColor = "#E6E9EF"
 font = "sans serif"
 
 [server]
 headless = true
 enableCORS = false
 enableXsrfProtection = true
-maxUploadSize = 200                 # MB — data room documents are large
+maxUploadSize = 200                  # MB — data room documents are large
 
 [browser]
-gatherUsageStats = false            # no telemetry for confidential deal data
+gatherUsageStats = false             # no telemetry for confidential deal data

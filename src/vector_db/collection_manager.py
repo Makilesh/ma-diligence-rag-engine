@@ -228,6 +228,11 @@ async def create_payload_indexes(client: AsyncQdrantClient | None = None) -> Non
         ("currency",            PayloadSchemaType.KEYWORD),
         ("contains_pii",        PayloadSchemaType.INTEGER),    # 0 or 1
         ("content_type",        PayloadSchemaType.KEYWORD),
+        # Indexed so /deals can facet distinct documents per deal without
+        # scrolling the whole collection. Qdrant refuses to facet an unindexed
+        # field outright, so this is a requirement of that endpoint, not a
+        # performance nicety.
+        ("source_file",         PayloadSchemaType.KEYWORD),
     ]
 
     for field_name, field_type in indexes:
