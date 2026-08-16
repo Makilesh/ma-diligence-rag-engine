@@ -192,3 +192,49 @@ def get_embed_executor() -> ThreadPoolExecutor:
         ThreadPoolExecutor dedicated to embedding operations.
     """
     return _embed_executor
+
+
+async def warm_models() -> dict[str, float]:
+    """
+    Loads and exercises every local model so the first query does not pay for it.
+
+    All three models load lazily on first use: BAAI/bge-m3 for dense embeddings,
+    bge-reranker-v2-m3 for cross-encoding, and FastEmbed's BM25 for sparse
+    vectors. Together that is several gigabytes of weights, so the first query
+    after a restart was tens of seconds slower than every query after it —
+    fine for a batch evaluation, bad in front of a live audience where the first
+    question is the one being watched.
+
+    Loading is not enough on its own; each model is also run once, because the
+    first forward pass allocates buffers and triggers kernel selection that a
+    bare constructor call does not.
+
+    Failures are logged and swallowed. A warmup is an optimisation, and it must
+    never be the reason the API refuses to start.
+
+    Returns:
+        Mapping of model name to seconds taken. Missing keys indicate a failure.
+    """
+    import asyncio
+    import time
+
+    from src.vector_db.hybrid_search import compute_sparse_bm25
+
+    timings: dict[str, float] = {}
+    loop = asyncio.get_running_loop()
+    probe = "Aurora Technologies reported total revenue of $452.8 million in FY2023."
+
+    async def _timed(name: str, fn) -> None:
+        start = time.monotonic()
+        try:
+            await loop.run_in_executor(_embed_executor, fn)
+            timings[name] = round(time.monotonic() - start, 2)
+        except Exception as e:
+            logger.warning(f"Model warmup failed for {name}: {e}")
+
+    await _timed("dense_embedding", lambda: _get_embedding_model().encode([probe]))
+    await _timed("reranker", lambda: _get_reranker_model().predict([(probe, probe)]))
+    await _timed("sparse_bm25", lambda: compute_sparse_bm25(probe))
+
+    logger.info("Local model warmup complete", extra={"seconds": timings})
+    return timings

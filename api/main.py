@@ -67,6 +67,14 @@ async def lifespan(app: FastAPI):
     # Compile LangGraph
     _app_graph = await get_compiled_graph(postgres_url)
 
+    # Load the local models now rather than on the first query. Costs a slower
+    # startup and removes a tens-of-seconds penalty from whichever question is
+    # asked first. Set WARM_MODELS=0 to skip (faster restarts while developing).
+    if os.getenv("WARM_MODELS", "1") != "0":
+        from src.vector_db.reranker import warm_models
+
+        await warm_models()
+
     logger.info("Application startup complete")
 
     yield  # Application runs here
