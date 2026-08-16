@@ -204,3 +204,43 @@ All architecture decisions that deviated from or resolved ambiguities in p4.md a
 - **Resolution**: server pinned to `v1.18.0`, client range narrowed to `>=1.17.0,<1.20.0`, with the coupling stated in both files. `assert_server_compatible()` now runs before anything writes and **raises** on a skew rather than logging. The eval harness aborts when fewer documents ingest than the corpus contains, instead of producing a full results file measuring the ingestion failure.
 - **Migration note**: Qdrant 1.18 cannot read segments written by 1.12 (`unknown variant 'on_disk'`), so the volume had to be recreated. It held zero points, so nothing was lost — on a populated deployment this would require a re-index.
 - **Impact**: requirements.txt, docker-compose.yml, src/vector_db/qdrant_client.py, api/main.py, tests/run_end_to_end_validation.py
+
+## Decision 30: The models were on CPU the whole time
+- **Date**: Session 8
+- **Context**: A live query took 51s, with 24s of it inside retrieval across two passes. `torch.__version__` was `2.12.1+cpu` on a machine with an idle RTX 5070 Ti (12GB). BAAI/bge-m3 and bge-reranker-v2-m3 had been running on CPU for the life of the project.
+- **Why it was invisible**: the device-selection code was correct — `"cuda" if torch.cuda.is_available() else "cpu"` — and it faithfully logged `CPU` at every startup. Nothing failed. Answers were identical. The only symptom was that everything was about five times slower than it needed to be, which is not a symptom anyone notices without a baseline. `requirements.txt` even documented installing a CUDA wheel; the instruction did not work, which is the actual defect.
+- **Root cause of the bad instruction**: `pip install torch --index-url https://download.pytorch.org/whl/cu128` reports *"Requirement already satisfied"* whenever any torch is present. The CPU and CUDA wheels share a version and differ only by local tag (`2.12.1+cpu` vs `+cu128`), which pip does not treat as an upgrade. The documented command was a no-op on every machine that already had torch — which is every machine that had installed `requirements.txt` first, since sentence-transformers pulls torch in.
+- **Resolution**: `pip install --force-reinstall --no-deps torch --index-url .../cu128`, with the reason written into `requirements.txt` and a one-line verification step in the README. cu128 or later is required for Blackwell (sm_120); earlier CUDA builds install cleanly and fail at the first forward pass.
+- **Measured**: retrieval 6–18s per pass → **0.8–3.8s for up to four passes**. API startup including model warmup 76s → 35s. End-to-end 51.5s → 32.5s on the same question.
+- **Impact**: requirements.txt, README.md
+
+## Decision 31: Warm the local models at startup
+- **Date**: Session 8
+- **Context**: All three local models load lazily. The first query after a restart therefore paid several gigabytes of weight loading — fine for a batch evaluation, bad in front of an audience, where the first question is the one being watched.
+- **Resolution**: `warm_models()` runs during the API lifespan, loading *and exercising* each model, since the first forward pass allocates buffers and selects kernels that a bare constructor does not. Failures are logged and swallowed — a warmup must never be why the API refuses to start. `WARM_MODELS=0` skips it for fast development restarts.
+- **Measured**: ~8.6s moved off the first query (dense 5.4s, reranker 2.9s, BM25 0.3s).
+- **Impact**: src/vector_db/reranker.py, api/main.py
+
+## Decision 32: The classifier must not veto the decomposer
+- **Date**: Session 8
+- **Context**: Sub-questions were kept only when `query_type` was `multi_hop` or `comparative`. Asked live for the implied EV/EBITDA multiple on adjusted rather than reported EBITDA — the exact question sub-question decomposition was built for (Decision 24) — Agent 1 decomposed it correctly into price, share count and EBITDA, *and* classified it `financial`. The veto discarded all three sub-questions and the engine answered about the offer price instead.
+- **Resolution**: honour sub-questions whenever the model returns them. Emitting them is the model's judgment that the answer spans several facts; classification is a separate judgment made for routing. Gating one on the other meant the feature worked only when two independent guesses agreed and failed invisibly when they did not. The prompt decides when to decompose; `MAX_SUB_QUESTIONS` bounds the cost.
+- **Measured on the same question**: 1 retrieval pass → 4; sub-questions 0 → 3; rewrite loops 1 → 0; confidence 0.85 → 1.00; and the answer went from the offer price to the multiple itself, **7.03x on Adjusted EBITDA of $99.0M versus 7.15x reported**.
+- **Not yet re-measured**: the 41-question evaluation predates this change. Removing a veto can only add decomposition, so the effect should be neutral-to-positive — but that is an argument, not a measurement, and the reported numbers say so.
+- **Guarded by**: `test_sub_questions_survive_an_unexpected_query_type`, `test_sub_questions_are_capped`.
+- **Impact**: src/agents/query_intelligence.py, tests/test_agents.py
+
+## Decision 33: The UI must reflect what is indexed, not what this process remembers
+- **Date**: Session 8
+- **Context**: Opening the dashboard against a fully populated index showed "No deals found", an empty version browser and an empty risk dashboard. `_deals` and `_documents` are in-memory dicts populated only by `POST /deals` and the ingest route, so anything ingested directly (how the evaluation harness loads the corpus) was invisible, and *everything* was invisible after a restart while Qdrant kept the data on disk. The engine answered questions correctly about a deal the UI said did not exist.
+- **Resolution**: `GET /deals` now merges the in-memory registry with deals discovered by faceting Qdrant on `deal_id`; documents and risk signals are reconstructed by scrolling chunk payloads when the registry is empty. Added a `source_file` payload index, since Qdrant refuses to facet an unindexed field.
+- **Shape mismatch worth noting**: chunk payloads store risk signals as bare type strings while the registry stores the extractor's full dicts. Handling only the dict shape produced a dashboard that rendered nothing and reported no error — the reconstruction normalises both.
+- **Result**: 9 documents and 19 risk signals (7 high severity) now visible after a cold start.
+- **Impact**: api/routes/deals.py, src/vector_db/collection_manager.py
+
+## Decision 34: One command to start the demo
+- **Date**: Session 8
+- **Context**: Starting the stack by hand has ordering constraints that are easy to get wrong and expensive to get wrong live: Qdrant must be healthy before the API opens its client, the API must be up before ingestion, and the index must be populated before the UI is worth showing. Every failure mode had already happened at least once — Docker not running, a version-skewed Qdrant, an empty index after a volume reset, cold models on the first question.
+- **Resolution**: `run_demo.py` performs and *checks* each step, starting Docker Desktop itself if needed. It fails with the specific remedy rather than a stack trace.
+- **Also fixed here**: the Qdrant healthcheck ran `curl`, which that image does not ship — 1932 consecutive failed checks on one container. Since `api` waits on `condition: service_healthy`, the fully containerized `docker compose up` path could never have started the API or the UI. Replaced with a bash `/dev/tcp` probe.
+- **Impact**: run_demo.py (new), docker-compose.yml

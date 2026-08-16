@@ -26,12 +26,24 @@ qdrant-client[async]>=1.17.0,<1.20.0
 sentence-transformers>=2.7.0,<3.0.0
 fastembed>=0.3.0,<0.4.0
 transformers>=4.40.0,<5.0.0
-# NOTE: PyTorch is intentionally EXCLUDED from this file.
-# sentence-transformers and transformers both depend on it, but the correct
-# version depends on your CUDA toolkit version. Install separately:
-#   pip install torch --index-url https://download.pytorch.org/whl/cu121
-# Replace cu121 with your CUDA version (cu118, cu124, cpu, etc.).
-# For the RTX 5070 Ti target hardware, use cu124 or later.
+# NOTE: PyTorch is intentionally EXCLUDED from this file, because the right
+# wheel depends on the machine's GPU and CUDA toolkit. Install it separately:
+#
+#   pip install --force-reinstall --no-deps torch \
+#       --index-url https://download.pytorch.org/whl/cu128
+#
+# `--force-reinstall --no-deps` matters. A plain `pip install torch
+# --index-url ...` reports "Requirement already satisfied" when any torch is
+# present and leaves a CPU build in place — the wheels differ only by local
+# version tag (2.12.1+cpu vs +cu128), which pip does not treat as an upgrade.
+# That is how this project silently ran BAAI/bge-m3 and bge-reranker-v2-m3 on
+# CPU while an idle RTX 5070 Ti sat next to them.
+#
+# cu128 or later is REQUIRED for Blackwell cards (RTX 50-series, sm_120).
+# Earlier builds install cleanly and then fail at the first forward pass with
+# "no kernel image is available for execution on the device".
+# Older GPUs: cu118 / cu124. No GPU: omit the index URL for the CPU build —
+# everything still works, roughly 5x slower through retrieval.
 numpy>=1.26.0,<2.0.0
 
 # Document processing

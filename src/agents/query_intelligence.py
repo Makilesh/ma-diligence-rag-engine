@@ -20,10 +20,9 @@ from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
-# Query types whose answers span several facts, and so benefit from being
-# decomposed into sub-questions before retrieval. Pointed financial or legal
-# lookups are answered from a single passage; decomposing them would multiply
-# retrieval passes for nothing.
+# Query types the prompt is told to decompose. Retained for the prompt contract
+# and for tests, but deliberately NOT used to veto sub-questions the model
+# returns under another classification — see the comment at the validation site.
 DECOMPOSABLE_QUERY_TYPES = {"multi_hop", "comparative"}
 
 # Ceiling on sub-questions. Each one costs a full retrieval pass (embed, hybrid
@@ -92,9 +91,22 @@ async def query_intelligence_node(state: AgentState) -> dict:
         },
     )
 
-    # Decomposition is only meaningful where the answer spans several facts.
-    # Accepting it for pointed queries would multiply retrieval passes for no
-    # gain, so it is gated on query type as well as on the model returning any.
+    # Decomposition is honoured whenever the model returns sub-questions, and is
+    # NOT additionally gated on query_type.
+    #
+    # It was, and that silently discarded the decomposition on the very query
+    # decomposition was built for. "What is the implied EV/EBITDA multiple on
+    # adjusted rather than reported EBITDA?" needs the share price, the share
+    # count and the EBITDA figure — three facts in three documents. Agent 1
+    # decomposed it correctly and then classified it `financial` rather than
+    # `multi_hop`, so the veto threw the sub-questions away and the engine
+    # answered about the offer price instead.
+    #
+    # Emitting sub-questions IS the model's judgment that the answer spans
+    # several facts. Classification is a separate judgment, made for routing.
+    # Letting one veto the other means the feature works only when two
+    # independent guesses agree, and fails invisibly when they do not. The
+    # prompt decides when to decompose; MAX_SUB_QUESTIONS bounds the cost.
     sub_questions = result.get("sub_questions") or []
     if not isinstance(sub_questions, list):
         sub_questions = []
@@ -102,8 +114,6 @@ async def query_intelligence_node(state: AgentState) -> dict:
         s.strip() for s in sub_questions
         if isinstance(s, str) and s.strip()
     ][:MAX_SUB_QUESTIONS]
-    if query_type not in DECOMPOSABLE_QUERY_TYPES:
-        sub_questions = []
 
     if sub_questions:
         logger.info(

@@ -430,20 +430,106 @@ class TestSubQuestionDecomposition:
         merged = _merge_by_quota([only], final_top_k=2)
         assert [c["chunk_id"] for c in merged] == ["a", "b"]
 
-    def test_decomposition_is_gated_by_query_type(self):
+    def test_prompt_contract_names_the_decomposable_types(self):
         """
-        Pointed lookups must not be decomposed.
+        The prompt instructs decomposition for these types; the constant records it.
 
-        Each sub-question costs a full retrieval pass, so decomposing a question
-        answerable from one passage buys nothing and multiplies latency.
+        This is a contract check only. It deliberately does NOT assert that other
+        types are refused — see the next test for why that veto was removed.
         """
         from src.agents.query_intelligence import DECOMPOSABLE_QUERY_TYPES
 
         assert "multi_hop" in DECOMPOSABLE_QUERY_TYPES
         assert "comparative" in DECOMPOSABLE_QUERY_TYPES
-        assert "financial" not in DECOMPOSABLE_QUERY_TYPES
-        assert "legal" not in DECOMPOSABLE_QUERY_TYPES
-        assert "summary" not in DECOMPOSABLE_QUERY_TYPES
+
+    @pytest.mark.asyncio
+    async def test_sub_questions_survive_an_unexpected_query_type(self, monkeypatch):
+        """
+        Sub-questions must not be discarded because the classifier said 'financial'.
+
+        Regression test for a live failure. Asked for the implied EV/EBITDA
+        multiple, Agent 1 decomposed the question correctly *and* classified it
+        `financial`; a `query_type not in DECOMPOSABLE_QUERY_TYPES` veto then
+        threw the decomposition away, and the engine answered about the offer
+        price instead of computing the multiple. Emitting sub-questions is the
+        model's judgment that the answer spans several facts; classification is a
+        separate judgment made for routing. Requiring both to agree made the
+        feature fail silently whenever they disagreed.
+        """
+        import src.agents.query_intelligence as qi
+
+        async def fake_call(*args, **kwargs):
+            return {
+                "query_type": "financial",
+                "primary_intent": "compute the implied multiple",
+                "extracted_entities": {},
+                "metadata_filters": {},
+                "query_expansions": [],
+                "sub_questions": [
+                    "What is the per-share merger consideration?",
+                    "How many fully diluted shares are outstanding?",
+                    "What is FY2023 Adjusted EBITDA?",
+                ],
+                "reformulated_query": "implied EV/EBITDA multiple on adjusted EBITDA",
+            }
+
+        class _Choice:
+            model = "gemini/test"
+            api_key = "k"
+            key_index = 0
+
+        class _Tracker:
+            async def get_model_for_agent(self):
+                return _Choice()
+
+        async def fake_instance(*args, **kwargs):
+            return _Tracker()
+
+        monkeypatch.setattr(qi, "call_structured_agent", fake_call)
+        monkeypatch.setattr(qi.BudgetTracker, "get_instance", fake_instance)
+
+        out = await qi.query_intelligence_node(
+            {"original_query": "implied EV/EBITDA multiple?", "deal_id": "d1"}
+        )
+
+        assert out["query_type"] == "financial"
+        assert len(out["sub_questions"]) == 3, (
+            "sub-questions were discarded because the classifier disagreed with "
+            "the decomposer"
+        )
+
+    @pytest.mark.asyncio
+    async def test_sub_questions_are_capped(self, monkeypatch):
+        """Cost is bounded by MAX_SUB_QUESTIONS, not by the query type veto."""
+        import src.agents.query_intelligence as qi
+
+        async def fake_call(*args, **kwargs):
+            return {
+                "query_type": "multi_hop",
+                "metadata_filters": {},
+                "sub_questions": [f"question {i}?" for i in range(12)],
+                "reformulated_query": "q",
+            }
+
+        class _Choice:
+            model = "gemini/test"
+            api_key = "k"
+            key_index = 0
+
+        class _Tracker:
+            async def get_model_for_agent(self):
+                return _Choice()
+
+        async def fake_instance(*args, **kwargs):
+            return _Tracker()
+
+        monkeypatch.setattr(qi, "call_structured_agent", fake_call)
+        monkeypatch.setattr(qi.BudgetTracker, "get_instance", fake_instance)
+
+        out = await qi.query_intelligence_node(
+            {"original_query": "q", "deal_id": "d1"}
+        )
+        assert len(out["sub_questions"]) == qi.MAX_SUB_QUESTIONS
 
     @pytest.mark.asyncio
     async def test_sub_questions_do_not_inherit_the_category_filter(self, monkeypatch):

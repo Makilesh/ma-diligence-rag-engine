@@ -162,11 +162,22 @@ Ensure you have Docker and Python 3.12+ installed.
 cp .env.example .env
 # Edit .env — add GEMINI_API_KEYS (one or more, comma-separated) and the DB password
 
-# Install PyTorch matching your CUDA version (example: CUDA 12.4)
-pip install torch --index-url https://download.pytorch.org/whl/cu124
 # Install requirements
 pip install -r requirements.txt
+
+# Install PyTorch for your GPU. --force-reinstall --no-deps is required:
+# a plain `pip install torch --index-url ...` reports "Requirement already
+# satisfied" against an existing CPU build and silently leaves it in place.
+pip install --force-reinstall --no-deps torch --index-url https://download.pytorch.org/whl/cu128
 ```
+
+**Check that the GPU is actually being used** — this is worth thirty seconds, because the failure is silent and costs about 5x on every query:
+
+```bash
+python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
+```
+
+`2.11.0+cu128 True` is correct. Anything ending `+cpu`, or `False`, means the embedding and reranker models are running on CPU: everything still works and answers are identical, but retrieval goes from under a second to roughly 6–18 seconds per pass. Use `cu128` or later for RTX 50-series (Blackwell, sm_120); `cu118`/`cu124` for older cards. With no GPU, install plain `torch` and expect the slower path.
 
 ### 3. Local Ollama (fallback model)
 Start the local Ollama server and pull the validation model:
@@ -180,7 +191,17 @@ ollama pull qwen2.5:14b
 
 ### 4. Choose Deployment Path
 
-#### Option A: Fully Containerized Stack (Recommended for Production/Evaluation)
+#### Option A (fastest): One command
+
+```bash
+python run_demo.py
+```
+
+Starts Docker Desktop if it is not running, brings up Postgres and Qdrant, waits for each to be genuinely healthy, starts the API, ingests the sample data room if the index is empty, warms the local models, and opens the UI at `http://localhost:8501`. It checks each step rather than assuming it — every failure it reports has actually happened during development. `python run_demo.py --stop` shuts the containers down.
+
+The models are loaded during startup rather than on first use, so the first question runs at the same speed as every one after it. That costs about 30 seconds of startup and removes roughly 9 seconds from whichever question gets asked first — which, in a live demo, is the one being watched.
+
+#### Option B: Fully Containerized Stack (Recommended for Production/Evaluation)
 Run the entire system (databases, API backend, and Streamlit frontend UI) inside Docker:
 ```bash
 # Spin up all services
@@ -190,7 +211,7 @@ docker compose up -d
 # Access the FastAPI docs: http://localhost:8000/docs
 ```
 
-#### Option B: Local Development Stack (Recommended for Development/Fast Reload)
+#### Option C: Local Development Stack (Recommended for Development/Fast Reload)
 Run only the databases in Docker and run the application services locally on your host:
 ```bash
 # Spin up only PostgreSQL and Qdrant database services
@@ -233,11 +254,13 @@ The set is **41 questions: 35 answerable** across financial, legal, comparative,
 | Citation-source match | 33/35 |
 | Answers flagged as unsupported by the validator | 0/35 |
 | Control questions where the engine did **not** fabricate | 6/6 |
-| Mean latency per query | 30s |
+| Mean latency per query | 30s in that run (CPU retrieval); 21–33s on GPU |
 
 Recall is reported with its dependency stated, because that dependency turned out to be the largest single factor. Four runs of the identical 41 questions against an identical index scored 86.6%, 73.9%, 71.0% and 85.9%, and the ordering is explained not by code changes but by **which synthesis model served the run**: the 85.9% run had 38 of 41 answers written by `gemini-3.6-flash` on fresh daily quota, while the 71.0% run had drained to `gemini-3.5-flash` for most of its answers. Quoting the best figure alone would be the more flattering choice and the less honest one. Full per-query breakdown, including every answer verbatim, in [`RESULTS.md`](RESULTS.md).
 
 Per-type recall on the full-quota run: legal 98.2%, multi-hop 85.2%, summary 83.3%, financial 83.8%, comparative 73.0%.
+
+**These numbers predate one later fix and have not been re-measured against it.** Sub-question decomposition was additionally gated on `query_type`, so a question the model decomposed correctly but classified as `financial` had its sub-questions discarded (see below). Removing that veto can only add decomposition, never remove it, so the effect should be neutral-to-positive — but "should be" is not a measurement, and the table above is what was actually run.
 
 **Three defects found by measurement rather than inspection.** Each was invisible to code review — the pipeline ran, returned plausible output, and logged no error:
 
@@ -253,6 +276,7 @@ Two details make it work rather than merely exist:
 
 - **Sub-questions do not inherit the parent's `document_category` filter.** They exist to look somewhere else; applying the parent's guess to them re-creates the problem. Measured: the EV/EBITDA query decomposed correctly into price, share count and EBITDA, but every pass inherited one filter and all three returned chunks from the same document.
 - **It is additive, not a redistribution.** Splitting a fixed `final_top_k` across passes cost the parent query most of its slots, and a comparative question whose answer sat in one table the parent had already found went from 20% to 0% coverage. The parent keeps its full budget; sub-questions add a small allocation on top.
+- **The classifier must not veto the decomposer.** Sub-questions were originally kept only when `query_type` was `multi_hop` or `comparative`. Asked for the implied EV/EBITDA multiple, Agent 1 decomposed the question correctly into price, share count and EBITDA — and classified it `financial`, so the veto discarded all three and the engine answered about the offer price instead. Emitting sub-questions *is* the model's judgment that the answer spans several facts; classification is a separate judgment made for routing. Requiring two independent guesses to agree made the feature fail silently whenever they disagreed. Now the prompt decides and `MAX_SUB_QUESTIONS` bounds the cost. Same question after the fix: 4 retrieval passes, 0 rewrite loops, confidence 1.00, and the multiple actually computed — **7.03x on Adjusted EBITDA of $99.0M versus 7.15x reported**.
 
 Measured in isolation — retrieval only, no synthesis, so model choice cannot influence it — **fact coverage in the retrieved context rose from 64.2% to 84.7% (+20.4pp) across the 15 decomposable questions, with no regressions.** `comp_02` went 10% → 100%, `mh_06` 33% → 100%, `mh_07` 50% → 100%.
 
@@ -262,7 +286,16 @@ End-to-end, decomposition does show up where it should: `mh_05` — "what is the
 
 **Three times the measurement was wrong rather than the system.** Each was caught by inspecting answers the metric had marked as failures: a binary refused/answered flag scored a correct partial answer as a hallucination; the golden set docked recall for writing "thirty-six months" instead of "36 months"; and markdown bold markers broke substring matching, so `contains **no information** regarding` was scored as a fabrication. Fact matching and refusal detection now normalise emphasis and accept equivalent surface forms. Re-scoring the same answers with the corrected matcher changed recall by roughly two points and moved control precision from 5/6 to 6/6 — a reminder that on a small set the harness is as likely to be wrong as the pipeline.
 
-**On latency.** Synthesis runs on `gemini-3.6-flash`, capped at 5 RPM, so the rate limiter paces harder than it would on a 15 RPM Lite model. That is a deliberate trade: better reasoning on the one call whose quality reaches the user, paid for in wall-clock. `VERIFICATION_BACKEND=local` moves the two verification agents back to Qwen2.5-14B — quota-free but slower, requiring a 12GB-VRAM host. Both paths are live, and the cloud path falls back to local automatically when quota is exhausted.
+**On latency.** A query is 21–33s end to end, and the split is worth knowing because only one half is under this project's control:
+
+| | GPU (RTX 5070 Ti) | CPU-only PyTorch |
+|---|---|---|
+| Retrieval — embed, hybrid search, rerank | **0.8–3.8s** for up to 4 passes | 6–18s per pass |
+| Everything else — 5–6 sequential LLM calls | ~20–28s | ~20–28s |
+
+Retrieval is no longer the bottleneck; provider latency is. Synthesis runs on `gemini-3.6-flash`, capped at 5 RPM, so the rate limiter also paces harder than it would on a 15 RPM Lite model — a deliberate trade of wall-clock for better reasoning on the one call whose quality reaches the user. `VERIFICATION_BACKEND=local` moves the two verification agents to Qwen2.5-14B: quota-free, slower, needs a 12GB-VRAM host. Both paths are live and the cloud path falls back to local automatically when quota runs out.
+
+**The GPU point is not a tuning note, it is a bug report.** This project ran its models on CPU for its entire life because `pip install torch --index-url .../cu128` reports *"Requirement already satisfied"* when any torch is installed — the CPU and CUDA wheels differ only by a local version tag, which pip does not treat as an upgrade. The code selected the device correctly (`"cuda" if torch.cuda.is_available() else "cpu"`), the logs said `CPU`, and nobody read them. A 12GB GPU sat idle next to a 40-passage cross-encoder rerank. The fix was one `--force-reinstall --no-deps`; the lesson is that a silent 5x is harder to notice than a crash.
 
 **Scope, stated plainly:** this is a synthetic data room of 9 documents (~66K tokens), not a real one. It is large enough that retrieval must discriminate across documents — the multi-hop questions each require combining two or more — but a production data room is orders of magnitude larger, and these numbers should not be read as evidence of behaviour at that scale.
 
