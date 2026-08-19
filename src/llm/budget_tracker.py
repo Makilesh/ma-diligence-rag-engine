@@ -343,6 +343,33 @@ class BudgetTracker:
             )
         return self._rate_limiters[slot]
 
+    def mark_slot_unavailable(self, key_index: int, model: str) -> None:
+        """
+        Records that this credential may never use this model.
+
+        Google grandfathers older API keys when a model closes to new users, so
+        `gemini-2.5-flash` answers on two of five configured keys and returns
+        404 "no longer available to new users" on the rest. Availability is
+        therefore a property of the (key, model) pair.
+
+        Retired for the process lifetime rather than the day: unlike a spent
+        quota this does not come back at midnight. Not persisted, because it is
+        a fact about credentials that a redeploy re-learns in one call.
+
+        Args:
+            key_index: Position of the API key.
+            model: Upstream model this key cannot use.
+        """
+        if key_index < 0 or is_local(model):
+            return
+        if not hasattr(self, "_unavailable_slots"):
+            self._unavailable_slots = set()
+        self._unavailable_slots.add(self._slot(key_index, model))
+
+    def _slot_is_unavailable(self, slot: str) -> bool:
+        """True if this (key, model) pair has been found permanently unusable."""
+        return slot in getattr(self, "_unavailable_slots", ())
+
     def skip_model_for_request(self, model: str) -> None:
         """
         Marks a model as provider-side unavailable for a short cooldown.
@@ -422,6 +449,8 @@ class BudgetTracker:
                 if not api_key:  # retired by mark_key_unusable
                     continue
                 slot = self._slot(key_index, model)
+                if self._slot_is_unavailable(slot):
+                    continue
                 if not await self._budget_available(slot):
                     continue
                 if not await self._get_rate_limiter(slot).try_acquire():
@@ -439,6 +468,8 @@ class BudgetTracker:
                 if not api_key:  # retired by mark_key_unusable
                     continue
                 slot = self._slot(key_index, model)
+                if self._slot_is_unavailable(slot):
+                    continue
                 if not await self._budget_available(slot):
                     continue
                 logger.info(
@@ -595,6 +626,14 @@ class BudgetTracker:
         today = _utc_today_iso()
 
         for slot in self._all_slots():
+            # A slot this credential may never use is not capacity. Before it is
+            # discovered the panel overstates a grandfathered model — 95/95 for
+            # gemini-2.5-flash when only two of five keys can reach it — but it
+            # self-corrects on the first call, and overstating for one call beats
+            # overstating for ever.
+            if self._slot_is_unavailable(slot):
+                continue
+
             model = self._slot_model(slot)
             budget = await self._load_budget(slot)
             limit = self._slot_limit(slot)

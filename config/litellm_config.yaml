@@ -24,14 +24,18 @@
 #   gemini-3.6-flash           5    250K       20    synthesis
 #   gemini-3.5-flash           5    250K       20    synthesis
 #   gemini-3-flash-preview     5    250K       20    synthesis
+#   gemini-2.5-flash           5    250K       20    synthesis (grandfathered)
 #   gemini-3.5-flash-lite     15    250K      500    agents (volume tier)
 #   gemini-3.1-flash-lite     15    250K      500    agents (volume tier)
+#   gemini-2.5-flash-lite     10    250K       20    agents (grandfathered)
 #
 # Quotas are transcribed from the AI Studio rate-limit console; availability was
 # confirmed separately with a live generateContent call per model, because the
 # two disagree:
-#   gemini-2.5-flash / gemini-2.5-flash-lite — listed in the console AND in
-#     ListModels, and 404 on every request. Not usable on this key.
+#   gemini-2.5-flash / gemini-2.5-flash-lite — closed to new sign-ups. They
+#     answer on 2 of 5 configured keys and 404 "no longer available to new
+#     users" on the rest, so availability is per (key, model). The router
+#     retires the individual slot, not the model.
 #   gemini-2-flash / gemini-2-flash-lite / gemini-2.5-pro / gemini-3.1-pro —
 #     console shows 0/0/0: no free-tier access.
 #   "Gemini 3 Flash" is served as gemini-3-flash-preview; the bare name 404s.
@@ -50,6 +54,7 @@ routing:
     - gemini/gemini-3.6-flash
     - gemini/gemini-3.5-flash
     - gemini/gemini-3-flash-preview
+    - gemini/gemini-2.5-flash
     - gemini/gemini-3.5-flash-lite
     - gemini/gemini-3.1-flash-lite
     - ollama/qwen2.5:14b
@@ -62,6 +67,7 @@ routing:
   agent_ladder:
     - gemini/gemini-3.5-flash-lite
     - gemini/gemini-3.1-flash-lite
+    - gemini/gemini-2.5-flash-lite
     - ollama/qwen2.5:14b
 
 # ==============================================================================

@@ -3,7 +3,7 @@
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
 [![Vector Database](https://img.shields.io/badge/vector__db-Qdrant-red.svg)](https://qdrant.tech/)
 [![Orchestration](https://img.shields.io/badge/orchestration-LangGraph-purple.svg)](https://github.com/langchain-ai/langgraph)
-[![Tests](https://img.shields.io/badge/tests-159%20passed-green.svg)]()
+[![Tests](https://img.shields.io/badge/tests-172%20passed-green.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 A **hybrid agentic RAG engine** for mergers & acquisitions due diligence. It ingests multi-format data rooms (financial statements, legal contracts, board decks) and performs multi-step reasoning over them with **deterministic financial verification, hallucination guarding, and traceable citations** — prioritizing "I don't know" over confident hallucination on high-stakes financial/legal questions.
@@ -124,14 +124,20 @@ The Gemini free tier is lopsided in a way that dictates the entire routing desig
 | `gemini-3.6-flash` | 5 | 20 | Synthesis |
 | `gemini-3.5-flash` | 5 | 20 | Synthesis |
 | `gemini-3-flash-preview` | 5 | 20 | Synthesis |
+| `gemini-2.5-flash` | 5 | 20 | Synthesis — *grandfathered keys only* |
 | `gemini-3.5-flash-lite` | 15 | **500** | Agents — volume tier |
 | `gemini-3.1-flash-lite` | 15 | **500** | Agents — volume tier |
+| `gemini-2.5-flash-lite` | 10 | 20 | Agents — *grandfathered keys only* |
 
-Every model here was checked twice: against the AI Studio rate-limit console for its quota, and with a live `generateContent` call for whether this key can reach it at all. Both checks earn their keep — `gemini-2.5-flash` and `gemini-2.5-flash-lite` appear in the console *and* in the ListModels catalogue, and 404 on every request. `gemini-2-flash`, `gemini-2-flash-lite`, `gemini-2.5-pro` and `gemini-3.1-pro` show 0/0/0: no free-tier access.
+Every model here was checked twice: against the AI Studio console for its quota, and with a live `generateContent` call **per key** for whether that credential can reach it. The second check found the interesting case — **availability is a property of the (key, model) pair, not of the model.** `gemini-2.5-flash` and `gemini-2.5-flash-lite` are closed to new sign-ups: they answer on two of five configured keys and return 404 *"no longer available to new users"* on the rest, because Google grandfathers older keys.
+
+The router handles that at the right granularity. A 429 retires the pair for a day; a 503 retires the model for every key briefly; an auth error retires the key entirely; and a per-key revocation retires exactly one slot, permanently, leaving the model usable on the keys that still have it. Restoring these two on that basis added **19 reasoning-grade syntheses and 19 agent calls per day on each grandfathered key**.
+
+`gemini-2-flash`, `gemini-2-flash-lite`, `gemini-2.5-pro` and `gemini-3.1-pro` show 0/0/0 in the console: no free-tier access on any key.
 
 **Only the Lite tier can sustain traffic.** Every reasoning-grade model is capped at 20 requests/day. A query spends ~4 agent calls (classification, rewriting, quality assessment, validation) and 1 synthesis call — so putting agent traffic on a reasoning model would drain it in five queries, and it would then be unavailable to synthesis, which is the only place reasoning quality reaches the user.
 
-Per API key that works out to **950 agent calls/day (~237 queries)** and **76 syntheses on reasoning-grade models** (four rungs at 19 usable each) before any downgrade. With five keys configured, that is roughly 1,185 queries and 380 reasoning-grade syntheses per day.
+Per API key that works out to **969 agent calls/day (~242 queries)** and **95 syntheses on reasoning-grade models** across five rungs — though the last rung of each ladder exists only on grandfathered keys, so a newer key gets 950 and 76.
 
 Hence two ladders, both defined in [`src/llm/model_registry.py`](src/llm/model_registry.py):
 
@@ -229,7 +235,7 @@ streamlit run app/streamlit_app.py
 
 ### 5. Running Tests & E2E Validation
 ```bash
-# Execute pytest suite (159 tests covering async safety, agents, quotas, RRF,
+# Execute pytest suite (172 tests covering async safety, agents, quotas, RRF,
 # sub-question decomposition, SQL parameter binding, provider-failure handling,
 # and the Streamlit UI via Streamlit's own AppTest harness)
 pytest
@@ -414,7 +420,7 @@ src/
   vector_db/           Qdrant client, hybrid search, RRF fusion, reranker
   workflow/            LangGraph state machine, orchestrator, conditional edges
   utils/               Logging, token counting, audit log, metrics
-tests/                 159 tests + golden Q&A set + live E2E runner
+tests/                 172 tests + golden Q&A set + live E2E runner
 config/                Qdrant, LiteLLM, and chunking YAML configs
 ```
 

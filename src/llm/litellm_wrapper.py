@@ -104,6 +104,32 @@ def is_service_unavailable(exc: Exception) -> bool:
     )
 
 
+def is_model_unavailable_for_key(exc: Exception) -> bool:
+    """
+    True when this credential specifically cannot use this model.
+
+    Distinct from every other failure mode here, and the distinction is not
+    hypothetical. `gemini-2.5-flash` and `gemini-2.5-flash-lite` return
+    404 "This model is no longer available to new users" on two of five
+    configured keys and answer normally on the other two — Google grandfathers
+    older keys when a model is closed to new sign-ups.
+
+    So availability is a property of the (key, model) pair, not of the model.
+    A 429 retires the pair for the day, a 503 retires the model for everyone
+    briefly, an auth error retires the key entirely — none of those describe
+    "this key may never use this model", which is permanent and affects one
+    slot.
+    """
+    text = str(exc).lower()
+    if "404" not in text and "notfound" not in type(exc).__name__.lower():
+        return False
+    return (
+        "no longer available" in text
+        or "not found for api version" in text
+        or "is not supported for generatecontent" in text
+    )
+
+
 def is_auth_error(exc: Exception) -> bool:
     """
     True when the provider rejected the credential itself.
@@ -443,6 +469,15 @@ async def call_verification_agent(
                 await tracker.mark_slot_exhausted(choice.key_index, choice.model)
                 logger.warning(
                     "Verification rung refused by provider, descending the ladder",
+                    extra={"model": choice.model, "key_index": choice.key_index},
+                )
+                continue
+            if is_model_unavailable_for_key(e) and choice.key_index >= 0:
+                # This key may never use this model. Retire the pair, not the
+                # key and not the model — both are still fine elsewhere.
+                tracker.mark_slot_unavailable(choice.key_index, choice.model)
+                logger.warning(
+                    "Model not available for this credential; retiring the slot",
                     extra={"model": choice.model, "key_index": choice.key_index},
                 )
                 continue

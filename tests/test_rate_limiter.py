@@ -892,6 +892,12 @@ class TestLadderModelsExist:
     """
 
     PROBED_AVAILABLE = {
+        # Available on at least one configured key. gemini-2.5-flash and
+        # gemini-2.5-flash-lite answer on 2 of 5 and return 404 "no longer
+        # available to new users" on the rest; the router retires those slots
+        # individually rather than dropping the model.
+        "gemini/gemini-2.5-flash",
+        "gemini/gemini-2.5-flash-lite",
         "gemini/gemini-3.7-flash",
         "gemini/gemini-3.6-flash",
         "gemini/gemini-3.5-flash",
@@ -901,9 +907,10 @@ class TestLadderModelsExist:
     }
 
     PROBED_MISSING = {
-        "gemini/gemini-3-flash",          # wrong id — the real one is -preview
-        "gemini/gemini-2.5-flash",        # 404s despite being catalogued
-        "gemini/gemini-2.5-flash-lite",   # 404s despite being catalogued
+        "gemini/gemini-3-flash",   # wrong id — the real one is -preview
+        "gemini/gemini-2-flash",   # console shows 0/0/0: no free-tier access
+        "gemini/gemini-2.5-pro",   # console shows 0/0/0
+        "gemini/gemini-3.1-pro",   # console shows 0/0/0
     }
 
     def test_no_ladder_contains_a_known_missing_model(self):
@@ -1046,3 +1053,107 @@ class TestUnavailableModelIsNotRetried:
             )
 
         assert calls["n"] == wrapper.MAX_RETRIES
+
+
+class TestPerKeyModelAvailability:
+    """
+    A model can exist for one credential and not another.
+
+    `gemini-2.5-flash` and `gemini-2.5-flash-lite` are closed to new sign-ups:
+    on two of five configured keys they answer normally, and on the other three
+    they return 404 "This model is no longer available to new users". Google
+    grandfathers older keys.
+
+    Every other failure mode retires the wrong thing here. A 429 retires the
+    pair for a day, a 503 retires the model for everyone briefly, an auth error
+    retires the key entirely — none of them mean "this key may never use this
+    model", which is permanent and scoped to one slot.
+    """
+
+    @staticmethod
+    def _revoked():
+        class NotFoundError(Exception):
+            pass
+
+        return NotFoundError(
+            'litellm.NotFoundError: GeminiException - {"error": {"code": 404, '
+            '"message": "This model models/gemini-2.5-flash is no longer '
+            'available to new users", "status": "NOT_FOUND"}}'
+        )
+
+    def test_recognises_a_per_key_revocation(self):
+        from src.llm.litellm_wrapper import is_model_unavailable_for_key
+
+        assert is_model_unavailable_for_key(self._revoked())
+
+    def test_distinct_from_quota_service_and_auth(self):
+        from src.llm.litellm_wrapper import (
+            is_auth_error, is_model_unavailable_for_key,
+            is_quota_error, is_service_unavailable,
+        )
+
+        err = self._revoked()
+        assert is_model_unavailable_for_key(err)
+        assert not is_quota_error(err), "would retire the pair for only a day"
+        assert not is_auth_error(err), "would retire a perfectly good key"
+        assert not is_service_unavailable(err), (
+            "would retire the model for every key, including the ones it works on"
+        )
+
+    def test_a_healthy_503_is_not_a_revocation(self):
+        from src.llm.litellm_wrapper import is_model_unavailable_for_key
+
+        class ServiceUnavailableError(Exception):
+            pass
+
+        assert not is_model_unavailable_for_key(
+            ServiceUnavailableError('503 "currently experiencing high demand"')
+        )
+
+    def _tracker(self):
+        from src.llm.budget_tracker import BudgetTracker
+
+        t = BudgetTracker.__new__(BudgetTracker)
+        t._api_keys = ["k" * 40, "j" * 40]
+        t._rate_limiters = {}
+        t._is_mock = True
+        t._mock_budgets = {}
+        return t
+
+    def test_retiring_a_slot_leaves_the_other_key_usable(self):
+        """The whole point: one key losing a model must not cost the other one."""
+        t = self._tracker()
+        model = "gemini/gemini-2.5-flash"
+
+        t.mark_slot_unavailable(0, model)
+
+        assert t._slot_is_unavailable(t._slot(0, model))
+        assert not t._slot_is_unavailable(t._slot(1, model))
+
+    def test_retiring_a_slot_leaves_other_models_on_that_key_usable(self):
+        t = self._tracker()
+
+        t.mark_slot_unavailable(0, "gemini/gemini-2.5-flash")
+
+        assert not t._slot_is_unavailable(t._slot(0, "gemini/gemini-3.6-flash"))
+
+    @pytest.mark.asyncio
+    async def test_selection_skips_a_retired_slot(self):
+        from src.llm.model_registry import SYNTHESIS_LADDER
+
+        t = self._tracker()
+        top = SYNTHESIS_LADDER[0]
+
+        # Retire the top model on both keys; selection must move down the ladder.
+        t.mark_slot_unavailable(0, top)
+        t.mark_slot_unavailable(1, top)
+
+        choice = await t.get_model_for_synthesis()
+        assert choice.model != top
+
+    def test_local_model_is_never_retired(self):
+        from src.llm.model_registry import LOCAL_MODEL
+
+        t = self._tracker()
+        t.mark_slot_unavailable(0, LOCAL_MODEL)
+        assert not t._slot_is_unavailable(t._slot(0, LOCAL_MODEL))

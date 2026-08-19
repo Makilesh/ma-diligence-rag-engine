@@ -15,6 +15,7 @@ from src.llm.litellm_wrapper import (
     is_quota_error,
     is_auth_error,
     is_service_unavailable,
+    is_model_unavailable_for_key,
 )
 from src.llm.budget_tracker import BudgetTracker
 from src.llm.prompt_templates.answer_synthesizer import (
@@ -363,6 +364,14 @@ async def answer_synthesizer_node(state: AgentState) -> dict:
                 await tracker.mark_slot_exhausted(choice.key_index, model)
                 logger.warning(
                     "Synthesis rung refused by provider, descending the ladder",
+                    extra={"model": model, "key_index": choice.key_index},
+                )
+                continue
+            if is_model_unavailable_for_key(e) and choice.key_index >= 0:
+                # This key may never use this model — retire the pair only.
+                tracker.mark_slot_unavailable(choice.key_index, model)
+                logger.warning(
+                    "Model not available for this credential; retiring the slot",
                     extra={"model": model, "key_index": choice.key_index},
                 )
                 continue

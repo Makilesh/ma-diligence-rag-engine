@@ -89,9 +89,19 @@ MODEL_LIMITS: dict[str, ModelLimits] = {
     "gemini/gemini-3.5-flash-lite":   ModelLimits(rpm=15, tpm=250_000, rpd=500, reasoning=False),
     "gemini/gemini-3.1-flash-lite":   ModelLimits(rpm=15, tpm=250_000, rpd=500, reasoning=False),
 
+    # Grandfathered tier — available on SOME keys only.
+    #
+    # Both are closed to new sign-ups: on two of five configured keys they
+    # return 404 "This model is no longer available to new users", and on the
+    # other two they answer normally. Availability here is a property of the
+    # (key, model) pair, which is why the router retires a *slot* rather than
+    # the model when it sees that 404 — see mark_slot_unavailable(). Keeping
+    # them costs one wasted call per unavailable slot per process, and buys
+    # real capacity on the keys that still have access.
+    "gemini/gemini-2.5-flash":        ModelLimits(rpm=5,  tpm=250_000, rpd=20,  reasoning=True),
+    "gemini/gemini-2.5-flash-lite":   ModelLimits(rpm=10, tpm=250_000, rpd=20,  reasoning=False),
+
     # NOT LISTED, deliberately:
-    #   gemini-2.5-flash, gemini-2.5-flash-lite — console shows 5/250K/20 and
-    #     10/250K/20, and both 404 on generateContent for this key.
     #   gemini-2-flash, gemini-2-flash-lite, gemini-2.5-pro, gemini-3.1-pro —
     #     console shows 0/0/0, i.e. no free-tier access at all.
     #
@@ -116,6 +126,7 @@ SYNTHESIS_LADDER: list[str] = [
     "gemini/gemini-3.6-flash",
     "gemini/gemini-3.5-flash",
     "gemini/gemini-3-flash-preview",
+    "gemini/gemini-2.5-flash",
     "gemini/gemini-3.5-flash-lite",
     "gemini/gemini-3.1-flash-lite",
     LOCAL_MODEL,
@@ -129,6 +140,7 @@ SYNTHESIS_LADDER: list[str] = [
 AGENT_LADDER: list[str] = [
     "gemini/gemini-3.5-flash-lite",
     "gemini/gemini-3.1-flash-lite",
+    "gemini/gemini-2.5-flash-lite",
     LOCAL_MODEL,
 ]
 
