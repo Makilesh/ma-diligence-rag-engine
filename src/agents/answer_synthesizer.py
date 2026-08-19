@@ -10,7 +10,12 @@ Temp: 0.1 | Tokens: 3000 | JSON mode: OFF (prose answer)
 import json
 import re
 
-from src.llm.litellm_wrapper import call_prose_agent, is_quota_error, is_auth_error
+from src.llm.litellm_wrapper import (
+    call_prose_agent,
+    is_quota_error,
+    is_auth_error,
+    is_service_unavailable,
+)
 from src.llm.budget_tracker import BudgetTracker
 from src.llm.prompt_templates.answer_synthesizer import (
     ANSWER_SYNTHESIZER_SYSTEM_PROMPT,
@@ -74,6 +79,71 @@ def _format_context_for_synthesis(chunks: list[dict]) -> str:
 # Matching on the pipe avoids colliding with ordinary markdown links.
 _CITATION_MARKER = re.compile(r"\[([^\[\]]*\|[^\[\]]*)\]")
 _PAGE_IN_MARKER = re.compile(r"(?:p\.|pg\.|page\s*)(\d+)", re.IGNORECASE)
+
+
+# Fragments that mean the model emitted its own working notes instead of an
+# answer. Seen live during a provider incident: one response opened mid-thought
+# with "Wu's patents: [...] Let's double-check all details to ensure accuracy",
+# which shipped to the user as a finished answer with 0.85 confidence.
+_SCRATCHPAD_MARKERS = (
+    "let's double-check",
+    "let me double-check",
+    "let's verify",
+    "let me verify",
+    "wait, i need to",
+    "actually, let me",
+)
+
+# Below this, a response is a fragment rather than a due-diligence answer.
+# Genuine answers in this pipeline run 2,000-4,500 characters; the truncated
+# generations during the incident came back at 349-575.
+_MIN_ANSWER_CHARS = 220
+
+
+def _is_usable_answer(answer: str | None, chunks: list[dict]) -> bool:
+    """
+    True when a generation is worth returning rather than retrying.
+
+    The synthesis prompt requires an inline `[file | page | section]` marker on
+    every claim, so a response carrying none of them has not followed the
+    contract. That normally cannot happen — but under a provider incident,
+    gemini-3.6-flash returned answers at 10-15% of their usual length with zero
+    citations, and the pipeline shipped them: one scored `validation=passed`
+    with `confidence=1.0` and no sources at all, in a tool whose entire premise
+    is that every claim is traced to a document.
+
+    An uncited answer is therefore treated as a failed generation, not a weak
+    one. Retrying costs a few seconds; publishing an unsourced figure in a due
+    diligence report is the failure this project exists to prevent.
+
+    Deliberately narrow: it only rejects when there is evidence to cite. A
+    genuine refusal (no usable context) has nothing to cite and must pass
+    through untouched.
+
+    Args:
+        answer: Raw model output.
+        chunks: Context the model was given.
+
+    Returns:
+        True if the answer should be accepted.
+    """
+    if answer is None or not answer.strip():
+        return False
+
+    text = answer.strip()
+
+    # No evidence was supplied, so an uncited answer is the correct output.
+    if not chunks:
+        return True
+
+    if len(text) < _MIN_ANSWER_CHARS:
+        return False
+
+    lowered = text.lower()
+    if any(marker in lowered for marker in _SCRATCHPAD_MARKERS):
+        return False
+
+    return bool(_CITATION_MARKER.search(text))
 
 
 def _select_cited_chunks(answer: str, chunks: list[dict]) -> list[dict]:
@@ -224,7 +294,7 @@ async def answer_synthesizer_node(state: AgentState) -> dict:
         choice = await tracker.get_model_for_synthesis()
         model = choice.model
         try:
-            answer = await call_prose_agent(
+            candidate = await call_prose_agent(
                 system_prompt=ANSWER_SYNTHESIZER_SYSTEM_PROMPT,
                 user_prompt=user_prompt,
                 model=model,
@@ -232,6 +302,23 @@ async def answer_synthesizer_node(state: AgentState) -> dict:
                 max_tokens=3000,
                 api_key=choice.api_key,
             )
+            if not _is_usable_answer(candidate, chunks):
+                # A response that violates the prompt's citation contract is a
+                # failed generation, not an answer. Retrying on another rung is
+                # the same treatment a transport error gets, and for the same
+                # reason: the model did not do what was asked.
+                logger.warning(
+                    "Synthesis returned an uncited or truncated answer; retrying",
+                    extra={
+                        "model": model,
+                        "chars": len(candidate or ""),
+                        "context_chunks": len(chunks),
+                    },
+                )
+                last_error = RuntimeError("synthesis produced an uncited answer")
+                tracker.skip_model_for_request(model)
+                continue
+            answer = candidate
             break
         except Exception as e:
             last_error = e
@@ -244,6 +331,17 @@ async def answer_synthesizer_node(state: AgentState) -> dict:
                 logger.warning(
                     "Synthesis rung refused by provider, descending the ladder",
                     extra={"model": model, "key_index": choice.key_index},
+                )
+                continue
+            if is_service_unavailable(e) and choice.key_index >= 0:
+                # 503 means the model is down for every key, so rotating keys
+                # just repeats the failure. Skip the model briefly instead, and
+                # do not debit quota — this clears in minutes and should not
+                # cost the day's capacity on the best synthesis model.
+                tracker.skip_model_for_request(model)
+                logger.warning(
+                    "Synthesis rung unavailable provider-side, trying another model",
+                    extra={"model": model},
                 )
                 continue
             break

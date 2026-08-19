@@ -41,6 +41,13 @@ from src.utils.logger import setup_logger
 logger = setup_logger(__name__)
 
 
+# How long to skip a model after the provider reports it unavailable (503).
+# Long enough to get past a demand spike, short enough that a model does not sit
+# unused after it recovers — observed spikes on gemini-3.6-flash cleared within
+# a couple of minutes.
+SERVICE_COOLDOWN_SECONDS = 90.0
+
+
 def _utc_today() -> date:
     """
     Today's date in UTC — the unit the daily quota resets on.
@@ -336,6 +343,44 @@ class BudgetTracker:
             )
         return self._rate_limiters[slot]
 
+    def skip_model_for_request(self, model: str) -> None:
+        """
+        Marks a model as provider-side unavailable for a short cooldown.
+
+        Distinct from `mark_slot_exhausted`, and the distinction matters. A 429
+        means this key is spent on this model until the daily reset, so the slot
+        is debited to its limit. A 503 — "This model is currently experiencing
+        high demand" — means the model is down for every key, and typically
+        clears in minutes. Debiting quota for that would retire real capacity
+        over a blip.
+
+        The cooldown is in-memory and per-process by design: it is a hint about
+        the last few seconds of provider behaviour, not durable accounting.
+
+        Args:
+            model: Upstream model the provider reported as unavailable.
+        """
+        import time
+
+        if is_local(model):
+            return
+        if not hasattr(self, "_model_cooldowns"):
+            self._model_cooldowns = {}
+        self._model_cooldowns[model] = time.monotonic() + SERVICE_COOLDOWN_SECONDS
+
+    def _models_in_cooldown(self) -> set[str]:
+        """Models currently skipped after a provider-side unavailability."""
+        import time
+
+        cooldowns = getattr(self, "_model_cooldowns", None)
+        if not cooldowns:
+            return set()
+        now = time.monotonic()
+        expired = [m for m, until in cooldowns.items() if until <= now]
+        for m in expired:
+            del cooldowns[m]
+        return set(cooldowns)
+
     async def _select_from_ladder(self, ladder: list[str], purpose: str) -> ModelChoice:
         """
         Walks a model ladder and the configured keys to find capacity.
@@ -365,10 +410,14 @@ class BudgetTracker:
         Returns:
             ModelChoice naming the model and the key to bill it to.
         """
+        cooled = self._models_in_cooldown()
+
         # Pass 1 — immediate capacity anywhere.
         for model in ladder:
             if is_local(model):
                 break
+            if model in cooled:
+                continue
             for key_index, api_key in enumerate(self._api_keys):
                 if not api_key:  # retired by mark_key_unusable
                     continue
@@ -381,6 +430,8 @@ class BudgetTracker:
                     return ModelChoice(model=model, api_key=api_key, key_index=key_index)
 
         # Pass 2 — everything is rate-limited; wait rather than degrade quality.
+        # Cooldowns are ignored here: if the only remaining capacity is on a
+        # model the provider just 503'd, trying it beats degrading to local.
         for model in ladder:
             if is_local(model):
                 break

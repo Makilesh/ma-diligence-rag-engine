@@ -39,6 +39,20 @@ MAX_LADDER_FALLBACKS = 6
 # than a generic transport error before the next attempt is worth making.
 RATE_LIMIT_BACKOFF_SECONDS = 20.0
 
+# Per-request ceilings. LiteLLM defaults to 600s, which is not a timeout so much
+# as an absence of one: when Gemini returned 503 "experiencing high demand", each
+# synthesis call hung for ~125 seconds before the provider dropped it, and the
+# ladder could not descend until it did. Three of those in a row is a query that
+# looks hung to the user while a perfectly good fallback model sits unused.
+#
+# The values are generous against observed behaviour rather than tight: healthy
+# structured calls finish in 1-3s and healthy synthesis in 10-30s, so these only
+# fire when something is actually wrong. Exceeding them raises, which the retry
+# loop already treats as a transport error — so the effect is to reach the next
+# rung sooner, never to lose a call that would have succeeded.
+STRUCTURED_TIMEOUT_SECONDS = 60.0
+PROSE_TIMEOUT_SECONDS = 120.0
+
 
 def is_quota_error(exc: Exception) -> bool:
     """
@@ -57,6 +71,36 @@ def is_quota_error(exc: Exception) -> bool:
         or "429" in text
         or "resource_exhausted" in text
         or "quota" in text
+    )
+
+
+def is_service_unavailable(exc: Exception) -> bool:
+    """
+    True when the provider says the model itself is temporarily unavailable.
+
+    Worth separating from both quota and transport errors because the right
+    response is different. A 429 means *this key* is spent, so another key on
+    the same model is the best next move. A 503 — "This model is currently
+    experiencing high demand" — means the model is down provider-wide, so every
+    key will fail the same way and only another *model* helps.
+
+    Observed live: gemini-3.6-flash returned 503 on roughly a third of synthesis
+    calls while gemini-3.5-flash answered every request in ~1.2s. Treating the
+    503 as a generic transport error meant three retries with backoff against a
+    model that was not going to answer, before anything else was tried.
+
+    Deliberately NOT treated as quota exhaustion: marking the slot spent would
+    retire that model for the rest of the day over a blip that typically clears
+    in minutes.
+    """
+    name = type(exc).__name__.lower()
+    text = str(exc).lower()
+    return (
+        "serviceunavailable" in name
+        or "overloaded" in name
+        or "503" in text
+        or "unavailable" in text
+        or "experiencing high demand" in text
     )
 
 
@@ -136,6 +180,7 @@ async def call_structured_agent(
                 "temperature": temperature,
                 "max_tokens": max_tokens,
                 "response_format": {"type": "json_object"},  # Enforces JSON mode
+                "timeout": STRUCTURED_TIMEOUT_SECONDS,
             }
             if model.startswith("ollama/"):
                 kwargs["num_ctx"] = 8192  # Expand context window for local Ollama to prevent truncation
@@ -262,6 +307,7 @@ async def call_prose_agent(
                 ],
                 "temperature": temperature,
                 "max_tokens": max_tokens,
+                "timeout": PROSE_TIMEOUT_SECONDS,
             }
             if api_key:
                 prose_kwargs["api_key"] = api_key
@@ -388,6 +434,16 @@ async def call_verification_agent(
                 logger.warning(
                     "Verification rung refused by provider, descending the ladder",
                     extra={"model": choice.model, "key_index": choice.key_index},
+                )
+                continue
+            if is_service_unavailable(e) and choice.key_index >= 0:
+                # The model is down for everyone, so rotating keys is pointless.
+                # Skip the whole model for this request without debiting quota —
+                # this clears in minutes and should not cost the day's capacity.
+                tracker.skip_model_for_request(choice.model)
+                logger.warning(
+                    "Verification rung unavailable provider-side, trying another model",
+                    extra={"model": choice.model},
                 )
                 continue
             break

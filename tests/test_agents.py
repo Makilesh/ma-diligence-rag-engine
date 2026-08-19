@@ -618,3 +618,82 @@ class TestSubQuestionDecomposition:
         parent_ids = {c["chunk_id"] for c in chunks
                       if c["chunk_id"].startswith("parent-")}
         assert len(parent_ids) == 10, "parent must retain its full allocation"
+
+
+class TestUsableAnswerGuard:
+    """
+    An answer that cites nothing is a failed generation, not a weak answer.
+
+    During a provider incident gemini-3.6-flash returned answers at 10-15% of
+    their usual length with zero citation markers, and the pipeline published
+    them. One scored `validation=passed` with `confidence=1.0` and no sources at
+    all; another opened mid-thought with "Let's double-check all details to
+    ensure accuracy" — the model's own working notes — and shipped at 0.85.
+
+    For a tool whose premise is that every claim is traceable, an unsourced
+    figure presented confidently is the exact failure it exists to prevent.
+    """
+
+    @staticmethod
+    def _chunks(n=3):
+        return [{"text": f"chunk {i}", "source_file": "f.txt"} for i in range(n)]
+
+    def test_cited_answer_is_accepted(self):
+        from src.agents.answer_synthesizer import _is_usable_answer
+
+        answer = (
+            "### 1. Direct Answer\n\nFY2023 revenue was $452.8 million, up 17.0% "
+            "from $387.1 million in FY2022 "
+            "[aurora_financials_fy2023.txt | p.1 | CONSOLIDATED INCOME STATEMENT]. "
+            "The increase was driven by SaaS subscriptions, which grew 27.9% "
+            "[aurora_financials_fy2023.txt | p.1 | CONSOLIDATED INCOME STATEMENT]."
+        )
+        assert _is_usable_answer(answer, self._chunks())
+
+    def test_uncited_answer_is_rejected(self):
+        """The real sum_03 failure: a full-looking answer with zero sources."""
+        from src.agents.answer_synthesizer import _is_usable_answer
+
+        answer = (
+            "### 1. Direct Answer\n\nUnder Article VI of the Merger Agreement, "
+            "closing is subject to regulatory conditions and government "
+            "clearances, including antitrust clearance, CFIUS review, and "
+            "certain foreign competition filings that must be completed before "
+            "the transaction may be consummated by either party hereto."
+        )
+        assert not _is_usable_answer(answer, self._chunks())
+
+    def test_scratchpad_leak_is_rejected(self):
+        """The real sum_04 failure: internal reasoning shipped as the answer."""
+        from src.agents.answer_synthesizer import _is_usable_answer
+
+        answer = (
+            "Wu's patents: [ip_portfolio_and_litigation_schedule.txt | p.2 | "
+            "SECTION 2] Let's double-check all details to ensure accuracy and "
+            "strict adherence to rules. Everything looks precise and complete "
+            "so the final response can now be assembled for the reviewer."
+        )
+        assert not _is_usable_answer(answer, self._chunks())
+
+    def test_truncated_fragment_is_rejected(self):
+        from src.agents.answer_synthesizer import _is_usable_answer
+
+        assert not _is_usable_answer("### 1. Direct Answer\n\nThe", self._chunks())
+        assert not _is_usable_answer("", self._chunks())
+        assert not _is_usable_answer(None, self._chunks())
+
+    def test_refusal_without_context_is_allowed_through(self):
+        """
+        A genuine refusal has nothing to cite and must not be retried.
+
+        This is the guard's most important limit: the refusal path is a designed
+        outcome, and rejecting uncited text unconditionally would send the engine
+        into a retry loop every time it correctly declined to answer.
+        """
+        from src.agents.answer_synthesizer import _is_usable_answer
+
+        refusal = (
+            "I was unable to find sufficient relevant information in the data "
+            "room to answer this question, even after refining the search."
+        )
+        assert _is_usable_answer(refusal, [])

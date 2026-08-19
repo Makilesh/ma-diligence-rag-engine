@@ -570,3 +570,224 @@ class TestDateBindingToPostgres:
         assert isinstance(_utc_today(), date)
         assert isinstance(_utc_today_iso(), str)
         assert _utc_today_iso() == _utc_today().isoformat()
+
+
+class TestRequestTimeouts:
+    """
+    Every upstream call must carry an explicit timeout.
+
+    LiteLLM's default is 600s, which in practice is no timeout at all. When
+    Gemini returned 503 "This model is currently experiencing high demand", each
+    synthesis call hung for ~125 seconds before the provider dropped it, and the
+    model ladder could not descend to a healthy rung until it did. A third of
+    calls failing that way turned a 25-second query into a two-minute one while
+    a working fallback model sat idle.
+
+    These assert the kwargs actually reach litellm, because the omission is
+    invisible: nothing errors, calls simply take as long as the provider takes.
+    """
+
+    @staticmethod
+    def _capture(monkeypatch):
+        """Replaces litellm.acompletion with a recorder; returns the call list."""
+        import src.llm.litellm_wrapper as wrapper
+
+        calls: list[dict] = []
+
+        class _Message:
+            content = '{"ok": true}'
+
+        class _Choice:
+            message = _Message()
+
+        class _Response:
+            choices = [_Choice()]
+
+        async def fake_acompletion(**kwargs):
+            calls.append(kwargs)
+            return _Response()
+
+        monkeypatch.setattr(wrapper.litellm, "acompletion", fake_acompletion)
+        return calls
+
+    @pytest.mark.asyncio
+    async def test_structured_agent_sends_a_timeout(self, monkeypatch):
+        from src.llm.litellm_wrapper import (
+            STRUCTURED_TIMEOUT_SECONDS,
+            call_structured_agent,
+        )
+
+        calls = self._capture(monkeypatch)
+        await call_structured_agent(
+            model="gemini/test",
+            system_prompt="s",
+            user_prompt="u",
+            api_key="k",
+        )
+
+        assert calls, "no upstream call was made"
+        assert calls[0].get("timeout") == STRUCTURED_TIMEOUT_SECONDS
+
+    @pytest.mark.asyncio
+    async def test_prose_agent_sends_a_timeout(self, monkeypatch):
+        from src.llm.litellm_wrapper import PROSE_TIMEOUT_SECONDS, call_prose_agent
+
+        calls = self._capture(monkeypatch)
+        await call_prose_agent(
+            model="gemini/test",
+            system_prompt="s",
+            user_prompt="u",
+            api_key="k",
+        )
+
+        assert calls, "no upstream call was made"
+        assert calls[0].get("timeout") == PROSE_TIMEOUT_SECONDS
+
+    def test_timeouts_leave_headroom_over_healthy_latency(self):
+        """
+        The ceilings must not clip calls that would have succeeded.
+
+        Healthy structured calls finish in 1-3s and healthy synthesis in 10-30s
+        (measured across the 41-question evaluation). A timeout tight enough to
+        cut those would trade a slow answer for no answer, which is the wrong
+        direction for a tool whose whole premise is not guessing.
+        """
+        from src.llm.litellm_wrapper import (
+            PROSE_TIMEOUT_SECONDS,
+            STRUCTURED_TIMEOUT_SECONDS,
+        )
+
+        assert STRUCTURED_TIMEOUT_SECONDS >= 30
+        assert PROSE_TIMEOUT_SECONDS >= 60
+        assert PROSE_TIMEOUT_SECONDS > STRUCTURED_TIMEOUT_SECONDS
+
+
+class TestServiceUnavailableHandling:
+    """
+    A 503 is not a quota refusal and must not be treated as one.
+
+    Observed live: gemini-3.6-flash returned "This model is currently
+    experiencing high demand" on roughly a third of synthesis calls while
+    gemini-3.5-flash answered every request in ~1.2s. Two distinct mistakes are
+    possible here and both are expensive:
+
+      * treating it as a transport error retries the same dead model three times
+        with backoff before anything else is tried;
+      * treating it as a quota refusal debits the slot and retires the best
+        synthesis model for the rest of the day over a blip that clears in
+        minutes.
+
+    The right response is neither: skip that MODEL briefly, across all keys,
+    without touching quota.
+    """
+
+    @staticmethod
+    def _service_error():
+        class ServiceUnavailableError(Exception):
+            pass
+
+        return ServiceUnavailableError(
+            'litellm.ServiceUnavailableError: GeminiException - {"error": '
+            '{"code": 503, "message": "This model is currently experiencing '
+            'high demand.", "status": "UNAVAILABLE"}}'
+        )
+
+    def test_recognises_provider_unavailability(self):
+        from src.llm.litellm_wrapper import is_service_unavailable
+
+        assert is_service_unavailable(self._service_error())
+
+    def test_not_confused_with_quota_or_auth(self):
+        """The three classifications must stay disjoint on a real 503."""
+        from src.llm.litellm_wrapper import (
+            is_auth_error,
+            is_quota_error,
+            is_service_unavailable,
+        )
+
+        err = self._service_error()
+        assert is_service_unavailable(err)
+        assert not is_quota_error(err), (
+            "a 503 classified as quota would debit the slot and retire the "
+            "model for the rest of the day"
+        )
+        assert not is_auth_error(err)
+
+    def test_quota_errors_are_not_treated_as_unavailability(self):
+        from src.llm.litellm_wrapper import is_quota_error, is_service_unavailable
+
+        class RateLimitError(Exception):
+            pass
+
+        err = RateLimitError("litellm.RateLimitError: 429 RESOURCE_EXHAUSTED")
+        assert is_quota_error(err)
+        assert not is_service_unavailable(err)
+
+    def test_cooldown_removes_the_model_from_selection(self):
+        from src.llm.budget_tracker import BudgetTracker
+        from src.llm.model_registry import SYNTHESIS_LADDER, is_local
+
+        t = BudgetTracker.__new__(BudgetTracker)
+        t._api_keys = ["k" * 40]
+        t._rate_limiters = {}
+        t._is_mock = True
+        t._mock_budgets = {}
+
+        model = next(m for m in SYNTHESIS_LADDER if not is_local(m))
+        assert model not in t._models_in_cooldown()
+
+        t.skip_model_for_request(model)
+        assert model in t._models_in_cooldown()
+
+    def test_cooldown_expires(self, monkeypatch):
+        """A model must return to service once the spike passes."""
+        import src.llm.budget_tracker as bt
+        from src.llm.model_registry import SYNTHESIS_LADDER, is_local
+
+        t = bt.BudgetTracker.__new__(bt.BudgetTracker)
+        t._api_keys = ["k" * 40]
+        t._rate_limiters = {}
+        t._is_mock = True
+        t._mock_budgets = {}
+
+        model = next(m for m in SYNTHESIS_LADDER if not is_local(m))
+        t.skip_model_for_request(model)
+        assert model in t._models_in_cooldown()
+
+        # Jump past the cooldown window rather than sleeping through it.
+        t._model_cooldowns[model] -= bt.SERVICE_COOLDOWN_SECONDS + 1
+        assert model not in t._models_in_cooldown()
+
+    def test_cooldown_does_not_debit_quota(self):
+        """
+        The whole point: a transient outage must not cost the day's capacity.
+        """
+        from src.llm.budget_tracker import BudgetTracker
+        from src.llm.model_registry import SYNTHESIS_LADDER, is_local
+
+        t = BudgetTracker.__new__(BudgetTracker)
+        t._api_keys = ["k" * 40]
+        t._rate_limiters = {}
+        t._is_mock = True
+        t._mock_budgets = {}
+
+        model = next(m for m in SYNTHESIS_LADDER if not is_local(m))
+        t.skip_model_for_request(model)
+
+        assert t._mock_budgets == {}, (
+            "skipping an unavailable model must not touch budget accounting"
+        )
+
+    def test_local_model_is_never_put_in_cooldown(self):
+        """The local model is the last resort; it must always remain selectable."""
+        from src.llm.budget_tracker import BudgetTracker
+        from src.llm.model_registry import LOCAL_MODEL
+
+        t = BudgetTracker.__new__(BudgetTracker)
+        t._api_keys = []
+        t._rate_limiters = {}
+        t._is_mock = True
+        t._mock_budgets = {}
+
+        t.skip_model_for_request(LOCAL_MODEL)
+        assert LOCAL_MODEL not in t._models_in_cooldown()

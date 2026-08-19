@@ -17,7 +17,13 @@ font = "sans serif"
 
 [server]
 headless = true
-enableCORS = false
+# enableCORS is deliberately absent. Setting it to false alongside
+# enableXsrfProtection = true is self-contradictory: XSRF protection sends a
+# cookie per request, which requires restricting allowed origins, so Streamlit
+# overrides enableCORS back to true and prints a nine-line warning at every
+# startup. The warning was accurate and the setting had no effect — for a tool
+# handling confidential deal documents, keeping XSRF protection is the right
+# side of that trade.
 enableXsrfProtection = true
 maxUploadSize = 200                  # MB — data room documents are large
 
