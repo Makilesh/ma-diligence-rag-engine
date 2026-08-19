@@ -19,7 +19,38 @@ from app.styles import pill
 # documented (DECISIONS_LOG Decision 16); hiding the worst artefacts is not the
 # same as fixing heading granularity in the chunker.
 _SEPARATOR_RUN = re.compile(r"^[\s=_\-*~#.·•]+$")
-_MAX_HEADING_CHARS = 90
+# Terminal punctuation on a long string means a complete sentence, which a
+# heading is not. Set at 70 by inspection of every heading in the corpus: it
+# drops "Customer concentration: the top ten customers represent 47.8% of FY2023
+# revenue." and three like it, while keeping the table rows that legitimately
+# end in a period ("SOC 2 Type II  FY2023 examination issued with NO
+# exceptions.", "ISO 27001  Certified, valid through October 2025.").
+#
+# Corpus-tuned, and openly so. Thresholds picked against one document set do not
+# generalise; the durable fix is per-heading granularity in the chunker
+# (DECISIONS_LOG Decision 16), not more numbers here.
+_MAX_HEADING_CHARS = 70
+
+# A long "heading" that stops on a preposition, article, conjunction or dangling
+# punctuation is a sentence the chunker cut, not a heading. Measured against
+# every distinct section_heading in the sample corpus (109 of them), this drops
+# 24 — including "VERTEX CAPITAL PARTNERS LLC, a Delaware limited liability
+# company (" and "The aggregate Merger Consideration is approximately $696
+# million, subject to" — without catching a single legitimate one. Real headings
+# here end on a noun, a number or a closing bracket: "Note 1 - Restructuring
+# Charges ($4.5M, FY2023)", "Section 9.2 — Effect on Material Contracts".
+_CONTINUATION_WORDS = {
+    "a", "an", "the", "and", "or", "of", "to", "in", "on", "for", "with", "by",
+    "from", "at", "is", "are", "was", "were", "be", "been", "that", "which",
+    "as", "its", "their", "this", "these", "those", "not", "no", "any", "all",
+    "such", "shall", "may", "will", "under",
+}
+# Low enough to catch short contract clauses used as headings — "(a) amend its
+# certificate of incorporation or bylaws;" is 53 characters — while leaving
+# genuine short labels ("Net Revenue Retention", "Section 3.5") untouched, since
+# those end on a noun rather than dangling punctuation.
+_MIN_PROSE_CHARS = 45
+_DANGLING_END = (",", "(", ":", "-", ";")
 
 
 def _clean_heading(section: str) -> str:
@@ -47,7 +78,37 @@ def _clean_heading(section: str) -> str:
 
     # Trim decorative rules that trail a genuine heading.
     heading = heading.strip("=_-*~ ").strip()
+
+    if _looks_truncated(heading):
+        return ""
+
     return heading
+
+
+def _looks_truncated(heading: str) -> bool:
+    """
+    True when a heading is really a sentence the chunker cut mid-flow.
+
+    Deliberately high-precision rather than exhaustive: it only fires on long
+    strings that end somewhere a heading never would. Some prose still gets
+    through — a fragment ending on an ordinary noun is indistinguishable from a
+    terse heading without parsing it — and that is the honest limit of fixing
+    this in the viewer. The real repair is per-heading granularity in the
+    chunker (see DECISIONS_LOG Decision 16); this only stops the citation panel
+    showing the worst of it.
+    """
+    if len(heading) < _MIN_PROSE_CHARS:
+        return False
+
+    trimmed = heading.rstrip()
+    if trimmed.endswith(_DANGLING_END):
+        return True
+
+    words = trimmed.split()
+    if not words:
+        return False
+    last = re.sub(r"[^A-Za-z]", "", words[-1]).lower()
+    return last in _CONTINUATION_WORDS
 
 
 def render_citations(citations: list[dict]) -> None:

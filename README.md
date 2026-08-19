@@ -3,7 +3,7 @@
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
 [![Vector Database](https://img.shields.io/badge/vector__db-Qdrant-red.svg)](https://qdrant.tech/)
 [![Orchestration](https://img.shields.io/badge/orchestration-LangGraph-purple.svg)](https://github.com/langchain-ai/langgraph)
-[![Tests](https://img.shields.io/badge/tests-172%20passed-green.svg)]()
+[![Tests](https://img.shields.io/badge/tests-175%20passed-green.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 A **hybrid agentic RAG engine** for mergers & acquisitions due diligence. It ingests multi-format data rooms (financial statements, legal contracts, board decks) and performs multi-step reasoning over them with **deterministic financial verification, hallucination guarding, and traceable citations** — prioritizing "I don't know" over confident hallucination on high-stakes financial/legal questions.
@@ -235,7 +235,7 @@ streamlit run app/streamlit_app.py
 
 ### 5. Running Tests & E2E Validation
 ```bash
-# Execute pytest suite (172 tests covering async safety, agents, quotas, RRF,
+# Execute pytest suite (175 tests covering async safety, agents, quotas, RRF,
 # sub-question decomposition, SQL parameter binding, provider-failure handling,
 # and the Streamlit UI via Streamlit's own AppTest harness)
 pytest
@@ -420,7 +420,7 @@ src/
   vector_db/           Qdrant client, hybrid search, RRF fusion, reranker
   workflow/            LangGraph state machine, orchestrator, conditional edges
   utils/               Logging, token counting, audit log, metrics
-tests/                 172 tests + golden Q&A set + live E2E runner
+tests/                 175 tests + golden Q&A set + live E2E runner
 config/                Qdrant, LiteLLM, and chunking YAML configs
 ```
 

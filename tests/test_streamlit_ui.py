@@ -158,3 +158,47 @@ class TestCitationHeadingCleanup:
 
         assert _clean_heading("") == ""
         assert _clean_heading(None) == ""
+
+
+class TestTruncatedHeadingDetection:
+    """
+    Chunker output includes sentences cut mid-flow and labelled as headings.
+
+    Measured across all 109 distinct section headings in the sample corpus: the
+    rule drops 24 and keeps 85, with no legitimate heading caught. It is
+    deliberately partial — a fragment ending on an ordinary noun cannot be told
+    from a terse heading without parsing it — so this guards the precision, not
+    the recall.
+    """
+
+    def test_sentences_cut_mid_flow_are_dropped(self):
+        from app.components.citation_viewer import _clean_heading
+
+        for prose in [
+            'VERTEX CAPITAL PARTNERS LLC, a Delaware limited liability company ("Buyer"),',
+            "The aggregate Merger Consideration is approximately $696 million, subject to",
+            "Notwithstanding the foregoing, the Company may engage in discussions with a",
+            "RESOLVED, that the Board of Directors hereby authorizes the Company to:",
+            "Severance multiples and estimated cost, assuming all five executives are",
+        ]:
+            assert _clean_heading(prose) == "", f"should have been dropped: {prose[:50]}"
+
+    def test_real_headings_with_commas_and_numbers_survive(self):
+        """The rule must not punish legitimate headings that look busy."""
+        from app.components.citation_viewer import _clean_heading
+
+        for good in [
+            "Note 1 - Restructuring Charges ($4.5M, FY2023)",
+            "Note 5 - Capitalized Software Adjustment (($3.2M), FY2023)",
+            "Agreement:          Amended and Restated Credit Agreement dated June 30, 2021",
+            "Delta Ridge Energy               $12.2M    Expires Dec 31, 2024",
+            "Section 9.2 — Effect on Material Contracts",
+        ]:
+            assert _clean_heading(good) == good.strip(), f"wrongly dropped: {good[:50]}"
+
+    def test_short_labels_are_never_treated_as_prose(self):
+        """Below the length floor, no truncation check applies at all."""
+        from app.components.citation_viewer import _clean_heading
+
+        for short in ["Net Revenue Retention", "Section 3.5", "EBITDA and Adjusted EBITDA"]:
+            assert _clean_heading(short) == short
