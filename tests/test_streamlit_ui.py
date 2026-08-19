@@ -30,18 +30,40 @@ APP_PATH = str(_PROJECT_ROOT / "app" / "streamlit_app.py")
 pytest.importorskip("streamlit.testing.v1")
 
 
-def _fresh_app():
+def _fresh_app(deal_id: str = "aurora_vertex_2024"):
+    """
+    Runs the app with a deal already selected, without needing the API.
+
+    The deal selector is populated from `GET /deals`, so tests that exercise
+    anything past the sidebar used to require a running backend — they passed or
+    failed depending on whether an unrelated server happened to be up, which is
+    not a property a test should have. The `?deal_id=` deep link selects a deal
+    without any network call, so these tests now exercise the UI and nothing
+    else. Panels whose endpoints are unreachable degrade to empty, which is the
+    behaviour the app is built for anyway.
+    """
     from streamlit.testing.v1 import AppTest
 
     at = AppTest.from_file(APP_PATH, default_timeout=60)
+    if deal_id:
+        at.query_params["deal_id"] = deal_id
     at.run()
     return at
 
 
 def test_app_renders_without_exception():
     """The script must run clean even with no deal selected and the API down."""
-    at = _fresh_app()
+    at = _fresh_app(deal_id="")
     assert not at.exception, f"app raised on first render: {at.exception}"
+
+
+def test_deep_link_selects_a_deal():
+    """`?deal_id=` must scope the dashboard without any backend round-trip."""
+    at = _fresh_app("aurora_vertex_2024")
+    assert not at.exception
+    assert any(
+        b.key and b.key.startswith("example_") for b in at.button
+    ), "query interface did not render for a deep-linked deal"
 
 
 def test_example_query_fills_the_box_and_enables_run():

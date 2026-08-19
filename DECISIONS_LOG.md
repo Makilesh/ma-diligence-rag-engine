@@ -262,3 +262,28 @@ All architecture decisions that deviated from or resolved ambiguities in p4.md a
 - **Why this rather than more careful reading**: the number gets quoted out of the document it lives in. Attaching the conditions to the artefact is the only version that survives being copied into a slide.
 - **Measured this run**: 62.1% mean recall, 30/35 answered, 6/6 controls held, 80.4s average latency, 38/41 syntheses on `gemini-3.6-flash`, 6 answers lost upstream. The comparable clean run scored 85.9% on the same model mix.
 - **Impact**: tests/run_end_to_end_validation.py, RESULTS.md, README.md
+
+## Decision 37: The decomposition fix, measured on a clean provider day
+- **Date**: Session 9
+- **Context**: Decision 36 recorded a 62.1% run that was dominated by a Gemini incident rather than by any code change. Re-run once `gemini-3.6-flash` quota reset and the provider was healthy (probed first: 4/4 successful calls, no 503s).
+- **Result**: **86.3% mean fact recall**, 35/35 answered, 26/35 with every expected fact present, 33/35 citation match, 6/6 controls held, **0/41 answers lost upstream**. Same synthesis model mix as the 85.9% baseline (38 of 41 on `gemini-3.6-flash`), so the comparison is like-for-like.
+- **Honest reading**: end-to-end recall is **unchanged**. +0.4pp across 35 questions, with 6 improving and 3 regressing, is run-to-run variance in the synthesis model, not a demonstrated effect. The claim that decomposition works rests on the retrieval measurement — +5.4pp fact coverage with zero regressions, concentrated in comparative (+16.0) and multi-hop (+10.8) — not on this number.
+- **Why report both**: the two together say something more useful than either alone. Decomposition reliably puts more of the required evidence in front of the synthesizer; on a 9-document corpus the synthesizer was already finding enough for most questions, so the end-to-end ceiling is set elsewhere. That is an argument for the corpus being too small to show the gain, not for the gain being absent — and it predicts where the difference would appear at data-room scale.
+- **Also confirmed**: the uncited-answer guard from Decision 35 fired zero times on this run, which is the expected behaviour when the provider is healthy.
+- **Impact**: RESULTS.md, README.md
+
+## Decision 38: A UI test that needs the backend is not a UI test
+- **Date**: Session 9
+- **Context**: Two Streamlit tests failed when run with the API stopped. They were not broken — they had always required a live backend, and had only ever been run while one happened to be up. The deal selector is populated from `GET /deals`, so with no API the app returns early at "select a deal" and never renders the query interface the tests assert on.
+- **Resolution**: added a `?deal_id=` deep link as the last fallback in the deal selector, and the tests now use it. No network call is needed to select a deal, so the tests exercise the UI and nothing else. Panels whose endpoints are unreachable degrade to empty, which is the behaviour the dashboard is built for regardless.
+- **Not a test-only change**: the deep link is independently useful — it makes a data room shareable as a URL rather than "open the dashboard, then pick Aurora from the dropdown".
+- **Guarded by**: `test_deep_link_selects_a_deal`, plus the existing example-query tests now running API-free.
+- **Impact**: app/components/deal_manager.py, tests/test_streamlit_ui.py
+
+## Decision 39: The budget panel reported yesterday's spend
+- **Date**: Session 9
+- **Context**: After the daily quota reset, the sidebar read "26/95 left" on `gemini-3.6-flash` while all 95 were in fact available. The daily reset is applied lazily inside `_try_consume`, on each slot's next call, so the stored counter stays at yesterday's value until then. `_budget_available` already handles this — a stale `reset_date` means a full allowance — but `get_budget_status` read `used_today` raw.
+- **Why it mattered**: the panel contradicted the router. A status display that disagrees with the thing it reports on is worse than no display, and this one is the first thing a reviewer looks at to understand the quota engineering.
+- **Resolution**: `get_budget_status` treats a stale `reset_date` as zero usage, matching what the consumption path will do on the next call, and reports today's date rather than the stored one.
+- **Guarded by**: `TestBudgetStatusReporting`, including an invariant test that the reported remaining capacity never contradicts `_budget_available`.
+- **Impact**: src/llm/budget_tracker.py

@@ -3,7 +3,7 @@
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
 [![Vector Database](https://img.shields.io/badge/vector__db-Qdrant-red.svg)](https://qdrant.tech/)
 [![Orchestration](https://img.shields.io/badge/orchestration-LangGraph-purple.svg)](https://github.com/langchain-ai/langgraph)
-[![Tests](https://img.shields.io/badge/tests-93%20passed-green.svg)]()
+[![Tests](https://img.shields.io/badge/tests-154%20passed-green.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 A **hybrid agentic RAG engine** for mergers & acquisitions due diligence. It ingests multi-format data rooms (financial statements, legal contracts, board decks) and performs multi-step reasoning over them with **deterministic financial verification, hallucination guarding, and traceable citations** — prioritizing "I don't know" over confident hallucination on high-stakes financial/legal questions.
@@ -228,8 +228,9 @@ streamlit run app/streamlit_app.py
 
 ### 5. Running Tests & E2E Validation
 ```bash
-# Execute pytest suite (125 tests covering async safety, agents, quotas, RRF,
-# sub-question decomposition, and SQL parameter binding)
+# Execute pytest suite (154 tests covering async safety, agents, quotas, RRF,
+# sub-question decomposition, SQL parameter binding, provider-failure handling,
+# and the Streamlit UI via Streamlit's own AppTest harness)
 pytest
 
 # Execute the live E2E validation against the 41-question golden set
@@ -260,15 +261,25 @@ Recall is reported with its dependency stated, because that dependency turned ou
 
 Per-type recall on the full-quota run: legal 98.2%, multi-hop 85.2%, summary 83.3%, financial 83.8%, comparative 73.0%.
 
-**The re-run after the decomposition fix scored 62.1%, and that number is not what it looks like.** It was measured during a Gemini incident: `gemini-3.6-flash` returned 503 *"currently experiencing high demand"* on roughly a third of synthesis calls. Both runs used the same synthesis model (38 of 41 answers on `gemini-3.6-flash`), so the usual model-mix explanation does not apply here. What does:
+**Re-run after the decomposition fix, on a clean provider day: 86.3%.** Same synthesis model mix as the run above (38 of 41 answers on `gemini-3.6-flash`) and zero answers lost upstream, so the two are directly comparable.
 
-- **5 answerable questions never got an answer** — synthesis exhausted its retries and degraded to a refusal. Those score 0%, which is 12.1pp of the 23.8pp drop on its own.
-- **The questions that did answer came back truncated.** The regressed ones produced answers **10–22% of their previous length** with **0–1 citations instead of 4–13**. `comp_02` went from 3,624 characters and 7 citations to 349 and none. That is a generation failure, not a retrieval one.
-- **Retrieval, measured independently, improved.** The A/B below shows +5.4pp fact coverage with zero regressions on the same index. Context did not get worse; the model writing from it did.
+| | before the fix | after |
+|---|---|---|
+| Mean fact recall | 85.9% | **86.3%** |
+| Answerable questions answered | 35/35 | **35/35** |
+| Answers with every expected fact | 24/35 | **26/35** |
+| Citation-source match | 33/35 | 33/35 |
+| Controls held | 6/6 | **6/6** |
 
-This is the same lesson as the model-mix confound, in a new costume: on a 35-question set, one bad afternoon at the provider moves the headline metric further than any change in this repository has. `RESULTS.md` now records the synthesis model mix and the upstream-failure count in every report, so the number can never again be read without the conditions that produced it.
+Per question: **6 improved, 3 regressed, 26 unchanged.** Per type: legal 100%, financial 87.9%, multi-hop 82.5%, summary 80.6%, comparative 74.0%.
 
-**Three fixes came out of the incident**, all of which make the engine fail more honestly under provider stress: explicit per-request timeouts (LiteLLM's 600s default is not a timeout), 503 classified as *model unavailable* rather than *quota exhausted* — so the ladder tries a different model instead of retrying a dead one on five keys, without burning the day's quota — and a guard that treats an uncited or scratchpad-leaking answer as a failed generation. That last one matters most: this run shipped an answer with **zero citations at `validation=passed` and confidence 1.00**, in a tool whose entire premise is that every claim is traceable.
+Read honestly, end-to-end recall is **unchanged** — +0.4pp is well inside run-to-run variance on 35 questions, and three questions moved down while six moved up. The retrieval measurement below is the one that shows the fix working (+5.4pp coverage, zero regressions). Both facts are worth stating together: decomposition reliably puts more of the needed evidence in front of the model, and on this corpus the model was already finding enough for most questions. The gain concentrates exactly where it should — comparative and multi-hop retrieval — rather than lifting an average that was already high.
+
+**An earlier attempt at this same re-run scored 62.1%, and that number was an artifact worth keeping in the record.** It was measured during a Gemini incident: `gemini-3.6-flash` returned 503 *"currently experiencing high demand"* on roughly a third of synthesis calls. The model mix was identical, so the usual explanation did not apply. What did: five answerable questions never got an answer at all (12.1pp of the drop on its own), and the ones that did came back **10-22% of their normal length with 0-1 citations instead of 4-13** — `comp_02` went from 3,624 characters and 7 citations to 349 and none. Retrieval on the same index measured *better* throughout. One bad afternoon at the provider moved the headline metric further than any change in this repository has.
+
+**Three fixes came out of that incident**, all of which make the engine fail more honestly under provider stress: explicit per-request timeouts (LiteLLM's 600s default is not a timeout), 503 classified as *model unavailable* rather than *quota exhausted* — so the ladder tries a different model instead of retrying a dead one across five keys, without burning the day's quota — and a guard that treats an uncited or scratchpad-leaking response as a failed generation. That last one matters most: the incident run shipped an answer with **zero citations at `validation=passed` and confidence 1.00**, in a tool whose entire premise is that every claim is traceable. On the clean re-run that guard fired zero times.
+
+`RESULTS.md` now records the synthesis model mix, the decomposition count and the upstream-failure count in every report, so no future number can be read without the conditions that produced it.
 
 **Three defects found by measurement rather than inspection.** Each was invisible to code review — the pipeline ran, returned plausible output, and logged no error:
 
@@ -373,7 +384,7 @@ src/
   vector_db/           Qdrant client, hybrid search, RRF fusion, reranker
   workflow/            LangGraph state machine, orchestrator, conditional edges
   utils/               Logging, token counting, audit log, metrics
-tests/                 125 tests + golden Q&A set + live E2E runner
+tests/                 154 tests + golden Q&A set + live E2E runner
 config/                Qdrant, LiteLLM, and chunking YAML configs
 ```
 

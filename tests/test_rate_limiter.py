@@ -791,3 +791,76 @@ class TestServiceUnavailableHandling:
 
         t.skip_model_for_request(LOCAL_MODEL)
         assert LOCAL_MODEL not in t._models_in_cooldown()
+
+
+class TestBudgetStatusReporting:
+    """
+    The reported budget must agree with the routing decision.
+
+    The daily reset is applied lazily, inside `_try_consume`, on a slot's next
+    call. `_budget_available` already accounts for that — a stale reset_date
+    means a full allowance — but `get_budget_status` read `used_today` raw, so
+    after a quota reset the sidebar reported "26/95 left" while the router
+    considered all 95 available. A status panel that contradicts the thing it
+    is reporting on is worse than no panel.
+    """
+
+    @staticmethod
+    def _tracker(used_today: int, reset_date: str):
+        from src.llm.budget_tracker import BudgetTracker, ModelBudget
+
+        t = BudgetTracker.__new__(BudgetTracker)
+        t._api_keys = ["k" * 40]
+        t._rate_limiters = {}
+        t._is_mock = True
+        t._mock_budgets = {}
+
+        async def fake_load(slot):
+            return ModelBudget(
+                model_key=slot,
+                daily_limit=t._slot_limit(slot),
+                used_today=used_today,
+                reset_date=reset_date,
+            )
+
+        t._load_budget = fake_load
+        return t
+
+    @pytest.mark.asyncio
+    async def test_todays_usage_is_reported(self):
+        from src.llm.budget_tracker import _utc_today_iso
+
+        t = self._tracker(used_today=5, reset_date=_utc_today_iso())
+        status = await t.get_budget_status()
+
+        assert status, "no models reported"
+        entry = next(iter(status.values()))
+        assert entry["used"] == 5
+
+    @pytest.mark.asyncio
+    async def test_stale_counter_reports_as_unused(self):
+        """Yesterday's spend must not be shown as today's."""
+        from src.llm.budget_tracker import _utc_today_iso
+
+        t = self._tracker(used_today=19, reset_date="2000-01-01")
+        status = await t.get_budget_status()
+
+        entry = next(iter(status.values()))
+        assert entry["used"] == 0, (
+            "a counter from a previous day was reported as today's usage"
+        )
+        assert entry["remaining"] == entry["limit"]
+        assert entry["reset_date"] == _utc_today_iso()
+
+    @pytest.mark.asyncio
+    async def test_display_agrees_with_availability(self):
+        """
+        The invariant that was violated: if the router says capacity exists,
+        the panel must not say it is spent.
+        """
+        t = self._tracker(used_today=19, reset_date="2000-01-01")
+        slot = t._all_slots()[0]
+
+        assert await t._budget_available(slot) is True
+        status = await t.get_budget_status()
+        assert next(iter(status.values()))["remaining"] > 0

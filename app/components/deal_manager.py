@@ -70,4 +70,15 @@ def render_deal_manager(api_url: str) -> str | None:
 
     # Manual deal ID entry as fallback
     manual_id = st.text_input("Or enter Deal ID directly", placeholder="UUID")
-    return manual_id if manual_id else None
+    if manual_id:
+        return manual_id
+
+    # `?deal_id=...` deep link, last.
+    #
+    # Two reasons this exists. It makes a deal shareable — a link that opens the
+    # dashboard already scoped to one data room, rather than "open it and then
+    # pick Aurora from the dropdown". And it gives the UI tests a way to select a
+    # deal without a running API: every other path here depends on GET /deals, so
+    # those tests silently required the backend and passed or failed on whether
+    # an unrelated server happened to be up.
+    return st.query_params.get("deal_id") or None

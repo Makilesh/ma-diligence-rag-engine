@@ -592,23 +592,33 @@ class BudgetTracker:
             Dict of model -> {used, limit, remaining, reset_date, keys}.
         """
         status: dict[str, dict] = {}
+        today = _utc_today_iso()
 
         for slot in self._all_slots():
             model = self._slot_model(slot)
             budget = await self._load_budget(slot)
             limit = self._slot_limit(slot)
 
+            # A slot whose stored reset_date is not today has a stale counter:
+            # the daily reset is applied lazily by _try_consume, on that slot's
+            # next call. Reporting the raw number means the sidebar shows
+            # yesterday's spend as today's — after a quota reset it read
+            # "26/95 left" while all 95 were in fact available. _budget_available
+            # already treats a stale date as a full allowance; this makes the
+            # display agree with the routing decision instead of contradicting it.
+            used_today = budget.used_today if budget.reset_date == today else 0
+
             entry = status.setdefault(
                 model,
                 {"used": 0, "limit": 0, "remaining": 0,
-                 "reset_date": budget.reset_date, "keys": []},
+                 "reset_date": today, "keys": []},
             )
-            entry["used"] += budget.used_today
+            entry["used"] += used_today
             entry["limit"] += limit
-            entry["remaining"] += max(0, limit - budget.used_today)
+            entry["remaining"] += max(0, limit - used_today)
             entry["keys"].append(
                 {"key_index": int(slot.split(self.SLOT_SEPARATOR)[0]),
-                 "used": budget.used_today, "limit": limit}
+                 "used": used_today, "limit": limit}
             )
 
         return status
