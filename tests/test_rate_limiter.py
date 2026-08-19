@@ -986,3 +986,63 @@ class TestLadderModelsExist:
         from src.llm.model_registry import SYNTHESIS_LADDER
 
         assert SYNTHESIS_LADDER[0] == "gemini/gemini-3.7-flash"
+
+
+class TestUnavailableModelIsNotRetried:
+    """
+    A 503 must reach the ladder immediately, not after three backoffs.
+
+    Retrying the same model is only useful when the failure is local or
+    transient to the request. "This model is currently experiencing high demand"
+    is neither — it is true for every key and every retry. Measured live:
+    gemini-3.7-flash cost three attempts and ~48s of backoff before the ladder
+    was allowed to try gemini-3.6-flash, which answered first time.
+    """
+
+    @pytest.mark.asyncio
+    async def test_prose_agent_raises_on_first_503(self, monkeypatch):
+        import src.llm.litellm_wrapper as wrapper
+
+        calls = {"n": 0}
+
+        class ServiceUnavailableError(Exception):
+            pass
+
+        async def always_503(**kwargs):
+            calls["n"] += 1
+            raise ServiceUnavailableError(
+                '503 "This model is currently experiencing high demand."'
+            )
+
+        monkeypatch.setattr(wrapper.litellm, "acompletion", always_503)
+
+        with pytest.raises(Exception):
+            await wrapper.call_prose_agent(
+                model="gemini/test", system_prompt="s", user_prompt="u", api_key="k"
+            )
+
+        assert calls["n"] == 1, (
+            f"made {calls['n']} attempts against a model the provider said is "
+            f"unavailable; it should bail after one so the ladder can descend"
+        )
+
+    @pytest.mark.asyncio
+    async def test_ordinary_transport_errors_still_retry(self, monkeypatch):
+        """The fast bail must not disable retries for genuinely transient faults."""
+        import src.llm.litellm_wrapper as wrapper
+
+        calls = {"n": 0}
+
+        async def flaky(**kwargs):
+            calls["n"] += 1
+            raise ConnectionError("connection reset by peer")
+
+        monkeypatch.setattr(wrapper.litellm, "acompletion", flaky)
+        monkeypatch.setattr(wrapper, "RETRY_BACKOFF_SECONDS", 0.0)
+
+        with pytest.raises(Exception):
+            await wrapper.call_prose_agent(
+                model="gemini/test", system_prompt="s", user_prompt="u", api_key="k"
+            )
+
+        assert calls["n"] == wrapper.MAX_RETRIES

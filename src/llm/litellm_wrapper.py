@@ -338,6 +338,16 @@ async def call_prose_agent(
                 extra={"model": model, "attempt": attempt, "error": str(e)},
             )
 
+            # A 503 means the model is down for everyone, so retrying *this*
+            # model is time spent waiting for the same answer. Surface it
+            # immediately and let the caller's ladder pick a different model.
+            #
+            # Measured: gemini-3.7-flash returning 503 cost three attempts and
+            # ~48 seconds of backoff before the ladder was allowed to move to
+            # gemini-3.6-flash, which answered on the first try.
+            if is_service_unavailable(e):
+                raise
+
         if attempt < MAX_RETRIES:
             await asyncio.sleep(RETRY_BACKOFF_SECONDS * attempt)
 
