@@ -70,11 +70,21 @@ class ModelLimits:
 MODEL_LIMITS: dict[str, ModelLimits] = {
     "gemini/gemini-3.6-flash":      ModelLimits(rpm=5,  tpm=250_000, rpd=20,  reasoning=True),
     "gemini/gemini-3.5-flash":      ModelLimits(rpm=5,  tpm=250_000, rpd=20,  reasoning=True),
-    "gemini/gemini-3-flash":        ModelLimits(rpm=5,  tpm=250_000, rpd=20,  reasoning=True),
-    "gemini/gemini-2.5-flash":      ModelLimits(rpm=5,  tpm=250_000, rpd=20,  reasoning=True),
     "gemini/gemini-3.5-flash-lite": ModelLimits(rpm=15, tpm=250_000, rpd=500, reasoning=False),
     "gemini/gemini-3.1-flash-lite": ModelLimits(rpm=15, tpm=250_000, rpd=500, reasoning=False),
-    "gemini/gemini-2.5-flash-lite": ModelLimits(rpm=10, tpm=250_000, rpd=20,  reasoning=False),
+    # REMOVED — gemini-3-flash, gemini-2.5-flash and gemini-2.5-flash-lite were
+    # listed here and on the ladders, and none of them exist on this API. Every
+    # one returns
+    #   404 "models/... is not found for API version v1alpha, or is not
+    #   supported for generateContent"
+    # confirmed on two independent keys. Half the fallback ladder was therefore
+    # phantom: once the top rungs were spent or failing, the router descended
+    # into models that could only 404, burning an attempt and a timeout each
+    # before reaching anything real. Graceful degradation that degrades into
+    # nothing is worse than no fallback, because it looks like it works.
+    #
+    # Availability is a provider fact, not a config choice — re-probe before
+    # adding a rung rather than assuming a plausible-looking name resolves.
     # Local fallback. Not provider-metered; the numbers just mean "effectively
     # unlimited" so the same accounting code path works without special-casing.
     "ollama/qwen2.5:14b":           ModelLimits(rpm=1000, tpm=10**9, rpd=10**6, reasoning=True),
@@ -94,8 +104,6 @@ SAFETY_MARGIN = 0.95
 SYNTHESIS_LADDER: list[str] = [
     "gemini/gemini-3.6-flash",
     "gemini/gemini-3.5-flash",
-    "gemini/gemini-3-flash",
-    "gemini/gemini-2.5-flash",
     "gemini/gemini-3.5-flash-lite",
     "gemini/gemini-3.1-flash-lite",
     LOCAL_MODEL,
@@ -109,7 +117,6 @@ SYNTHESIS_LADDER: list[str] = [
 AGENT_LADDER: list[str] = [
     "gemini/gemini-3.5-flash-lite",
     "gemini/gemini-3.1-flash-lite",
-    "gemini/gemini-2.5-flash-lite",
     LOCAL_MODEL,
 ]
 

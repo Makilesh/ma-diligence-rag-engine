@@ -568,14 +568,59 @@ class TestSubQuestionDecomposition:
 
         assert len(seen) == 3, "parent query plus one pass per sub-question"
 
-        # Parent keeps the filter — it buys precision on the question as asked.
-        assert seen[0]["filters"].get("document_category") == "financial"
-
-        # Sub-questions must be free to search the whole data room.
-        for pass_ in seen[1:]:
+        # EVERY pass drops the category once the query has been decomposed —
+        # including the parent. Decomposing is Agent 1 saying the answer spans
+        # several facts, and those facts sit in documents of different
+        # categories; constraining the parent search to one contradicts the
+        # judgment that produced the sub-questions.
+        #
+        # Measured on the real corpus: the $696M aggregate merger consideration
+        # is stated in the regulatory memo and the merger agreement. Filtering
+        # to `financial` or `legal` removes the chunk that states it, so the
+        # context comes back full of plausible high-scoring chunks with the one
+        # required number missing, and the engine reports the multiple cannot be
+        # computed. Progressive relaxation does not save it — that fires on low
+        # context quality, and this context scores well. It is incomplete, not
+        # weak, and nothing downstream can tell those apart.
+        for pass_ in seen:
             assert "document_category" not in pass_["filters"]
-            # but isolation and compliance filters still apply
+            # Isolation and compliance filters still apply to every pass.
             assert pass_["filters"]["include_pii"] is False
+
+    @pytest.mark.asyncio
+    async def test_undecomposed_query_keeps_the_category_filter(self, monkeypatch):
+        """
+        Without sub-questions the category filter stays — it buys precision.
+
+        The relaxation above is scoped to decomposed queries deliberately. A
+        pointed single-fact lookup is exactly the case the filter helps, and
+        dropping it everywhere would trade precision for nothing.
+        """
+        import src.agents.retrieval_executor as rx
+
+        seen: list[dict] = []
+
+        async def fake_retrieve(query, config, deal_id, metadata_filters):
+            seen.append({"query": query, "filters": dict(metadata_filters)})
+            return []
+
+        monkeypatch.setattr(rx, "_retrieve_for_query", fake_retrieve)
+        monkeypatch.setattr(rx, "expand_context", lambda **kw: _coro([]))
+
+        await rx.retrieval_executor_node({
+            "current_query": "What was FY2023 revenue?",
+            "query_type": "financial",
+            "parsed_intent": {},
+            "deal_id": "d1",
+            "include_pii": False,
+            "rewrite_iteration": 0,
+            "retrieval_config": {},
+            "extracted_filters": {"document_category": "financial"},
+            "sub_questions": [],
+        })
+
+        assert len(seen) == 1
+        assert seen[0]["filters"].get("document_category") == "financial"
 
     @pytest.mark.asyncio
     async def test_decomposition_never_shrinks_the_parent_budget(self, monkeypatch):

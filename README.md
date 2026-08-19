@@ -3,7 +3,7 @@
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
 [![Vector Database](https://img.shields.io/badge/vector__db-Qdrant-red.svg)](https://qdrant.tech/)
 [![Orchestration](https://img.shields.io/badge/orchestration-LangGraph-purple.svg)](https://github.com/langchain-ai/langgraph)
-[![Tests](https://img.shields.io/badge/tests-154%20passed-green.svg)]()
+[![Tests](https://img.shields.io/badge/tests-159%20passed-green.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 A **hybrid agentic RAG engine** for mergers & acquisitions due diligence. It ingests multi-format data rooms (financial statements, legal contracts, board decks) and performs multi-step reasoning over them with **deterministic financial verification, hallucination guarding, and traceable citations** — prioritizing "I don't know" over confident hallucination on high-stakes financial/legal questions.
@@ -122,11 +122,10 @@ The Gemini free tier is lopsided in a way that dictates the entire routing desig
 |---|---|---|---|
 | `gemini-3.6-flash` | 5 | 20 | Synthesis (best reasoning) |
 | `gemini-3.5-flash` | 5 | 20 | Synthesis |
-| `gemini-3-flash` | 5 | 20 | Synthesis |
-| `gemini-2.5-flash` | 5 | 20 | Synthesis |
 | `gemini-3.5-flash-lite` | 15 | **500** | Agents — volume tier |
 | `gemini-3.1-flash-lite` | 15 | **500** | Agents — volume tier |
-| `gemini-2.5-flash-lite` | 10 | 20 | Agent overflow |
+
+`gemini-3-flash`, `gemini-2.5-flash` and `gemini-2.5-flash-lite` were on these ladders and are **not served by this API** — each returns 404, confirmed on two keys. They have been removed; see the note on the phantom ladder below.
 
 **Only the Lite tier can sustain traffic.** Every reasoning-grade model is capped at 20 requests/day. A query spends ~4 agent calls (classification, rewriting, quality assessment, validation) and 1 synthesis call — so putting agent traffic on a reasoning model would drain it in five queries, and it would then be unavailable to synthesis, which is the only place reasoning quality reaches the user.
 
@@ -228,7 +227,7 @@ streamlit run app/streamlit_app.py
 
 ### 5. Running Tests & E2E Validation
 ```bash
-# Execute pytest suite (154 tests covering async safety, agents, quotas, RRF,
+# Execute pytest suite (159 tests covering async safety, agents, quotas, RRF,
 # sub-question decomposition, SQL parameter binding, provider-failure handling,
 # and the Streamlit UI via Streamlit's own AppTest harness)
 pytest
@@ -308,7 +307,28 @@ Re-measured after the classifier veto was removed, now across **all 35 answerabl
 | multi-hop (n=10) | 70.8% | **81.7% (+10.8)** |
 | financial / legal / summary | — | unchanged |
 
-**4 improved, 0 regressed**, with Agent 1 choosing to decompose 14 of the 35. The types it does not decompose are untouched, which is the expected shape: decomposition should help questions that span documents and do nothing to the ones that do not.
+**7 improved, 0 regressed**, with Agent 1 choosing to decompose 19 of the 35 — after one further fix described below. The types it does not decompose are untouched, which is the expected shape: decomposition should help questions that span documents and do nothing to the ones that do not.
+
+**The category filter has to come off before the search, not after it.** The EV/EBITDA question answered differently run to run — sometimes 7.50x, sometimes "cannot be determined". The required `$696 million` aggregate merger consideration reached the context in only **3 of 8 runs**.
+
+Two plausible explanations were measured and discarded. Sub-question depth: the `$696M` chunk ranks 1st, 5th, 4th or 1st depending on how Agent 1 phrases the value sub-question, and only the top 2 per pass survive — but sweeping depth 2→6 across the golden set moved coverage *not at all*, because the sweep froze one decomposition per question and froze a favourable one here. Agent 1's temperature: already 0.0; the variance is model nondeterminism.
+
+The actual cause is deterministic and needs no LLM to reproduce. `$696 million` is stated in the regulatory memo and the merger agreement; Agent 1 classifies the question `financial` or `legal`; either filter removes the chunk that states it:
+
+| `document_category` filter | `$696M` in context |
+|---|---|
+| none | ✓ |
+| `financial` | ✗ |
+| `legal` | ✗ |
+| `regulatory` | ✓ |
+
+Progressive filter relaxation does not rescue this, and the reason is the interesting part: relaxation fires on *low context quality*, and this context scores well. It is full of plausible, high-scoring financial chunks — it is **incomplete, not weak**, and nothing downstream can distinguish those. A gate that reacts to bad scores cannot catch a good score with a hole in it.
+
+Fixed by dropping `document_category` from the parent pass too, once a query has been decomposed — decomposing is the model stating the answer spans several facts, and those facts sit in different categories. Undecomposed queries keep the filter, where it still buys precision. Retrieval A/B went from +5.4pp to **+10.4pp**, multi-hop coverage **81.7% → 94.7%**, and live the required figures now reach the answer in **4/4** runs against 3/8.
+
+The residual is worth stating: the *computed* 7.5x still appears in 2 of 4 live runs, and both misses were on `gemini-3.5-flash-lite` while both hits were on `gemini-3.6-flash`. Retrieval is now reliable; the arithmetic is model-dependent. The answer still reports the inputs it could not combine.
+
+**Half the fallback ladder did not exist.** Tracing a synthesis failure surfaced `404 models/gemini-3-flash is not found for API version v1alpha`. Probing every laddered model across two keys: `gemini-3-flash`, `gemini-2.5-flash` and `gemini-2.5-flash-lite` all 404. Three of six cloud rungs were phantom, so whenever the working rungs were spent or failing — exactly when a ladder earns its keep — the router descended into models that could only fail, burning an attempt and a timeout each. Every existing registry test checked internal consistency (laddered models have declared quotas, allowances fit under caps); none could check that a model is real, because that is a network fact rather than a config one.
 
 **Why the end-to-end number is measured separately from that.** Answer recall across runs is dominated by which synthesis model served the run, and that drifts within a day as the top rung's 20-request daily quota drains. Four runs of the same 41 questions scored 86.6%, 73.9%, 71.0% and 85.9% as the mix shifted between `gemini-3.6-flash` and `gemini-3.5-flash` — and question types that are **never** decomposed moved in lockstep (legal 100% → 73% → 98%, summary 72% → 50% → 83%). The fourth run tested the explanation rather than just restating it: run on fresh quota, 38 of its 41 answers were written by `gemini-3.6-flash`, and recall returned to the top of the range. Cross-run end-to-end comparison at this sample size therefore cannot attribute a change to a retrieval improvement, which is why the decomposition result above is measured on retrieval alone.
 
@@ -384,7 +404,7 @@ src/
   vector_db/           Qdrant client, hybrid search, RRF fusion, reranker
   workflow/            LangGraph state machine, orchestrator, conditional edges
   utils/               Logging, token counting, audit log, metrics
-tests/                 154 tests + golden Q&A set + live E2E runner
+tests/                 159 tests + golden Q&A set + live E2E runner
 config/                Qdrant, LiteLLM, and chunking YAML configs
 ```
 

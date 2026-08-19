@@ -287,3 +287,26 @@ All architecture decisions that deviated from or resolved ambiguities in p4.md a
 - **Resolution**: `get_budget_status` treats a stale `reset_date` as zero usage, matching what the consumption path will do on the next call, and reports today's date rather than the stored one.
 - **Guarded by**: `TestBudgetStatusReporting`, including an invariant test that the reported remaining capacity never contradicts `_budget_available`.
 - **Impact**: src/llm/budget_tracker.py
+
+## Decision 40: The category filter must come off *before* the search, not after it
+- **Date**: Session 9
+- **Symptom**: the EV/EBITDA question answered differently run to run — sometimes computing 7.50x, sometimes reporting the multiple "cannot be determined". Live sampling put the required `$696 million` aggregate merger consideration in the retrieved context in only **3 of 8 runs**.
+- **False leads, both measured and discarded**:
+  - *Sub-question depth.* The `$696M` chunk ranks 1st, 5th, 4th and 1st depending on how Agent 1 phrases the value sub-question, and `MIN_CHUNKS_PER_SUB_QUESTION = 2` truncates before rank 4. Plausible — but a sweep over depth 2→6 on the whole golden set moved mean coverage **not at all** (73.8% flat), because the sweep froze one decomposition per question and happened to freeze a favourable one for this query. A measurement that cannot see the failure is not evidence of its absence.
+  - *Agent 1 temperature.* Already `0.0`. The phrasing variance is model nondeterminism, not a setting.
+- **Actual cause**: Agent 1 classifies this question `financial` or `legal`, and `document_category` is applied as a hard filter on the *first* attempt. `$696 million` is stated in the regulatory memo and in the merger agreement; either filter removes the chunk that states it. Deterministic, no LLM involved: filter `none` → found, `financial` → missing, `legal` → missing, `regulatory` → found.
+- **Why progressive relaxation (Decision 18) did not save it**: relaxation fires on *low context quality*. This context scores well — it is full of plausible, high-scoring financial chunks. It is **incomplete, not weak**, and nothing downstream can tell those two apart. A gate that only reacts to bad scores cannot rescue a good score with a hole in it.
+- **Resolution**: once a query has been decomposed, the parent pass drops `document_category` too — not just the sub-question passes. Decomposing is Agent 1 stating that the answer spans several facts; those facts routinely sit in different document categories, so constraining the parent search to one contradicts the judgment that produced the sub-questions. Undecomposed queries keep the filter, where it still buys precision.
+- **Measured**: `$696M` present at every category filter and at the smallest depth (15 chunks, no increase in context size). Retrieval A/B over the golden set improved from **+5.4pp to +10.4pp**, multi-hop coverage **81.7% → 94.7%**, comparative **+31.0pp**, still **zero regressions**. Live, `$696` and `$92.8` now reach the answer in **4/4** runs against 3/8 before.
+- **Residual, stated plainly**: the computed `7.5x` still appears in only 2 of 4 live runs — and both misses were on `gemini-3.5-flash-lite`, both hits on `gemini-3.6-flash`. Retrieval is now reliable; the arithmetic step is model-dependent. That is honest degradation rather than a retrieval defect, and the answer still reports the inputs it was unable to combine.
+- **Guarded by**: `test_sub_questions_do_not_inherit_the_category_filter` (updated), `test_undecomposed_query_keeps_the_category_filter`.
+- **Impact**: src/agents/retrieval_executor.py, tests/test_agents.py
+
+## Decision 41: Half the fallback ladder did not exist
+- **Date**: Session 9
+- **Context**: while tracing a synthesis failure, the log showed `404 models/gemini-3-flash is not found for API version v1alpha`. Probing every laddered model across two working keys: **`gemini-3-flash`, `gemini-2.5-flash` and `gemini-2.5-flash-lite` all return 404**. Three of the six cloud rungs were phantom.
+- **Consequence**: whenever the working rungs were spent or failing — exactly when the ladder matters — the router descended into models that could only 404, burning an attempt and a timeout on each before reaching anything real. Graceful degradation that degrades into nothing is worse than no fallback, because it reads as working.
+- **Why it went unnoticed**: the ladder is only exercised under quota pressure, and until the provider incidents of the last two sessions it rarely got past the second rung. Every existing registry test checked *internal consistency* — that laddered models have declared quotas, that allowances fit under caps — and none could check that a model is real, because that is a network fact.
+- **Resolution**: removed from `MODEL_LIMITS` and both ladders. Synthesis is now `3.6-flash → 3.5-flash → 3.5-flash-lite → 3.1-flash-lite → local`; agents `3.5-flash-lite → 3.1-flash-lite → local`. Both keep at least two real cloud rungs.
+- **Guarded by**: `TestLadderModelsExist`, which pins the ladders to the probed set and fails if a known-404 model reappears. It deliberately cannot assert live availability — the point is that adding a rung means re-probing, not writing a plausible-looking name.
+- **Impact**: src/llm/model_registry.py, tests/test_rate_limiter.py

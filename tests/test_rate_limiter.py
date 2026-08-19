@@ -864,3 +864,76 @@ class TestBudgetStatusReporting:
         assert await t._budget_available(slot) is True
         status = await t.get_budget_status()
         assert next(iter(status.values()))["remaining"] > 0
+
+
+class TestLadderModelsExist:
+    """
+    Every rung must be a model the provider actually serves.
+
+    Three of the six laddered Gemini models did not exist: `gemini-3-flash`,
+    `gemini-2.5-flash` and `gemini-2.5-flash-lite` each returned
+    404 "not found for API version v1alpha, or is not supported for
+    generateContent", confirmed on two independent keys. Half the fallback
+    ladder was phantom, so once the working rungs were spent or failing the
+    router descended into models that could only 404 — burning an attempt and a
+    timeout on each before reaching anything real.
+
+    This cannot assert live availability without a network call, so it pins the
+    ladders to the set that was probed. Changing that set should mean re-probing
+    (scripts in the session scratchpad), not editing this list to match.
+    """
+
+    PROBED_AVAILABLE = {
+        "gemini/gemini-3.6-flash",
+        "gemini/gemini-3.5-flash",
+        "gemini/gemini-3.5-flash-lite",
+        "gemini/gemini-3.1-flash-lite",
+    }
+
+    PROBED_MISSING = {
+        "gemini/gemini-3-flash",
+        "gemini/gemini-2.5-flash",
+        "gemini/gemini-2.5-flash-lite",
+    }
+
+    def test_no_ladder_contains_a_known_missing_model(self):
+        from src.llm.model_registry import AGENT_LADDER, SYNTHESIS_LADDER
+
+        for ladder_name, ladder in (("synthesis", SYNTHESIS_LADDER),
+                                    ("agent", AGENT_LADDER)):
+            offenders = self.PROBED_MISSING.intersection(ladder)
+            assert not offenders, (
+                f"{ladder_name} ladder routes to {sorted(offenders)}, which the "
+                f"provider returns 404 for"
+            )
+
+    def test_registry_declares_no_known_missing_model(self):
+        from src.llm.model_registry import MODEL_LIMITS
+
+        offenders = self.PROBED_MISSING.intersection(MODEL_LIMITS)
+        assert not offenders, (
+            f"MODEL_LIMITS declares quotas for nonexistent models: {sorted(offenders)}"
+        )
+
+    def test_every_cloud_rung_was_probed_available(self):
+        from src.llm.model_registry import AGENT_LADDER, SYNTHESIS_LADDER, is_local
+
+        for model in set(SYNTHESIS_LADDER + AGENT_LADDER):
+            if is_local(model):
+                continue
+            assert model in self.PROBED_AVAILABLE, (
+                f"{model} is on a ladder but has not been probed against the "
+                f"provider — add it to PROBED_AVAILABLE only after confirming it "
+                f"answers, not because the name looks plausible"
+            )
+
+    def test_each_ladder_still_has_a_working_cloud_rung(self):
+        """Removing the phantoms must not leave a ladder that is local-only."""
+        from src.llm.model_registry import AGENT_LADDER, SYNTHESIS_LADDER, is_local
+
+        for name, ladder in (("synthesis", SYNTHESIS_LADDER), ("agent", AGENT_LADDER)):
+            cloud = [m for m in ladder if not is_local(m)]
+            assert len(cloud) >= 2, (
+                f"{name} ladder has {len(cloud)} cloud rungs; it needs a real "
+                f"fallback, not just a top choice and the local model"
+            )

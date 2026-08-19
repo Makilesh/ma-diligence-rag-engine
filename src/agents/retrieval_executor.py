@@ -298,8 +298,32 @@ async def retrieval_executor_node(state: AgentState) -> dict:
         k: v for k, v in metadata_filters.items() if k != "document_category"
     }
 
+    # The parent pass drops the category too, once a query has been decomposed.
+    #
+    # Decomposing is Agent 1 stating that the answer spans several facts. Those
+    # facts routinely live in documents of different categories, so constraining
+    # the parent search to one category contradicts the judgment that produced
+    # the sub-questions in the first place.
+    #
+    # Measured on "implied EV/EBITDA multiple of the Vertex deal": the aggregate
+    # merger consideration of $696 million is stated in the regulatory memo and
+    # in the merger agreement. Agent 1 classifies the question `financial` or
+    # `legal`, and either filter removes the chunk that states it — retrieval
+    # then returns a context full of plausible, high-scoring financial chunks
+    # with the one required number absent, and the engine reports that the
+    # multiple cannot be computed.
+    #
+    # Progressive relaxation (see the rewrite path) does not rescue this. It
+    # triggers on *low* context quality, and this context scores well — it is
+    # incomplete, not weak. Nothing downstream can tell the difference, which is
+    # why the filter has to come off before the search rather than after it.
+    #
+    # deal_id, version and PII filters still apply to every pass: those are
+    # isolation and compliance constraints, not relevance hints.
+    parent_filters = sub_question_filters if sub_questions else metadata_filters
+
     def _filters_for(index: int) -> dict:
-        return metadata_filters if index == 0 else sub_question_filters
+        return parent_filters if index == 0 else sub_question_filters
 
     # Passes are independent, so run them concurrently. The embedding and
     # reranking thread pools are bounded, so this queues rather than oversubscribes.

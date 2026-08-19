@@ -22,11 +22,15 @@
 #   model                    RPM     TPM      RPD    role
 #   gemini-3.6-flash           5    250K       20    synthesis (best reasoning)
 #   gemini-3.5-flash           5    250K       20    synthesis
-#   gemini-3-flash             5    250K       20    synthesis
-#   gemini-2.5-flash           5    250K       20    synthesis
 #   gemini-3.5-flash-lite     15    250K      500    agents (volume tier)
 #   gemini-3.1-flash-lite     15    250K      500    agents (volume tier)
-#   gemini-2.5-flash-lite     10    250K       20    agents (overflow)
+#
+# NOT AVAILABLE on this API, and removed from both ladders after probing:
+#   gemini-3-flash, gemini-2.5-flash, gemini-2.5-flash-lite
+# Each returns 404 "not found for API version v1alpha", confirmed on two keys.
+# They were rungs the router descended into under quota pressure, where they
+# could only fail. Re-probe before adding a rung; availability is a provider
+# fact, not a config choice.
 #
 # Only the Lite tier can sustain traffic. Every reasoning-grade model is capped
 # at 20 requests/day, which is the single fact that dictates the routing below.
@@ -39,8 +43,6 @@ routing:
   synthesis_ladder:
     - gemini/gemini-3.6-flash
     - gemini/gemini-3.5-flash
-    - gemini/gemini-3-flash
-    - gemini/gemini-2.5-flash
     - gemini/gemini-3.5-flash-lite
     - gemini/gemini-3.1-flash-lite
     - ollama/qwen2.5:14b
@@ -53,7 +55,6 @@ routing:
   agent_ladder:
     - gemini/gemini-3.5-flash-lite
     - gemini/gemini-3.1-flash-lite
-    - gemini/gemini-2.5-flash-lite
     - ollama/qwen2.5:14b
 
 # ==============================================================================
