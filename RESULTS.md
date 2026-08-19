@@ -11,19 +11,34 @@ not on fact recall — so the two are reported separately. Without them, "never
 refuses" and "always finds the answer" would be indistinguishable.
 
 ## Run Summary
-- **Timestamp**: 2026-08-14 13:26:14
+- **Timestamp**: 2026-08-17 21:05:23
 - **Deal ID**: `aurora_vertex_2024`
 - **Completed without an unhandled exception**: 41/41
-- **Average E2E latency**: 29.7s
+- **Average E2E latency**: 80.4s
 
 ### Answerable questions (35)
-- **Answered** (not refused): 35/35
-- **Mean fact recall**: 85.9%
-- **Answers with every expected fact present**: 24/35
-- **Citation-source match**: 33/35
+- **Answered** (not refused): 30/35
+- **Mean fact recall**: 62.1%
+- **Answers with every expected fact present**: 14/35
+- **Citation-source match**: 20/35
 
 ### Control questions (6)
 - **Declined to fabricate the missing figure**: 6/6
+
+### Run conditions
+
+Read these before comparing this run to another one. Recall on this set moves
+with the synthesis model, and the synthesis model moves with daily quota and
+provider health — neither of which is a property of the engine.
+
+- **Synthesis model mix**: `gemini/gemini-3.6-flash` ×38
+- **Queries decomposed into sub-questions**: 18/41
+- **Answers lost to upstream synthesis failure**: 6/41
+
+A non-zero synthesis-failure count means the provider refused or truncated
+generations during the run. Those questions score 0% recall regardless of how
+good retrieval was, so the headline figure understates the engine by roughly
+`failures / answerable` and the comparison to a clean run is not like-for-like.
 
 ## Metrics by Query Type
 
@@ -32,11 +47,11 @@ retrieval quality rather than refusal behaviour.
 
 | Query Type | Count | Answered | Avg Recall | Avg Latency (ms) |
 | --- | --- | --- | --- | --- |
-| Financial | 8 | 8/8 | 83.8% | 26925.75 |
-| Legal | 8 | 8/8 | 98.2% | 25875.00 |
-| Comparative | 5 | 5/5 | 73.0% | 34281.40 |
-| Summary | 4 | 4/4 | 83.3% | 29718.50 |
-| Multi_hop | 10 | 10/10 | 85.2% | 34662.60 |
+| Financial | 8 | 6/8 | 65.0% | 75994.13 |
+| Legal | 8 | 7/8 | 76.2% | 81425.88 |
+| Comparative | 5 | 4/5 | 48.0% | 68350.00 |
+| Summary | 4 | 4/4 | 41.7% | 147496.00 |
+| Multi_hop | 10 | 9/10 | 63.6% | 83831.20 |
 
 ## Detailed Query Output Reports
 
@@ -49,47 +64,45 @@ retrieval quality rather than refusal behaviour.
 - **Facts Recalled**: 4/4 (100.0%)
   - *Recalled*: ['$452.8', '$387.1', '17.0%', 'growth']
 - **Citations Match**: ✅ Yes
-- **Total Latency**: 27171.00 ms
+- **Total Latency**: 40016.00 ms
 - **Answer**:
 ```
 ### 1. Direct Answer
-
-In **FY2023**, Aurora Technologies Inc. reported total revenue of **$452.8 million**, compared to **$387.1 million** in **FY2022**. This represents a year-over-year (YoY) increase of **$65.7 million** or **17.0%** growth [📄 aurora_financials_fy2023.txt | FY2023 | p.1 | CONSOLIDATED INCOME STATEMENT] [📄 aurora_financials_fy2023.txt | FY2023 | p.3 | Revenue Growth: 17.0% YoY].
+In **FY2023**, Aurora Technologies Inc.'s total revenue was **$452.8 million**. In comparison, its total revenue in **FY2022** was **$387.1 million**, representing a year-over-year (YoY) revenue increase of $65.7 million or **17.0%**.
 
 ---
 
 ### 2. Supporting Evidence & Revenue Breakdown
+All values are reported under Audited Consolidated Financial Statements in **millions of USD**:
 
-All values are reported in millions of USD ($M) [📄 aurora_financials_fy2023.txt | FY2023 | p.1 | CONSOLIDATED INCOME STATEMENT]:
+* **FY2023 Total Revenue**: **$452.8 million** [📄 aurora_financials_fy2023.txt | FY2023 | p.1 | CONSOLIDATED INCOME STATEMENT]
+  * **Software Licenses**: $198.4 million [📄 aurora_financials_fy2023.txt | FY2023 | p.1 | CONSOLIDATED INCOME STATEMENT]
+  * **SaaS Subscriptions**: $189.6 million [📄 aurora_financials_fy2023.txt | FY2023 | p.1 | CONSOLIDATED INCOME STATEMENT]
+  * **Professional Services**: $64.8 million [📄 aurora_financials_fy2023.txt | FY2023 | p.1 | CONSOLIDATED INCOME STATEMENT]
 
-* **Software Licenses:**
-  * FY2023: **$198.4 million**
-  * FY2022: **$172.3 million**
-  * Change: Increase of $26.1 million (+15.1%) [📄 aurora_financials_fy2023.txt | FY2023 | p.1 | CONSOLIDATED INCOME STATEMENT]
-  * *Note:* Within this segment, perpetual license revenue was $56.3 million in FY2023 compared to $61.2 million in FY2022 [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | Net Revenue Retention].
+* **FY2022 Total Revenue**: **$387.1 million** [📄 aurora_financials_fy2023.txt | FY2022 | p.1 | CONSOLIDATED INCOME STATEMENT]
+  * **Software Licenses**: $172.3 million [📄 aurora_financials_fy2023.txt | FY2022 | p.1 | CONSOLIDATED INCOME STATEMENT]
+  * **SaaS Subscriptions**: $148.2 million [📄 aurora_financials_fy2023.txt | FY2022 | p.1 | CONSOLIDATED INCOME STATEMENT]
+  * **Professional Services**: $66.6 million [📄 aurora_financials_fy2023.txt | FY2022 | p.1 | CONSOLIDATED INCOME STATEMENT]
 
-* **SaaS Subscriptions:**
-  * FY2023: **$189.6 million**
-  * FY2022: **$148.2 million**
-  * Change: Increase of $41.4 million (+27.9%) [📄 aurora_financials_fy2023.txt | FY2023 | p.1 | CONSOLIDATED INCOME STATEMENT]
-
-* **Professional Services:**
-  * FY2023: **$64.8 million**
-  * FY2022: **$66.6 million**
-  * Change: Decrease of $1.8 million (-2.7%) [📄 aurora_financials_fy2023.txt | FY2023 | p.1 | CONSOLIDATED INCOME STATEMENT]
-
-* **Total Revenue:**
-  * FY2023: **$452.8 million**
-  * FY2022: **$387.1 million**
-  * Total Growth: **17.0% YoY** [📄 aurora_financials_fy2023.txt | FY2023 | p.3 | Revenue Growth: 17.0% YoY]
+* **Year-over-Year Revenue Growth**: **17.0% YoY** [📄 aurora_financials_fy2023.txt | FY2023 | p.3 | Revenue Growth: 17.0% YoY]
 
 ---
 
-### 3. Financial Context & Due Diligence Caveats
+### 3. Caveats, Inconsistencies, & Due Diligence Notes
+* **Revenue Sustainability Warning**: The Quality of Earnings report indicates that perpetual license revenue (included under Software Licenses) declined from $61.2 million in FY2022 to $56.3 million in FY2023 as the company transitions to subscription pricing. Potential buyers are instructed not to model perpetual license revenue as sustainable [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | SECTION 5: WORKING CAPITAL].
+* **Inconsistencies**: None found across the financial review documents [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.1 | Inconsistencies Found].
 
-* **Scale & Reporting Basis:** Values are stated in **millions of USD** and originate from audited consolidated income statements audited by Deloitte & Touche LLP [📄 aurora_financials_fy2023.txt | FY2023 | p.1 | CONSOLIDATED INCOME STATEMENT].
-* **Mix Shift Caution:** The Quality of Earnings report highlights that perpetual license revenue declined from $61.2 million in FY2022 to $56.3 million in FY2023 due to the company's migration to subscription pricing. Buyers are advised not to model perpetual license revenue as sustainable [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | Net Revenue Retention].
-* **Inconsistencies:** No revenue discrepancies were noted across the provided financial statements and quality of earnings documents [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.1 | Inconsistencies Found].
+---
+
+### 4. Financial Scale & Context Summary
+
+| Metric | FY2022 | FY2023 | YoY Change ($) | YoY Change (%) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Total Revenue** | **$387.1M** ($387,100,000) | **$452.8M** ($452,800,000) | +$65.7M (+$65,700,000) | +17.0% |
+| SaaS Subscriptions | $148.2M | $189.6M | +$41.4M | +27.9% |
+| Software Licenses | $172.3M | $198.4M | +$26.1M | +15.1% |
+| Professional Services | $66.6M | $64.8M | -$1.8M | -2.7% |
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -106,49 +119,14 @@ All values are reported in millions of USD ($M) [📄 aurora_financials_fy2023.t
 - **Status**: ✅ PASS
 - **Confidence Score**: 1.00
 - **Validation Status**: passed
-- **Facts Recalled**: 4/4 (100.0%)
-  - *Recalled*: ['$92.8', '$97.3', 'restructuring', '$4.5']
-- **Citations Match**: ✅ Yes
-- **Total Latency**: 20032.00 ms
+- **Facts Recalled**: 0/4 (0.0%)
+  - *Recalled*: []
+  - *Missing*: ['$92.8', '$97.3', 'restructuring', '$4.5']
+- **Citations Match**: ❌ No
+- **Total Latency**: 157265.00 ms
 - **Answer**:
 ```
-### 1. Direct Answer
-For Fiscal Year 2023 (FY2023):
-* **Reported EBITDA:** **$92.8 million**
-* **Adjusted EBITDA:** **$99.0 million** per the Quality of Earnings Report (or **$97.3 million** per the company's internal financial statements).
-
----
-
-### 2. Supporting Evidence & Citations
-
-* **Reported EBITDA ($92.8 million):**
-  * Both sources consistently report an EBITDA of **$92.8 million** for FY2023 (calculated as Net Income of $46.4M + Tax $15.5M + Interest $8.2M - Other Income $2.1M + Depreciation $11.4M + Amortization $13.4M, or Operating Income of $68.0M + D&A of $24.8M) [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.1 | SECTION 2: ADJUSTED EBITDA BRIDGE] [📄 aurora_financials_fy2023.txt | FY2023 | p.2 | KEY FINANCIAL METRICS AND NOTES].
-
-* **Adjusted EBITDA ($99.0 million / $97.3 million):**
-  * **Quality of Earnings (QoE) Analysis:** Reports **$99.0 million** (21.9% margin), representing a **$6.2 million** net normalization add-back above reported EBITDA [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.2 | Adjusted EBITDA] [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | SECTION 6: KEY OBSERVATIONS FOR THE BUYER].
-  * **Company Financial Statements:** Reports **$97.3 million** (21.5% margin), which adds back only **$4.5 million** of restructuring charges to reported EBITDA [📄 aurora_financials_fy2023.txt | FY2023 | p.2 | KEY FINANCIAL METRICS AND NOTES].
-
----
-
-### 3. Inconsistencies & Caveats
-
-* **Discrepancy in Adjusted EBITDA:** 
-  * Company internal financials state FY2023 Adjusted EBITDA is **$97.3 million** (reflecting only a $4.5 million restructuring add-back) [📄 aurora_financials_fy2023.txt | FY2023 | p.2 | KEY FINANCIAL METRICS AND NOTES].
-  * The QoE Report derives an Adjusted EBITDA of **$99.0 million** by incorporating additional normalization adjustments (e.g., legal fees, founder compensation normalization, and capitalized software adjustments) [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.2-3 | SECTION 3 & SECTION 6].
-
-* **Quality Caveats Identified in QoE Report:**
-  * **Legal Fee Add-back:** Includes a $2.8 million DataFlow legal fee add-back which is qualified; if litigation continues into FY2024, Adjusted EBITDA would be overstated by that amount [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | SECTION 6].
-  * **Capitalized Software:** Includes a downward adjustment of $3.2 million to align capitalized software accounting with peer practice [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.2 | Note 5].
-
----
-
-### 4. Normalized Financial Figures Summary (USD)
-
-| Metric | Context / Source | Raw Value ($M) | Full Normalized Value ($) | Margin (%) |
-| :--- | :--- | :--- | :--- | :--- |
-| **Reported EBITDA** | QoE & Company Financials | $92.8 | $92,800,000 | 20.5% |
-| **Adjusted EBITDA (Company)** | Aurora Financials | $97.3 | $97,300,000 | 21.5% |
-| **Adjusted EBITDA (QoE)** | QoE Report | $99.0 | $99,000,000 | 21.9% |
+I could not generate an answer for this question because the language model did not return a usable response. The retrieved context may still be relevant — please retry the query.
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -168,38 +146,43 @@ For Fiscal Year 2023 (FY2023):
 - **Facts Recalled**: 1/5 (20.0%)
   - *Recalled*: ['capital expenditures']
   - *Missing*: ['$64.2', '$78.4', 'operations', '$14.2']
-- **Citations Match**: ✅ Yes
-- **Total Latency**: 23640.00 ms
+- **Citations Match**: ❌ No
+- **Total Latency**: 140938.00 ms
 - **Answer**:
 ```
 ### 1. Direct Answer
-The provided context **does not contain the explicit Free Cash Flow (FCF) figure** for Aurora in FY2023, nor does it include a complete Consolidated Statement of Cash Flows or Capital Expenditures (CapEx) figure to compute FCF under the standard formula ($\text{Free Cash Flow} = \text{Operating Cash Flow} - \text{Capital Expenditures}$). 
 
-However, the context explicitly reports that Aurora generated **$52.1 million in Operating Cash Flow** during FY2023 [📄 credit_agreement_summary.txt | p.1 | Section: Net Debt / Reported EBITDA (FY2023)].
+The provided context **does not contain the explicit Free Cash Flow (FCF) figure for FY2023** nor the complete Consolidated Statement of Cash Flows required to compute FCF precisely (specifically, Capital Expenditures / CapEx is missing).
+
+However, the context explicitly provides the following related operating cash flow figure for FY2023:
+* **Operating Cash Flow (FY2023):** **$52.1 million**
 
 ---
 
-### 2. Supporting Evidence & Financial Components
+### 2. Supporting Evidence with Citations
 
-#### Known Cash Flow Components (FY2023):
-* **Operating Cash Flow:** $52.1 million [📄 credit_agreement_summary.txt | p.1 | Section: Net Debt / Reported EBITDA (FY2023)]
-* **Voluntary Debt Repayment:** $25.0 million voluntary paydown of the revolving credit facility in Q4 FY2023 [📄 credit_agreement_summary.txt | p.1 | Section: Net Debt / Reported EBITDA (FY2023)]
-* **Beginning Cash Balance (FY2022):** $72.1 million [📄 aurora_financials_fy2023.txt | p.2 | Section: ASSETS]
-* **Ending Cash Balance (FY2023):** $89.4 million [📄 aurora_financials_fy2023.txt | p.2 | Section: ASSETS]
-* **Net Change in Cash:** +$17.3 million ($89.4 million - $72.1 million) [📊 aurora_financials_fy2023.txt | p.2 | COMPUTED: Net cash change from FY2022 to FY2023]
-
-#### Income Statement & Working Capital Components Related to Operating Cash Flow:
-* **Revenue:** $452.8 million [📄 aurora_financials_fy2023.txt | p.1 | Section: CONSOLIDATED INCOME STATEMENT]
-* **Gross Profit:** $271.7 million [📄 aurora_financials_fy2023.txt | p.1 | Section: CONSOLIDATED INCOME STATEMENT]
-* **Accounts Receivable (net):** $67.8 million (FY2023) vs. $58.2 million (FY2022) [📄 aurora_financials_fy2023.txt | p.2 | Section: ASSETS]
-* **Deferred Revenue:** $78.2 million (FY2023) vs. $65.4 million (FY2022) [📄 aurora_financials_fy2023.txt | p.3 | Section: LIABILITIES AND STOCKHOLDERS' EQUITY]
-* **Accounts Payable:** $28.4 million (FY2023) vs. $24.6 million (FY2022) [📄 aurora_financials_fy2023.txt | p.3 | Section: LIABILITIES AND STOCKHOLDERS' EQUITY]
+* **Operating Cash Flow (FY2023):** **$52.1 million** [📄 credit_agreement_summary.txt | FY2023 | p.1 | Section: Net Debt / Reported EBITDA (FY2023)]
+* **Net Income (FY2023):** **$46.4 million** [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.1 | Section 2: ADJUSTED EBITDA BRIDGE]
+* **Voluntary Debt Paydown:** **$25.0 million** voluntary paydown of the revolver in Q4 FY2023 [📄 credit_agreement_summary.txt | FY2023 | p.1 | Section: Net Debt / Reported EBITDA (FY2023)]
 
 ---
 
 ### 3. Missing Information & Caveats
-* **Missing Data:** Capital Expenditures (CapEx), purchases of Property, Plant, and Equipment (PP&E), and the full Statement of Cash Flows are missing from the provided dataset. CapEx is necessary to derive exact Free Cash Flow.
-* **Scale Context:** All financial amounts are presented in millions of USD ($ millions).
+
+* **Insufficient Context for Free Cash Flow:** Free Cash Flow is conventionally calculated as **Operating Cash Flow minus Capital Expenditures (CapEx)**. Because neither Capital Expenditures nor a complete Consolidated Statement of Cash Flows is included in the provided document chunks, exact Free Cash Flow for FY2023 cannot be determined without making assumptions outside the provided text.
+* **Missing Components:** Non-cash adjustments, property/equipment purchases, software capitalization, and other investing activities are missing from the provided context.
+
+---
+
+### 4. Normalized Financial Values with Scale Context
+
+*(Note: All financial figures below are reported exact values in millions of USD)*
+
+| Metric | Reported FY2023 Value | Full Scale Context | Citation |
+| :--- | :--- | :--- | :--- |
+| **Operating Cash Flow** | $52.1 million | $52,100,000 USD | [📄 credit_agreement_summary.txt \| FY2023 \| p.1 \| Section: Net Debt / Reported EBITDA (FY2023)] |
+| **Net Income** | $46.4 million | $46,400,000 USD | [📄 quality_of_earnings_report_fy2023.txt \| FY2023 \| p.1 \| Section 2: ADJUSTED EBITDA BRIDGE] |
+| **Revolver Paydown** | $25.0 million | $25,000,000 USD | [📄 credit_agreement_summary.txt \| FY2023 \| p.1 \| Section: Net Debt / Reported EBITDA (FY2023)] |
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -219,68 +202,42 @@ However, the context explicitly reports that Aurora generated **$52.1 million in
 - **Facts Recalled**: 3/3 (100.0%)
   - *Recalled*: ['0.2x', '0.7x', '$20.6']
 - **Citations Match**: ✅ Yes
-- **Total Latency**: 41953.00 ms
+- **Total Latency**: 55328.00 ms
 - **Answer**:
 ```
 ### 1. Direct Answer
 
-Aurora's current Net Debt/EBITDA leverage ratio for **FY2023 is 0.2x** (or **0.22x** as measured under credit agreement covenant testing) [📄 aurora_financials_fy2023.txt | FY2023 | p. 3 | Net Debt:] [📄 credit_agreement_summary.txt | p. 2 | Section 3: Financial Covenants]. 
+Aurora's current Net Debt/EBITDA leverage ratio as of December 31, 2023 (FY2023) is **0.2x** (or **0.22x** per credit covenant calculations). In the prior period (FY2022), the leverage ratio was **0.7x**. 
 
-This represents a significant deleveraging compared to the prior period (**FY2022**), when the Net Debt/EBITDA leverage ratio was **0.7x** [📄 aurora_financials_fy2023.txt | FY2022 | p. 3 | Net Debt:].
-
----
-
-### 2. Supporting Evidence & Period Comparison
-
-#### Leverage Ratio Breakdown
-* **FY2023 (Current Period):**
-  * **Total Debt:** $110,000,000 ($110.0M) [📄 aurora_financials_fy2023.txt | FY2023 | p. 3 | Net Debt:]
-  * **Cash & Cash Equivalents:** $89,400,000 ($89.4M) [📄 aurora_financials_fy2023.txt | FY2023 | p. 3 | Net Debt:]
-  * **Net Debt:** $20,600,000 ($20.6M) [📄 aurora_financials_fy2023.txt | FY2023 | p. 3 | Net Debt:]
-  * **Reported EBITDA:** $92,800,000 ($92.8M) [📄 aurora_financials_fy2023.txt | FY2023 | p. 2 | Key Financial Metrics]
-  * **Net Debt / EBITDA:** **0.2x** (exact calculation: $20.6M / $92.8M = 0.222x, reported as **0.22x** in credit covenant calculations) [📄 aurora_financials_fy2023.txt | FY2023 | p. 3 | Net Debt:] [📄 credit_agreement_summary.txt | p. 2 | Section 3]
-
-* **FY2022 (Prior Period):**
-  * **Total Debt:** $122,000,000 ($122.0M) [📄 aurora_financials_fy2023.txt | FY2022 | p. 3 | Net Debt:]
-  * **Cash & Cash Equivalents:** $72,100,000 ($72.1M) [📄 aurora_financials_fy2023.txt | FY2022 | p. 3 | Net Debt:]
-  * **Net Debt:** $49,900,000 ($49.9M) [📄 aurora_financials_fy2023.txt | FY2022 | p. 3 | Net Debt:]
-  * **Reported EBITDA:** $74,000,000 ($74.0M) [📄 aurora_financials_fy2023.txt | FY2022 | p. 2 | Key Financial Metrics]
-  * **Net Debt / EBITDA:** **0.7x** [📄 aurora_financials_fy2023.txt | FY2022 | p. 3 | Net Debt:]
-
-#### Key Drivers of Deleveraging
-The reduction in leverage from 0.7x to 0.2x was driven by:
-1. **EBITDA Growth:** Reported EBITDA increased by 25.4% from $74.0M in FY2022 to $92.8M in FY2023 [📄 aurora_financials_fy2023.txt | p. 2 | Key Financial Metrics].
-2. **Debt Reduction & Cash Generation:** Net debt declined by 58.7% ($29.3M reduction), supported by strong operating cash flow and a **$25.0 million voluntary paydown** of the credit facility in Q4 FY2023 [📄 credit_agreement_summary.txt | p. 1 | Section 1].
+This represents a net reduction/deleveraging of **0.5x** year-over-year, driven by cash generation and a $25.0 million voluntary debt paydown in Q4 FY2023.
 
 ---
 
-### 3. Covenant Headroom and Financial Impact
+### 2. Supporting Evidence & Metrics
 
-* **Credit Agreement Covenant Limit:** Maximum Total Net Leverage Ratio of **3.50x** [📄 credit_agreement_summary.txt | p. 2 | Section 3].
-* **Current Headroom:** With an actual ratio of **0.22x** at December 31, 2023, Aurora has **3.28x** of leverage headroom [📄 credit_agreement_summary.txt | p. 2 | Section 3].
-* **Interest Margin Re-Grid:** Under the credit facility's pricing grid, Net Leverage below 1.0x qualifies Aurora for a margin of **175 bps** over Term SOFR (down from the current 225 bps rate), offering potential annual interest savings of approximately **$425,000** upon delivery of the compliance certificate [📄 credit_agreement_summary.txt | p. 2 | Section 2].
+#### **FY2023 Metrics (as of December 31, 2023)**
+* **Total Debt:** $110.0M [📄 aurora_financials_fy2023.txt | FY2023 | p.3 | Net Debt]
+* **Less Cash and Cash Equivalents:** ($89.4M) [📄 aurora_financials_fy2023.txt | FY2023 | p.3 | Net Debt]
+* **Net Debt:** $20.6M [📄 aurora_financials_fy2023.txt | FY2023 | p.3 | Net Debt]
+* **EBITDA:** $92.8M [📄 aurora_financials_fy2023.txt | FY2023 | p.2 | EBITDA Reconciliation]
+* **Net Debt / EBITDA Ratio:** **0.2x** [📄 aurora_financials_fy2023.txt | FY2023 | p.3 | Net Debt] *(exact covenant test figure: **0.22x** [📄 credit_agreement_summary.txt | FY2023 | p.2 | SECTION 3: FINANCIAL COVENANTS])*
+
+#### **FY2022 Metrics (as of December 31, 2022)**
+* **Total Debt:** $122.0M [📄 aurora_financials_fy2023.txt | FY2022 | p.3 | Net Debt]
+* **Less Cash and Cash Equivalents:** ($72.1M) [📄 aurora_financials_fy2023.txt | FY2022 | p.3 | Net Debt]
+* **Net Debt:** $49.9M [📄 aurora_financials_fy2023.txt | FY2022 | p.3 | Net Debt]
+* **EBITDA:** $74.0M [📄 aurora_financials_fy2023.txt | FY2022 | p.2 | EBITDA Reconciliation]
+* **Net Debt / EBITDA Ratio:** **0.7x** [📄 aurora_financials_fy2023.txt | FY2022 | p.3 | Net Debt]
+
+#### **Key Drivers of the Deleveraging**
+* A **$25.0 million voluntary paydown** of the senior secured revolving credit facility in Q4 FY2023 [📄 credit_agreement_summary.txt | FY2023 | p.1 | Section 1].
+* Expansion in EBITDA from **$74.0 million** in FY2022 to **$92.8 million** in FY2023 [📄 aurora_financials_fy2023.txt | FY2022–FY2023 | p.2 | EBITDA Reconciliation].
 
 ---
 
-### 4. Normalized Financial Metric Context
+### 3. Normalized Financial Figures & Scale Context
 
-| Metric | FY2022 | FY2023 | Scale Context | Source |
-| :--- | :--- | :--- | :--- | :--- |
-| **Total Debt** | $122,000,000 | $110,000,000 | USD Millions | [📄 aurora_financials_fy2023.txt | p. 3] |
-| **Cash & Cash Equivalents** | $72,100,000 | $89,400,000 | USD Millions | [📄 aurora_financials_fy2023.txt | p. 3] |
-| **Net Debt** | $49,900,000 | $20,600,000 | USD Millions | [📄 aurora_financials_fy2023.txt | p. 3] |
-| **Reported EBITDA** | $74,000,000 | $92,800,000 | USD Millions | [📄 aurora_financials_fy2023.txt | p. 2] |
-| **Adjusted EBITDA** | $74,000,000 | $97,300,000 | USD Millions | [📄 aurora_financials_fy2023.txt | p. 2] |
-| **Net Debt / Reported EBITDA** | **0.7x** | **0.2x** | Ratio | [📄 aurora_financials_fy2023.txt | p. 3] |
-
----
-
-### 5. Inconsistencies & Document Caveats
-
-1. **Total Debt Breakdown Discrepancy:**
-   * **Financial Statements (`aurora_financials_fy2023.txt`):** Lists Total Debt as **$110.0M** as of December 31, 2023 (entirely consisting of drawn revolver balance under Note 7) [📄 aurora_financials_fy2023.txt | p. 3 | Note 7].
-   * **Credit Agreement Summary (`credit_agreement_summary.txt`):** Reports Total Debt as **$91.4M** as of December 31, 2023 ($85.0M revolver drawn + $6.4M capital lease obligations) [📄 credit_agreement_summary.txt | p. 1 | Section 1].
-   * *Impact:* Despite this disclosure variance in total debt composition, both documents arrive at an identical Net Debt/EBITDA leverage conclusion of **0.2x** (0.22x covenant test ratio).
+*All financial amounts
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -295,21 +252,16 @@ The reduction in leverage from 0.7x to 0.2x was driven by:
 **Query**: What are the terms of the company's revolving credit facility?
 
 - **Status**: ✅ PASS
-- **Confidence Score**: 1.00
-- **Validation Status**: passed
-- **Facts Recalled**: 3/6 (50.0%)
-  - *Recalled*: ['$150', 'JPMorgan', 'June 30, 2026']
-  - *Missing*: ['SOFR', '225', '3.5x']
+- **Confidence Score**: 0.00
+- **Validation Status**: failed
+- **Facts Recalled**: 0/6 (0.0%)
+  - *Recalled*: []
+  - *Missing*: ['$150', 'JPMorgan', 'SOFR', '225', 'June 30, 2026', '3.5x']
 - **Citations Match**: ❌ No
-- **Total Latency**: 32360.00 ms
+- **Total Latency**: 111093.00 ms
 - **Answer**:
 ```
-### 1. Direct Answer
-
-The company maintains a **$150 million Senior Secured Revolving Credit Facility** dated June 30, 2021, administered by JPMorgan Chase Bank, N.A. Key terms include:
-
-*   **Maturity Date:** June 30, 2026 [📄 credit_agreement_summary.txt | p.1 | Agreement]
-*   **Revolver Borrowings (Drawn):** **$85 million** drawn ($65 million available) as of December 3
+I could not generate an answer for this question because the language model did not return a usable response. The retrieved context may still be relevant — please retry the query.
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -329,40 +281,43 @@ The company maintains a **$150 million Senior Secured Revolving Credit Facility*
 - **Facts Recalled**: 4/4 (100.0%)
   - *Recalled*: ['$58.00', '42%', '$40.85', '90-day']
 - **Citations Match**: ✅ Yes
-- **Total Latency**: 17875.00 ms
+- **Total Latency**: 21813.00 ms
 - **Answer**:
 ```
 ### 1. Direct Answer
-
 * **Agreed Per-Share Merger Consideration:** **$58.00 per share** in cash.
-* **Percentage Premium:** **Approximately 42%** over the Company's 90-day volume-weighted average closing price (VWAP) of $40.85 as of March 14, 2024.
+* **Percentage Premium:** **Approximately 42%** relative to the Company's 90-day volume-weighted average closing price (VWAP) of **$40.85** as of March 14, 2024.
 
 ---
 
 ### 2. Supporting Evidence & Citations
 
 * **Per-Share Merger Consideration:**
-  * Each share of Company Common Stock issued and outstanding prior to the Effective Time will be converted into the right to receive $58.00 per share in cash [📄 merger_agreement_v2_final.txt | p.1 | Section 1.2 — Consideration].
-  * Confirmed in retention calculations where equity value is derived at the $58.00 per share price [📄 employment_and_retention_agreements.txt | p.1 | Section: Equity value is calculated at the merger consideration...].
+  * Section 1.2 of the Merger Agreement explicitly states that each share of Company Common Stock issued and outstanding prior to the Effective Time shall be converted into the right to receive **$58.00 per share** in cash [📄 merger_agreement_v2_final.txt | p.1 | Section 1.2 — Consideration].
+  * The **$58.00 per share** merger consideration is additionally confirmed in the context of equity value calculations for employee awards [📄 employment_and_retention_agreements.txt | p.1 | Equity value is calculated at the merger consideration of $58.00 per share].
 
-* **Premium over Historical Trading Price:**
-  * The $58.00 per share consideration represents a premium of approximately **42%** compared to the Company's 90-day volume-weighted average closing price of $40.85 as of March 14, 2024 [📄 merger_agreement_v2_final.txt | p.1 | Section 1.2 — Consideration].
-
----
-
-### 3. Financial Scale Context & Normalized Values
-
-* **Per-Share Consideration:** $58.00 / share
-* **Historical Baseline (90-Day VWAP as of March 14, 2024):** $40.85 / share
-* **Premium:** ~42.00%
-* **Aggregate Deal Consideration Context:** Approximately $696 million [📄 merger_agreement_v2_final.txt | p.1 | Section: The aggregate Merger Consideration is approximately $696 million...].
+* **Percentage Premium & Reference Stock Price:**
+  * The Merger Agreement specifies that the $58.00 per share offer represents a premium of **approximately 42%** to the Company's 90-day volume-weighted average closing price (VWAP) of **$40.85** as of March 14, 2024 [📄 merger_agreement_v2_final.txt | p.1 | Section 1.2 — Consideration].
 
 ---
 
-### 4. Caveats & Inconsistencies
+### 3. Caveats, Inconsistencies, & Missing Information
 
-* **Inconsistencies:** None. The per-share consideration of $58.00 is consistent across all provided documents (`merger_agreement_v2_final.txt` and `employment_and_retention_agreements.txt`).
-* **Missing Information:** Additional historical price metrics (e.g., 30-day VWAP, 52-week high/low, or spot closing price on the last trading day prior to announcement) are not specified in the provided context.
+* **Baseline Price Variants:** The 42% premium is explicitly calculated relative to the 90-day VWAP ($40.85 as of March 14, 2024). Board review materials note additional historical reference price points:
+  * **Current Price (as of Mar 8, 2024):** $41.20 [📊 board_deck_strategic_review_mar2024.txt | Slide 4] *(an implied premium of 40.78% relative to $58.00)*.
+  * **52-Week High (Jan 8, 2024):** $44.12 [📊 board_deck_strategic_review_mar2024.txt | Slide 4] *(an implied premium of 31.46% relative to $58.00)*.
+* **Inconsistencies:** No document inconsistencies exist regarding the final consideration amount ($58.00 per share in cash).
+
+---
+
+### 4. Normalized Financial Values & Scale Context
+
+| Metric | Value (Exact) | Unit / Reference Context | Source Citation |
+| :--- | :--- | :--- | :--- |
+| **Per-Share Merger Consideration** | `$58.00` | USD per share (Cash) | [📄 merger_agreement_v2_final.txt \| p.1 \| Section 1.2] |
+| **90-Day VWAP Baseline Price** | `$40.85` | USD per share (as of Mar 14, 2024) | [📄 merger_agreement_v2_final.txt \| p.1 \| Section 1.2] |
+| **Stated Merger Premium** | `42%` | Percentage over 90-day VWAP | [📄 merger_agreement_v2_final.txt \| p.1 \| Section 1.2] |
+| **Board Negotiated Price Floor** | `$55.00` | USD per share (Exclusivity Floor) | [📊 board_deck_strategic_review_mar2024.txt \| Slide 3] |
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -382,41 +337,51 @@ The company maintains a **$150 million Senior Secured Revolving Credit Facility*
 - **Facts Recalled**: 6/6 (100.0%)
   - *Recalled*: ['$20.88', '3.0%', '$13.92', '2.0%', 'Superior Proposal', 'Company Breach']
 - **Citations Match**: ✅ Yes
-- **Total Latency**: 17969.00 ms
+- **Total Latency**: 21406.00 ms
 - **Answer**:
 ```
-### Direct Answer
+### 1. Direct Answer
 
-Under Section 7.2 of the Merger Agreement between Aurora Technologies Inc. (Company) and Vertex (Buyer), two termination fee scenarios are specified:
+Under Section 7.2 of the merger agreement, the Company is subject to two distinct fee provisions payable to Buyer depending on the cause of termination:
 
-1. **Termination Fee (Superior Proposal):** **$20.88 million** (representing 3.0% of aggregate Merger Consideration), payable by the Company to Buyer if the agreement is terminated pursuant to Section 7.1(d) due to a **Superior Proposal**.
-2. **Reverse Termination Fee (Company Breach):** **$13.92 million** (representing 2.0% of aggregate Merger Consideration), payable by the Company to Buyer if terminated by Buyer pursuant to Section 7.1(c) due to a **Company Breach**.
-
----
-
-### Supporting Evidence
-
-* **Termination Fee ($20.88 million / 3.0%):**
-  * **Payor / Payee:** Paid by Company to Buyer [📄 merger_agreement_v2_final.txt | p.3 | Section 7.2 — Termination Fee]
-  * **Trigger / Condition:** Agreement terminated pursuant to Section 7.1(d) (Superior Proposal) [📄 merger_agreement_v2_final.txt | p.3 | Section 7.2 — Termination Fee]
-* **Reverse Termination Fee ($13.92 million / 2.0%):**
-  * **Payor / Payee:** Paid by Company to Buyer [📄 merger_agreement_v2_final.txt | p.3 | Section 7.2 — Termination Fee]
-  * **Trigger / Condition:** Agreement terminated by Buyer pursuant to Section 7.1(c) (Company Breach) [📄 merger_agreement_v2_final.txt | p.3 | Section 7.2 — Termination Fee]
+1. **Termination Fee (Superior Proposal):** A fee of **$20.88 million** (representing **3.0%** of the aggregate Merger Consideration) is payable by the Company to Buyer if the agreement is terminated pursuant to Section 7.1(d) (Superior Proposal).
+2. **Reverse Termination Fee (Company Breach):** A fee of **$13.92 million** (representing **2.0%** of the aggregate Merger Consideration) is payable by the Company to Buyer if the agreement is terminated by Buyer pursuant to Section 7.1(c) (Company Breach).
 
 ---
 
-### Financial Normalization & Scale Context
+### 2. Supporting Evidence with Citations
 
-* **Company Termination Fee:** $20.88 million (3.0% of Merger Consideration)
-* **Company Reverse Termination Fee:** $13.92 million (2.0% of Merger Consideration)
-* **Implied Aggregate Merger Consideration:** $696.00 million (calculated from $20.88M / 0.03 or $13.92M / 0.02)
+* **Termination Fee — Superior Proposal:**
+  * **Amount & Percentage:** $20.88 million, representing 3.0% of the aggregate Merger Consideration [📄 merger_agreement_v2_final.txt | N/A | p.3 | Section 7.2 — Termination Fee | v2_final]
+  * **Trigger / Condition:** Agreement is terminated pursuant to Section 7.1(d) (Superior Proposal) [📄 merger_agreement_v2_final.txt | N/A | p.3 | Section 7.2 — Termination Fee | v2_final]
+  * **Payer & Recipient:** Payable by the Company to Buyer [📄 merger_agreement_v2_final.txt | N/A | p.3 | Section 7.2 — Termination Fee | v2_final]
+
+* **Reverse Termination Fee — Company Breach:**
+  * **Amount & Percentage:** $13.92 million, representing 2.0% of the aggregate Merger Consideration [📄 merger_agreement_v2_final.txt | N/A | p.3 | Section 7.2 — Termination Fee | v2_final]
+  * **Trigger / Condition:** Agreement is terminated by Buyer pursuant to Section 7.1(c) (Company Breach) [📄 merger_agreement_v2_final.txt | N/A | p.3 | Section 7.2 — Termination Fee | v2_final]
+  * **Payer & Recipient:** Payable by the Company to Buyer [📄 merger_agreement_v2_final.txt | N/A | p.3 | Section 7.2 — Termination Fee | v2_final]
 
 ---
 
-### Caveats and Missing Information
+### 3. Caveats, Inconsistencies, or Missing Information
 
-* **Full Text of Section 7.1:** While Section 7.2 references Section 7.1(c) ("Company Breach") and Section 7.1(d) ("Superior Proposal"), the full verbatim text defining the specific procedures, cure periods, or notice requirements under Section 7.1 is omitted from the provided context chunks.
-* **Terminology Note:** Section 7.2 designates the fee payable by the target (Company) to the acquirer (Buyer) for a Company Breach as a "reverse termination fee," whereas traditionally reverse termination fees refer to fees paid by acquirers to target companies.
+* **Missing Information:**
+  * **Section 7.1 Definitions/Details:** The specific terms, conditions, cure periods, or exact definitions governing Section 7.1(c) (*Company Breach*) and Section 7.1(d) (*Superior Proposal*) are omitted from the provided context chunks (only the section heading for Section 7.1 appears in Chunk 5).
+  * **Payment Mechanics:** Timelines (e.g., payment due date upon termination), interest on late payments, or wire transfer terms are not stated in the provided text.
+* **Inconsistencies:** No inconsistencies regarding termination fee amounts or triggers were identified across the provided documents.
+
+---
+
+### 4. Normalized Financial Values with Scale Context
+
+* **Termination Fee (Superior Proposal):** 
+  * Exact value: **$20,880,000** ($20.88 million) [📄 merger_agreement_v2_final.txt | N/A | p.3 | Section 7.2 — Termination Fee | v2_final]
+  * Relative scale: **3.0%** of aggregate Merger Consideration
+* **Reverse Termination Fee (Company Breach):** 
+  * Exact value: **$13,920,000** ($13.92 million) [📄 merger_agreement_v2_final.txt | N/A | p.3 | Section 7.2 — Termination Fee | v2_final]
+  * Relative scale: **2.0%** of aggregate Merger Consideration
+* **Implied Aggregate Merger Consideration:**
+  * Derived mathematically from $20.88M / 3.0% (or $13.92M / 2.0%): **$696,000,000** ($696.00 million) [COMPUTED: Derived from Section 7.2 fee percentages].
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -436,40 +401,40 @@ Under Section 7.2 of the Merger Agreement between Aurora Technologies Inc. (Comp
 - **Facts Recalled**: 7/7 (100.0%)
   - *Recalled*: ['$69.6', '10%', '$174.0', '25%', '$3.48', '0.5%', 'Fundamental']
 - **Citations Match**: ✅ Yes
-- **Total Latency**: 17812.00 ms
+- **Total Latency**: 18235.00 ms
 - **Answer**:
 ```
-### **1. Direct Answer**
+### 1. Direct Answer
+Under the definitive Merger Agreement (`merger_agreement_v2_final.txt`), the indemnification caps and deductible amounts are as follows:
 
-Under Article VIII of the Acquisition Agreement (`merger_agreement_v2_final.txt`), the indemnification caps and deductible amounts are defined as follows:
-
-*   **General Indemnification Cap:** **$69.6 million** (representing **10%** of aggregate Merger Consideration).
-*   **Fundamental Representations Cap:** **$174.0 million** (representing **25%** of aggregate Merger Consideration).
-*   **Deductible Amount:** **$3.48 million** (representing **0.5%** of aggregate Merger Consideration). This functions as a "tipping" deductible, meaning that once the aggregate Losses exceed $3.48 million, stockholders become liable for all Losses from the first dollar.
-
----
-
-### **2. Supporting Evidence & Citations**
-
-*   **General Cap:** The aggregate liability of the Company's stockholders for indemnification claims under Article VIII is capped at $69.6 million (10% of aggregate Merger Consideration) [📄 merger_agreement_v2_final.txt | N/A | p.3 | Section 8.2 — Indemnification Cap | v2_final].
-*   **Fundamental Representations Cap:** Claims arising from breaches of Fundamental Representations are capped at $174.0 million (25% of aggregate Merger Consideration) [📄 merger_agreement_v2_final.txt | N/A | p.3 | Section 8.2 — Indemnification Cap | v2_final].
-*   **Deductible Threshold & Tipping Feature:** Stockholders are not liable until aggregate Losses exceed $3.48 million (0.5% of aggregate Merger Consideration); thereafter, stockholders are liable for all Losses from the first dollar [📄 merger_agreement_v2_final.txt | N/A | p.3 | Section 8.3 — Deductible | v2_final].
+*   **General Indemnification Cap:** $69.6 million (representing 10% of the aggregate Merger Consideration).
+*   **Fundamental Representations Cap:** $174.0 million (representing 25% of the aggregate Merger Consideration).
+*   **Deductible Amount:** $3.48 million (representing 0.5% of the aggregate Merger Consideration). This operates as a tipping deductible where, once aggregate Losses exceed $3.48 million, stockholders are liable for all Losses from the first dollar.
 
 ---
 
-### **3. Normalized Financial Values & Context**
-
-*   **Implied Aggregate Merger Consideration:** $696.0 million (derived from $69.6M / 10% or $3.48M / 0.5%).
-*   **Deductible:** $3,480,000 (0.5% of Merger Consideration).
-*   **General Cap:** $69,600,000 (10.0% of Merger Consideration).
-*   **Fundamental Reps Cap:** $174,000,000 (25.0% of Merger Consideration).
+### 2. Supporting Evidence with Citations
+*   **General Cap:** The aggregate liability of the Company's stockholders for indemnification claims under Article VIII is capped at $69.6 million [📄 merger_agreement_v2_final.txt | N/A | p.3 | Section 8.2 — Indemnification Cap | N/A].
+*   **Fundamental Representations Cap:** Indemnification claims for Fundamental Representations are subject to a higher cap of $174.0 million [📄 merger_agreement_v2_final.txt | N/A | p.3 | Section 8.2 — Indemnification Cap | N/A].
+*   **Deductible:** Stockholders are not liable for indemnification claims until aggregate Losses exceed $3.48 million, after which they are liable for all Losses from the first dollar [📄 merger_agreement_v2_final.txt | N/A | p.3 | Section 8.3 — Deductible | N/A].
+*   **Base Consideration Context:** The cap and deductible percentages are calculated against an estimated aggregate Merger Consideration of approximately $696 million [📄 merger_agreement_v2_final.txt | N/A | p.1 | Section 1.1 / Aggregate Consideration | N/A].
 
 ---
 
-### **4. Caveats, Inconsistencies & Missing Information**
+### 3. Caveats, Inconsistencies, or Missing Information
+*   **Adjustments to Consideration:** The aggregate Merger Consideration of $696 million is noted as approximate and subject to customary adjustments pursuant to Section 2.4 [📄 merger_agreement_v2_final.txt | N/A | p.1 | Section 1.1 / Aggregate Consideration | N/A]. The agreement does not specify whether the dollar values of the caps/deductible would adjust if the final consideration changes or if they remain fixed at the stated dollar amounts.
+*   **Inconsistencies:** None found across the provided context chunks.
 
-*   **Inconsistencies:** None identified within the provided context.
-*   **Missing Information:** The provided context does not detail specific exclusions from the General Cap other than Fundamental Representations (e.g., fraud or willful breach exclusions are not explicitly detailed in the provided excerpt).
+---
+
+### 4. Normalized Financial Breakdown & Scale Context
+
+| Metric | Stated Dollar Value | Percentage of Deal Size | Details / Terms | Citation |
+| :--- | :--- | :--- | :--- | :--- |
+| **Aggregate Merger Consideration** | $696 million | 100.0% | Baseline figure (subject to adjustments under Section 2.4) | [📄 merger_agreement_v2_final.txt \| N/A \| p.1 \| Aggregate Consideration \| N/A] |
+| **Deductible (Basket)** | $3.48 million | 0.5% | Tipping basket; covers Losses from the first dollar once threshold is met | [📄 merger_agreement_v2_final.txt \| N/A \| p.3 \| Section 8.3 — Deductible \| N/A] |
+| **General Indemnification Cap** | $69.6 million | 10.0% | Applies to general indemnification claims under Article VIII | [📄 merger_agreement_v2_final.txt \| N/A \| p.3 \| Section 8.2 — Indemnification Cap \| N/A] |
+| **Fundamental Reps Cap** | $174.0 million | 25.0% | Applies specifically to Fundamental Representations claims | [📄 merger_agreement_v2_final.txt \| N/A \| p.3 \| Section 8.2 — Indemnification Cap \| N/A] |
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -484,41 +449,22 @@ Under Article VIII of the Acquisition Agreement (`merger_agreement_v2_final.txt`
 **Query**: What pending litigation does the company face?
 
 - **Status**: ✅ PASS
-- **Confidence Score**: 1.00
-- **Validation Status**: passed
-- **Facts Recalled**: 5/5 (100.0%)
-  - *Recalled*: ['DataFlow Systems', 'patent infringement', '$3.5 million', '$8.0 million', 'Northern District of California']
-- **Citations Match**: ✅ Yes
-- **Total Latency**: 25469.00 ms
+- **Confidence Score**: 0.85
+- **Validation Status**: warning
+- **Facts Recalled**: 3/5 (60.0%)
+  - *Recalled*: ['DataFlow Systems', 'patent infringement', 'Northern District of California']
+  - *Missing*: ['$3.5 million', '$8.0 million']
+- **Citations Match**: ❌ No
+- **Total Latency**: 29890.00 ms
 - **Answer**:
 ```
 ### 1. Direct Answer
 
-Aurora has disclosed **two active court lawsuits**, **one unfiled commercial dispute**, and **one administrative trademark opposition proceeding** across its due diligence materials:
+The disclosures reflect **two active court lawsuits**, **one unfiled commercial dispute**, and **one trademark opposition proceeding** pending against Aurora Technologies Inc. No governmental investigations, subpoenas, or civil investigative demands are pending or have been received.
 
-1. **DataFlow Systems Inc. v. Aurora Technologies Inc.** (Active Patent Infringement Lawsuit)
-2. **Hartley v. Aurora Technologies Inc.** (Active Employment Lawsuit)
-3. **EMEA Former Reseller Dispute** (Commercial Dispute / Pre-litigation Claim)
-4. **European Union Trademark Opposition** (Administrative IP Proceeding)
-
-There are no pending or received governmental investigations, subpoenas, or civil investigative demands.
-
----
-
-### 2. Supporting Evidence & Detailed Disclosures
-
-#### A. Active Lawsuits
-1. **DataFlow Systems Inc. v. Aurora Technologies Inc.**
-   * **Caption & Case No.:** *DataFlow Systems Inc. v. Aurora Technologies Inc.*, Case No. 2023-CV-04821 [📄 ip_portfolio_and_litigation_schedule.txt | 2024 | p.1 | SECTION 2: THE DATAFLOW SYSTEMS LITIGATION]
-   * **Court & Date Filed:** U.S. District Court, Northern District of California; Filed September 14, 2023 [📄 ip_portfolio_and_litigation_schedule.txt | 2024 | p.1 | SECTION 2: THE DATAFLOW SYSTEMS LITIGATION]
-   * **Claim:** Patent infringement alleging Aurora's real-time data reconciliation engine infringes U.S. Patent Nos. 9,847,221 and 10,112,905 [📄 ip_portfolio_and_litigation_schedule.txt | 2024 | p.1 | SECTION 2: THE DATAFLOW SYSTEMS LITIGATION].
-   * **Procedural Posture (as of March 15, 2024):** Motion to dismiss denied in part on January 8, 2024; Claim construction (Markman) hearing scheduled for August 2024; no trial date set (estimated no earlier than Q3 2025) [📄 ip_portfolio_and_litigation_schedule.txt | 2024 | p.2 | Procedural posture as of March 15, 2024].
-   * **Financial Exposure Assessment:** Outside counsel assesses probable exposure between $3.5 million and $8.0 million ($3,500,000 to $8,000,000) [📄 merger_agreement_v2_final.txt | FY Unspecified | p.2 | Section 3.15 — Litigation].
-
-2. **Hartley v. Aurora Technologies Inc.**
-   * **Court & Date Filed:** Santa Clara County Superior Court; Filed November 2023 [📄 ip_portfolio_and_litigation_schedule.txt | 2024 | p.2 | SECTION 3: OTHER LITIGATION AND CLAIMS].
-   * **Claim:** Former employee wrongful termination claim [📄 ip_portfolio_and_litigation_schedule.txt | 2024 | p.2 | SECTION 3: OTHER LITIGATION AND CLAIMS].
-   * **Status & Exposure:** Demand of $450,000; counsel assesses exposure below $150,000; mediation scheduled for May 2024 [📄 ip_portfolio_and_litigation_schedule.txt | 2024 | p.
+1. **Active Patent Infringement Lawsuit:** *DataFlow Systems Inc. v. Aurora Technologies Inc.* (U.S. District Court, Northern District of California).
+2. **Active Employment Lawsuit:** *Hartley v. Aurora Technologies Inc.* (Santa Clara County Superior Court).
+3. **Un
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -533,33 +479,66 @@ There are no pending or received governmental investigations, subpoenas, or civi
 **Query**: What change of control provisions exist in the company's material contracts?
 
 - **Status**: ✅ PASS
-- **Confidence Score**: 0.98
+- **Confidence Score**: 1.00
 - **Validation Status**: passed
-- **Facts Recalled**: 6/7 (85.7%)
-  - *Recalled*: ['Northstar Defense', '$12.4M', '60-day', 'Pacific Data', 'terminate', '90 days']
-  - *Missing*: ['$8.7M']
+- **Facts Recalled**: 7/7 (100.0%)
+  - *Recalled*: ['Northstar Defense', '$12.4M', '60-day', 'Pacific Data', '$8.7M', 'terminate', '90 days']
 - **Citations Match**: ✅ Yes
-- **Total Latency**: 23500.00 ms
+- **Total Latency**: 25938.00 ms
 - **Answer**:
 ```
-### 1. Executive Summary
+### 1. Direct Answer
 
-Under Section 3.8 of the Merger Agreement, **Material Contracts** are defined as any contract involving annual consideration in excess of $5.0 million or having a term longer than three (3) years [📄 merger_agreement_v2_final.txt | p. 2 | Section 3.8 — Material Contracts]. 
+Aurora's material contracts contain several **change of control (CoC) provisions** and **termination rights**, while no contract-level acceleration clauses are detailed in the provided chunks (aside from double-trigger executive severance provisions). 
 
-Across the company's material vendor/licensing agreements, customer contracts, and executive employment agreements, change of control (CoC) provisions and termination triggers are categorized as follows:
+Specifically:
+* **Vendor & Licensing Contracts**: Two material contracts contain CoC provisions: the **Northstar Defense Systems** MSA requires 60-day notice and consent, and the **Pacific Data Corp** Tech License gives the counterparty a right to terminate within 90 days of a CoC. The **AWS** Cloud Infrastructure agreement contains no CoC provision.
+* **Customer Contracts**: Two key customers represent **$92.8 million** (20.5% of FY2023 revenue) in revenue subject to consent-based termination rights where consent is **NOT YET OBTAINED** (**Northstar Financial Group** and **Pacific Data Systems**). Three other customer contracts require notice only (no termination rights), and one requires consent only if the acquirer is a competitor (not applicable to Vertex Capital Partners).
 
-* **Termination Rights Upon Change of Control:**
-  * **Pacific Data Corp (Technology License):** Counterparty has the right to terminate within 90 days following a Change of Control [📄 merger_agreement_v2_final.txt | p. 3 | Section 9.2].
-  * **Pacific Data Systems ($38.5M customer revenue):** Customer consent required; customer has an absolute right to withhold consent in its sole discretion (consent not yet obtained) [📄 customer_contracts_schedule.txt | p. 1 | Section 2].
-  * **Northstar Financial Group ($54.3M customer revenue):** Requires written consent not less than 30 days prior to closing; consent may not be unreasonably withheld (consent not yet obtained) [📄 customer_contracts_schedule.txt | p. 1 | Section 2].
-* **Consent / Notice Requirements (No Direct Sole Discretion Termination):**
-  * **Northstar Defense Systems ($12.4M annual value):** Requires 60-day notice and consent [📄 merger_agreement_v2_final.txt | p. 3 | Section 9.2].
-  * **Ironbridge Manufacturing ($18.1M customer revenue):** Consent required *only* if the acquirer is a competitor. Because Vertex Capital Partners is a financial sponsor and not a competitor, this provision is not applicable [📄 customer_contracts_schedule.txt | p. 1 | Section 2].
-* **Notice Only Provisions (No Termination Rights):**
-  * **Meridian Health Networks ($27.2M):** 30 days' written notice required [📄 customer_contracts_schedule.txt | p. 1 | Section 2].
-  * **Cascade Logistics Corp ($21.7M):** 60 days' written notice required [📄 customer_contracts_schedule.txt | p. 1 | Section 2].
-  * **Summit Insurance Holdings ($15.4M):** 30 days' written notice required [📄 customer_contracts_schedule.txt | p. 1 | Section 2].
-* **Employment Agreements (Double
+---
+
+### 2. Detailed Breakdown and Supporting Evidence
+
+#### A. Material Contracts Identified in Merger Agreement
+* **Northstar Defense Systems** (Master Services Agreement, annual value $12.4M): Requires **60-day notice and consent** prior to Change of Control. [📄 merger_agreement_v2_final.txt | p.3 | Section 9.2 — Effect on Material Contracts]
+* **Pacific Data Corp** (Technology License Agreement, annual value $8.7M): Counterparty has the **right to terminate within 90 days** of a Change of Control. [📄 merger_agreement_v2_final.txt | p.3 | Section 9.2 — Effect on Material Contracts]
+* **Amazon Web Services** (Cloud Infrastructure Agreement, annual value $6.2M): Contains **no change of control provision**. [📄 merger_agreement_v2_final.txt | p.3 | Section 9.2 — Effect on Material Contracts]
+
+#### B. Customer Contracts Schedule
+
+##### 1. Consent Required / Termination Rights (Customer may terminate if consent is withheld)
+* **Northstar Financial Group** ($54.3M): Requires written consent not less than **30 days prior to closing**. Consent may not be unreasonably withheld. Status: **NOT YET OBTAINED**. [📄 customer_contracts_schedule.txt | p.1 | SECTION 2: CHANGE OF CONTROL PROVISIONS]
+* **Pacific Data Systems** ($38.5M): Written consent required. Customer has an **absolute right to withhold consent** in its sole discretion. Status: **NOT YET OBTAINED**. [📄 customer_contracts_schedule.txt | p.1 | SECTION 2: CHANGE OF CONTROL PROVISIONS]
+* **Ironbridge Manufacturing** ($18.1M): Consent required **only if the acquirer is a competitor**. Vertex Capital Partners is a financial sponsor and not a competitor; thus, **NOT APPLICABLE**. [📄 customer_contracts_schedule.txt | p.1 | SECTION 2: CHANGE OF CONTROL PROVISIONS]
+
+##### 2. Notice Only (No Termination Right)
+* **Meridian Health Networks** ($27.2M): 30 days' written notice. [📄 customer_contracts_schedule.txt | p.1 | SECTION 2: CHANGE OF CONTROL PROVISIONS]
+* **Cascade Logistics Corp** ($21.7M): 60 days' written notice. [📄 customer_contracts_schedule.txt | p.1 | SECTION 2: CHANGE OF CONTROL PROVISIONS]
+* **Summit Insurance Holdings** ($15.4M): 30 days' written notice. [📄 customer_contracts_schedule.txt | p.1 | SECTION 2: CHANGE OF CONTROL PROVISIONS]
+
+##### 3. No Change of Control Provision
+* **Delta Ridge Energy** ($12.2M), **Continental Retail Group** ($10.9M), **Blue Harbor Shipping** ($9.5M), and **Vanguard Media Partners** ($8.6M). [📄 customer_contracts_schedule.txt | p.1 | SECTION 2: CHANGE OF CONTROL PROVISIONS]
+
+#### C. Executive Acceleration / Severance Provisions
+* Executive employment agreements for all five named executive officers contain **double-trigger** severance provisions (payable if terminated without cause or resigning for good reason within 24 months post-change of control). No single-trigger contract acceleration was identified in the provided text. [📄 employment_and_retention_agreements.txt | p.1 | Executive Employment Agreements]
+
+---
+
+### 3. Financial Summary & Normalized Scale Context
+
+* **Aggregate Revenue Subject to Consent-Based Termination**: **$92.8 million** (20.5% of FY2023 revenue) comprising:
+  * Northstar Financial Group: **$54.3M**
+  * Pacific Data Systems: **$38.5M**
+* **Vendor & Licensing Contracts Value Impacted by CoC**:
+  * Northstar Defense Systems (MSA): **$12.4M** annual value
+  * Pacific Data Corp (Tech License): **$8.7M** annual value
+
+---
+
+### 4. Caveats, Inconsistencies, and Missing Information
+
+* **Name Inconsistencies Across Schedules**:
+  * The Merger Agreement lists **Northstar Defense
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -574,58 +553,16 @@ Across the company's material vendor/licensing agreements, customer contracts, a
 **Query**: Compare the three bidders — what were their offer ranges and certainty levels?
 
 - **Status**: ✅ PASS
-- **Confidence Score**: 1.00
-- **Validation Status**: passed
-- **Facts Recalled**: 9/12 (75.0%)
-  - *Recalled*: ['Vertex', '$55', '$60', 'HIGH', 'Meridian', 'Atlas', '$48', '$52', 'LOW']
-  - *Missing*: ['$50', '$54', 'MEDIUM']
-- **Citations Match**: ✅ Yes
-- **Total Latency**: 34375.00 ms
+- **Confidence Score**: 0.00
+- **Validation Status**: failed
+- **Facts Recalled**: 0/12 (0.0%)
+  - *Recalled*: []
+  - *Missing*: ['Vertex', '$55', '$60', 'HIGH', 'Meridian', '$50', '$54', 'MEDIUM', 'Atlas', '$48', '$52', 'LOW']
+- **Citations Match**: ❌ No
+- **Total Latency**: 123797.00 ms
 - **Answer**:
 ```
-### Direct Answer
-
-Among the three bidders participating in the Aurora-Vertex strategic review process:
-* **Vertex Capital Partners (Party A)** offers the **highest financial consideration ($55.00 – $60.00 per share in cash)** and the **highest transaction certainty (HIGH)**.
-* **Atlas Data Holdings (Party C)** offers the **lowest financial consideration ($48.00 – $52.00 per share in cash)** and the **lowest transaction certainty (LOW)**.
-* **Meridian Software (Party B)** is maintained as a strategic backup bidder whose **exact offer range is omitted from the provided context**, but whose transaction certainty is constrained by **antitrust risk**.
-
----
-
-### Comparative Analysis & Supporting Evidence
-
-#### 1. Vertex Capital Partners (Party A — Private Equity)
-* **Financial Offer Range:** $55.00 – $60.00 per share (All-cash consideration) [📊 board_deck_strategic_review_mar2024.txt | Slide 5 / p. 2 | Management Recommendation].
-* **Transaction Certainty:** **HIGH** [📊 board_deck_strategic_review_mar2024.txt | p. 2 | Party A — Vertex Capital Partners].
-* **Financing & Execution:** 
-  * Fully committed debt financing provided by JPMorgan and Goldman Sachs [📊 board_deck_strategic_review_mar2024.txt | p. 2 | Party A — Vertex Capital Partners].
-  * Shortest timeline to signing (60-day exclusivity, 90 days to signing) [📊 board_deck_strategic_review_mar2024.txt | p. 2 | Party A — Vertex Capital Partners].
-  * Standard due diligence with no unusual conditions [📊 board_deck_strategic_review_mar2024.txt | p. 2 | Party A — Vertex Capital Partners].
-  * Recommended by Management and Goldman Sachs as the preferred bidder, with a price floor set at $55.00 per share [📊 board_deck_strategic_review_mar2024.txt | Slide 5 / p. 2 | Management Recommendation & p. 3 | Board Authorization].
-
-#### 2. Meridian Software (Party B — Strategic Bidder)
-* **Financial Offer Range:** *Not specified in provided context* (Noted that synergy value could justify a higher price if antitrust concerns are resolved) [📊 board_deck_strategic_review_mar2024.txt | Slide 5 / p. 2 | Management Recommendation].
-* **Transaction Certainty:** *Unrated in context, but conditional on regulatory clearance* [📊 board_deck_strategic_review_mar2024.txt | Slide 5 / p. 2 | Management Recommendation].
-* **Financing & Execution:** 
-  * Maintained as a backup bidder to drive price competition [📊 board_deck_strategic_review_mar2024.txt | Slide 5 / p. 2 | Management Recommendation].
-  * Faces execution hurdle due to unresolved antitrust risks [📊 board_deck_strategic_review_mar2024.txt | Slide 5 / p. 2 | Management Recommendation].
-
-#### 3. Atlas Data Holdings (Party C — Private Equity Consortium)
-* **Financial Offer Range:** $48.00 – $52.00 per share (Cash) [📊 board_deck_strategic_review_mar2024.txt | p. 2 | Party C — Atlas Data Holdings].
-* **Transaction Certainty:** **LOW** [📊 board_deck_strategic_review_mar2024.txt | p. 2 | Party C — Atlas Data Holdings].
-* **Financing & Execution:** 
-  * Partially committed financing with an estimated ~30% equity shortfall, creating significant execution risk [📊 board_deck_strategic_review_mar2024.txt | Slide 5 & p. 2 | Party C — Atlas Data Holdings].
-  * Complex consortium structure [📊 board_deck_strategic_review_mar2024.txt | Slide 5 & p. 2 | Party C — Atlas Data Holdings].
-  * Longer timeline (90-day exclusivity, 150 days to signing) and extensive due diligence required [📊 board_deck_strategic_review_mar2024.txt | p. 2 | Party C — Atlas Data Holdings].
-  * Management recommended declining this offer [📊 board_deck_strategic_review_mar2024.txt | Slide 5 / p. 2 | Management Recommendation].
-
----
-
-### Bidder Comparison Summary
-
-| Bidder | Offer Range (per Share) | Consideration | Financing Status | Execution Timeline | Certainty Level |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Vertex Capital Partners** | **$55.00 – $60.00**
+I could not generate an answer for this question because the language model did not return a usable response. The retrieved context may still be relevant — please retry the query.
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -640,69 +577,27 @@ Among the three bidders participating in the Aurora-Vertex strategic review proc
 **Query**: How do the different valuation methodologies compare?
 
 - **Status**: ✅ PASS
-- **Confidence Score**: 1.00
-- **Validation Status**: passed
-- **Facts Recalled**: 10/10 (100.0%)
-  - *Recalled*: ['DCF', '$47', '$63', 'Precedent', '$46', '$62', 'LBO', '$50', '$61', 'Comparable']
-- **Citations Match**: ✅ Yes
-- **Total Latency**: 36204.00 ms
+- **Confidence Score**: 0.85
+- **Validation Status**: warning
+- **Facts Recalled**: 3/10 (30.0%)
+  - *Recalled*: ['DCF', '$47', '$63']
+  - *Missing*: ['Precedent', '$46', '$62', 'LBO', '$50', '$61', 'Comparable']
+- **Citations Match**: ❌ No
+- **Total Latency**: 30671.00 ms
 - **Answer**:
 ```
-### Direct Answer
-In the strategic review for Aurora Technologies Inc., five valuation methodologies were analyzed. The outputs range from a low of **$42.00 per share** (Comparable Companies EV/Revenue) to a high of **$63.00 per share** (Discounted Cash Flow). 
+### 1. Direct Answer
 
-Intrinsic valuation methods (DCF) and buyout analysis (LBO) generally produce higher mid-point and high-end valuations than public market trading comparables. Precedent transactions also imply a control premium over public comparables.
+Goldman Sachs evaluated **Aurora Technologies Inc.** across five primary valuation methodologies in March 2024, resulting in implied per-share value outputs ranging from **$42.00 to $63.00**:
 
----
-
-### Comparison of Valuation Outputs and Assumptions
-
-| Methodology | Low Share Price | Mid Share Price | High Share Price | Explicit Key Assumptions Listed |
-| :--- | :---: | :---: | :---: | :--- |
-| **Comparable Companies (EV/Revenue)** | $42.00 | $48.00 | $55.00 | Based on peer EV/Revenue trading multiples |
-| **Comparable Companies (EV/EBITDA)** | $44.00 | $51.00 | $59.00 | Based on peer EV/EBITDA trading multiples |
-| **Precedent Transactions** | $46.00 | $53.00 | $62.00 | Based on historical acquisition multiples in similar M&A deals |
-| **Discounted Cash Flow (DCF)** | $47.00 | $54.00 | $63.00 | • Weighted Average Cost of Capital (**WACC**): **10.5%**<br>• Terminal Growth Rate (**TGR**): **3.0%** |
-| **LBO Analysis** | $50.00 | $56.00 | $61.00 | • Target Internal Rate of Return (**IRR**): **20%** |
-
----
-
-### Key Takeaways from Comparative Analysis
-
-1. **Market Comparables vs. Strategic/Intrinsic Valuations:**
-   * **Comparable Companies (EV/Revenue & EV/EBITDA)** yield the lowest valuation floors ($42.00 and $44.00) and lowest midpoints ($48.00 and $51.00).
-   * **Precedent Transactions** imply higher value ranges ($46.00–$62.00; Mid: $53.00), reflecting historical acquisition control premiums over public market trading peer levels.
-
-2. **DCF Valuation:**
-   * Delivers the highest valuation ceiling (**$63.00/share**) and second-highest midpoint (**$54.00/share**), relying on a **10.5% WACC** and a **3.0% Terminal Growth Rate**.
-
-3. **LBO Floor and Midpoint:**
-   * The LBO analysis yields the highest valuation floor (**$50.00/share**) and highest midpoint (**$56.00/share**) based on achieving a **20% target IRR**.
-
----
-
-### Supporting Evidence & Citations
-
-* **Valuation Summary Table:** [📊 board_deck_strategic_review_mar2024.txt | Slide 2 | Section: Methodology Low Mid High]
-* **Transaction Value Context:** Transaction value is approximately $696 million [📄 regulatory_and_data_privacy_memo.txt | p.1 | Section 1: ANTITRUST AND MERGER CONTROL].
-* **Financial Baseline (FY2023):** Revenue of $452.8 million and reported EBITDA of $92.8 million [📄 aurora_financials_fy2023.txt | p.1–2 | CONSOLIDATED INCOME STATEMENT / KEY FINANCIAL METRICS AND NOTES].
-
----
-
-### Caveats, Inconsistencies, and Missing Information
-
-1. **EBITDA Inconsistencies Across Reports:**
-   * The Quality of Earnings report identifies Adjusted EBITDA of **$99.0 million** (vs. reported EBITDA of **$92.8 million**), noting that striking a valuation on Adjusted EBITDA rather than reported EBITDA produces a materially lower implied multiple [📄 quality_of_earnings_report_fy2023.txt | p.3 | SECTION 6: KEY OBSERVATIONS FOR THE BUYER].
-   * The audited financial statements show an Adjusted EBITDA of **$97.3 million** (adding back $4.5 million in restructuring charges) [📄 aurora_financials_fy2023.txt | p.2 | KEY FINANCIAL METRICS AND NOTES].
-2. **Missing Information:**
-   * Specific underlying peer companies, detailed revenue/EBITDA multiple ranges, projected cash flow figures for the DCF model, and exact debt-to-equity capital structure assumptions for the LBO model are not provided in the context chunks.
+*   **DCF**: Implied value of **$47.00 (Low)**, **$54.00 (Mid)**, and **$63.00 (High)** per share, based on a **10.5% WACC** and a **3
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
   - **retrieval_executor**:  ()
   - **financial_verifier**:  ()
   - **quality_assessor**:  ()
-  - **answer_synthesizer**:  ()
+  - **query_rewriter**:  ()
 
 ---
 
@@ -710,59 +605,30 @@ Intrinsic valuation methods (DCF) and buyout analysis (LBO) generally produce hi
 **Query**: Compare Aurora's gross margin and operating margin between FY2022 and FY2023.
 
 - **Status**: ✅ PASS
-- **Confidence Score**: 1.00
-- **Validation Status**: passed
+- **Confidence Score**: 0.85
+- **Validation Status**: warning
 - **Facts Recalled**: 2/4 (50.0%)
   - *Recalled*: ['60.0%', '59.1%']
   - *Missing*: ['15.0%', '13.3%']
 - **Citations Match**: ✅ Yes
-- **Total Latency**: 38703.00 ms
+- **Total Latency**: 27719.00 ms
 - **Answer**:
 ```
-### Direct Answer
+### 1. Direct Answer
 
-* **Gross Margin:**
-  * **FY2022:** **59.1%**
-  * **FY2023:** **60.0%**
-  * **Comparison:** Gross margin expanded by **+0.9 percentage points (+90 bps)** in FY2023.
-
-* **Operating Margin (Derived/Computed):**
-  * **FY2022:** **13.28%** ($51.4M Operating Income on $387.1M Revenue)
-  * **FY2023:** **15.02%** ($68.0M Operating Income on $452.8M Revenue)
-  * **Comparison:** Operating margin expanded by **+1.74 percentage points (+174 bps)** in FY2023.
+* **Gross Margin:** Aurora’s reported Gross Margin increased by **0.9 percentage points** from **59.1%** in FY2022 to **60.0%** in FY2023.
+* **Operating Margin (Derived):** Aurora’s calculated Operating Margin expanded by **1.7394 percentage points** (approx. 1.74 percentage points) from **13.2782%** in FY2022 to **15.0177%** in FY2023.
 
 ---
 
-### Supporting Evidence & Financial Breakdown
+### 2. Supporting Evidence & Financial Statement Breakdown
 
-All underlying financial figures are sourced from Aurora's Consolidated Income Statement:
+All monetary values are reported in **millions of USD ($M)**.
 
-#### 1. Gross Margin Analysis
-* **FY2022:** Gross Profit of **$228.8M** on Total Revenue of **$387.1M** yields a reported **Gross Margin of 59.1%** [📄 aurora_financials_fy2023.txt | FY2023 | p. 1 | Section: CONSOLIDATED INCOME STATEMENT].
-* **FY2023:** Gross Profit of **$271.7M** on Total Revenue of **$452.8M** yields a reported **Gross Margin of 60.0%** [📄 aurora_financials_fy2023.txt | FY2023 | p. 1 | Section: CONSOLIDATED INCOME STATEMENT].
-* **Year-over-Year (YoY) Trend:** Gross Profit grew by **18.75%** ($42.9M), outpacing revenue growth of **17.0%**, resulting in the 0.9 percentage point margin expansion.
-
-#### 2. Operating Margin Analysis *(Computed Metrics)*
-* **FY2022:**
-  * Total Operating Expenses: **$177.4M** ($63.2M R&D, $81.4M S&M, $32.8M G&A, $0.0 Restructuring) [📄 aurora_financials_fy2023.txt | FY2023 | p. 1 | Section: CONSOLIDATED INCOME STATEMENT].
-  * Operating Income: **$51.4M** ($228.8M Gross Profit − $177.4M Operating Expenses) [📊 aurora_financials_fy2023.txt | p. 1 | COMPUTED: Operating Income for FY2022].
-  * Operating Margin: **13.28%** ($51.4M ÷ $387.1M Revenue) [📊 aurora_financials_fy2023.txt | p. 1 | COMPUTED: Operating Margin for FY2022].
-* **FY2023:**
-  * Total Operating Expenses: **$203.7M** ($72.4M R&D, $90.6M S&M, $36.2M G&A, $4.5M Restructuring) [📄 aurora_financials_fy2023.txt | FY2023 | p. 1 | Section: CONSOLIDATED INCOME STATEMENT].
-  * Operating Income: **$68.0M** ($271.7M Gross Profit − $203.7M Operating Expenses) [📊 aurora_financials_fy2023.txt | p. 1 | COMPUTED: Operating Income for FY2023].
-  * Operating Margin: **15.02%** ($68.0M ÷ $452.8M Revenue) [📊 aurora_financials_fy2023.txt | p. 1 | COMPUTED: Operating Margin for FY2023].
-* **Year-over-Year (YoY) Trend:** Operating Income increased by **32.30%** ($16.6M expansion), demonstrating operational leverage as revenue growth (17.0%) outpaced operating expense growth (14.82%).
-
----
-
-### Comparison Summary & Normalized Values
-
-| Metric (USD in Millions) | FY2022 | FY2023 | YoY Change | Scale Context / Source |
+| Financial Metric | FY2022 | FY2023 | YoY Change / Scale Context | Citation |
 | :--- | :--- | :--- | :--- | :--- |
-| **Revenue** | $387.1 | $452.8 | +$65.7 (+17.0%) | Exact reported scale [📄 aurora_financials_fy2023.txt | p. 1] |
-| **Gross Profit** | $228.8 | $271.7 | +$42.9 (+18.7%) | Exact reported scale [📄 aurora_financials_fy2023.txt | p. 1] |
-| **Gross Margin** | **59.1%** | **60.0%** | **+0.9 pts** | Verbatim reported metric [📄 aurora_financials_fy2023.txt | p. 1] |
-| **Operating Expenses** | $177.4 | $203.7 | +$26.3 (+14.8%) | Exact reported scale [📄 aurora_financials_fy2023.txt | p. 1
+| **Revenue** | $387.1 | $452.8 | +$65.7 (+17.0%) | [📄 aurora_financials_fy2023.txt \| FY2023 \| p.1 \| CONSOLIDATED INCOME STATEMENT \| Current] |
+| **Cost of Revenue** | $158.3 | $181.1 | +$22.8 | [📄 aurora_financials_fy2
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -777,40 +643,18 @@ All underlying financial figures are sourced from Aurora's Consolidated Income S
 **Query**: Summarize the board's recommendation regarding the strategic alternatives.
 
 - **Status**: ✅ PASS
-- **Confidence Score**: 0.98
-- **Validation Status**: passed
-- **Facts Recalled**: 7/9 (77.8%)
-  - *Recalled*: ['Vertex Capital', 'preferred bidder', 'all-cash', 'Meridian', 'backup', 'Atlas', 'decline']
-  - *Missing*: ['unanimous', '7-0']
-- **Citations Match**: ✅ Yes
-- **Total Latency**: 21203.00 ms
+- **Confidence Score**: 0.85
+- **Validation Status**: warning
+- **Facts Recalled**: 4/9 (44.4%)
+  - *Recalled*: ['Vertex Capital', 'preferred bidder', 'unanimous', '7-0']
+  - *Missing*: ['all-cash', 'Meridian', 'backup', 'Atlas', 'decline']
+- **Citations Match**: ❌ No
+- **Total Latency**: 133359.00 ms
 - **Answer**:
 ```
-### Direct Answer
+### 1. Direct Answer
 
-The Board of Directors of **Aurora Technologies Inc.** (following recommendations from Management and financial advisor Goldman Sachs at its March 10, 2024 special meeting) officially authorized moving forward with **Vertex Capital Partners** as the preferred bidder for an all-cash transaction with a **negotiation price floor of $55.00 per share** [📄 board_deck_strategic_review_mar2024.txt | p.2-3 | Section: SLIDE 5: MANAGEMENT RECOMMENDATION & BOARD RESOLUTION].
-
-The Board's official decisions regarding the three evaluated strategic alternatives are as follows:
-1. **Vertex Capital Partners (Preferred Bidder):** **PROCEED** — Grant a 60-day exclusivity period, open the virtual data room, retain Skadden Arps to draft the definitive merger agreement, and negotiate within a price floor of $55.00 per share [📄 board_deck_strategic_review_mar2024.txt | p.2-3 | Section: SLIDE 5: MANAGEMENT RECOMMENDATION & BOARD RESOLUTION].
-2. **Meridian Software (Backup Bidder):** **MAINTAIN ENGAGEMENT** — Keep active as a backup to encourage competitive bidding and price improvement, leveraging potential synergy value if antitrust concerns are resolved [📄 board_deck_strategic_review_mar2024.txt | p.2 | Section: SLIDE 5: MANAGEMENT RECOMMENDATION].
-3. **Atlas Data Holdings:** **DECLINE** — Reject proposal due to lowest offer range, uncommitted financing execution risks, and a complex consortium structure [📄 board_deck_strategic_review_mar2024.txt | p.2 | Section: SLIDE 5: MANAGEMENT RECOMMENDATION].
-
----
-
-### Supporting Evidence & Details
-
-#### 1. Official Board Resolution Actions
-By official resolution on March 10, 2024, the Board authorized management to:
-* Grant Vertex Capital Partners a **60-day exclusivity period** [📄 board_deck_strategic_review_mar2024.txt | p.3 | Section: RESOLVED, that the Board of Directors hereby authorizes the Company to:].
-* Open the virtual data room for Vertex's due diligence team [📄 board_deck_strategic_review_mar2024.txt | p.3 | Section: RESOLVED, that the Board of Directors hereby authorizes the Company to:].
-* Retain **Skadden Arps** to prepare the definitive merger agreement [📄 board_deck_strategic_review_mar2024.txt | p.3 | Section: RESOLVED, that the Board of Directors hereby authorizes the Company to:].
-* Negotiate within a strict **price floor of $55.00 per share** [📄 board_deck_strategic_review_mar2024.txt | p.3 | Section: RESOLVED, that the Board of Directors hereby authorizes the Company to:].
-
-#### 2. Summary of Evaluated Strategic Alternatives
-
-| Party | Bid Structure / Offer Price | Recommendation & Status | Key Rationale / Context |
-| :--- | :--- | :--- | :--- |
-| **Vertex Capital Partners** *(Private Equity)* | **$55.00 – $60.00** per share (Cash) [📄 board_deck_strategic_review_mar2024.txt | p.2 | Section: Party A] | **PROCEED** (Preferred) [📄 board_deck_strategic_review_mar2024.txt | p.2 | Section: SLIDE 5] | Highest offer range, all-cash (no
+At the Special Meeting on March 10, 2024, the Board of Directors of Aurora Technologies Inc. unanimously voted (7-0) to approve management's and Goldman Sachs' recommendations regarding strategic alternatives. Specifically, the Board resolved to proceed with **Vertex Capital Partners** as the preferred bidder, granting them a 60-day exclusivity period and authorizing management to negotiate a transaction with a price floor of **$55.00 per share** and a target closing date of **September 15, 202
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -831,45 +675,18 @@ By official resolution on March 10, 2024, the Board authorized management to:
   - *Recalled*: ['customer consent', 'Northstar', 'Pacific Data', 'CTO', 'HSR']
   - *Missing*: ['DataFlow', 'patent litigation', 'key employee', '$4.5M']
 - **Citations Match**: ❌ No
-- **Total Latency**: 18875.00 ms
+- **Total Latency**: 84984.00 ms
 - **Answer**:
 ```
-### Direct Answer
-The primary risk factor highlighted for Buyer (Vertex Capital Partners) in the transaction is **Material Customer Consent / Contract Termination Risk**, as two major customer contracts accounting for **$92.8 million (20.5% of FY2023 revenue)** have consent-based termination rights that are **not** structured as closing conditions. 
+### 1. Direct Answer
 
-Additional regulatory and data privacy risk factors evaluated in the deal documents include:
-- **GDPR / Cross-Border Data Transfer Risk:** Aurora is not self-certified under the EU-US Data Privacy Framework, relying instead on Standard Contractual Clauses (SCCs) and supplementary measures.
-- **Regulatory / Merger Control Risk:** Substantive antitrust risk (HSR in the U.S. and UK CMA share of supply call-in) is identified but assessed by legal counsel as **low to remote**.
+The key material risk factors identified for the Aurora Technologies Inc. and Vertex Capital Partners transaction are:
 
----
+1. **Customer Consent and Concentration Risk (Post-Closing Risk Allocation to Buyer):**
+   Obtaining customer consents is **not** a condition to closing. Two material customer contracts (Northstar Financial Group and Pacific Data Systems)—representing **$92.8 million** or **20.5% of FY2023 revenue**—contain consent-based termination rights. Vertex Capital Partners (Buyer) bears 100% of the risk if these consents are not obtained post-closing.
 
-### Key Identified Risk Factors & Supporting Evidence
-
-#### 1. Customer Consent and Revenue Concentration Risk
-* **Description:** Two key customer contracts—**Northstar Financial Group** and **Pacific Data Systems**—together represent **$92.8 million**, or **20.5% of Aurora’s FY2023 revenue**. Both contracts contain consent-based termination rights triggered by the transaction. [📄 regulatory_and_data_privacy_memo.txt | p.3 | SECTION: CONDITIONS TO CLOSING]
-* **Risk Allocation:** The Merger Agreement contains **no closing condition** requiring customer consents to be obtained. Consequently, the Buyer bears 100% of the risk of potential contract cancellations post-closing, which is addressed (if at all) only through Article VIII indemnification provisions. [📄 regulatory_and_data_privacy_memo.txt | p.3–4 | SECTION: CONDITIONS TO CLOSING / SECTION 5]
-
-#### 2. Cross-Border Data Privacy Transfer Compliance (GDPR)
-* **Description:** Aurora processes EU personal data as a processor for customers and a controller for employee/prospect data. [📄 regulatory_and_data_privacy_memo.txt | p.2 | SECTION 2: DATA PRIVACY POSTURE]
-* **Risk Detail:** Aurora is **NOT self-certified** under the EU-US Data Privacy Framework (following the Nov 2023 adequacy decision) and must instead rely on Standard Contractual Clauses (SCCs) and supplementary measures to mitigate transfer liability. [📄 regulatory_and_data_privacy_memo.txt | p.2 | SECTION 2: DATA PRIVACY POSTURE]
-
-#### 3. Merger Control & Antitrust Approval Risks (Assessed as Low/Remote)
-* **U.S. HSR Act Filing:** Transaction value of approximately **$696 million** triggers HSR filing requirements ($260,000 fee paid 100% by Buyer). However, counsel assesses the probability of a Second Request as **low** because Vertex has no existing portfolio company in enterprise data analytics (no horizontal overlap or vertical relationship). [📄 regulatory_and_data_privacy_memo.txt | p.1 | SECTION 1: ANTITRUST AND MERGER CONTROL]
-* **UK CMA Call-In Risk:** The transaction is not reportable on a turnover basis in the UK, but the share of supply test is theoretically available to the CMA. Legal counsel assesses the call-in risk as **remote**. [📄 regulatory_and_data_privacy_memo.txt | p.1–2 | SECTION 1: ANTITRUST AND MERGER CONTROL]
-
----
-
-### Normalized Financial Context & Key Metrics
-* **Transaction Value:** $696,000,000 [📄 regulatory_and_data_privacy_memo.txt | p.1 | SECTION 1]
-* **Customer Consent Exposure:** $92,800,000 (20.5% of FY2023 Revenue) [📄 regulatory_and_data_privacy_memo.txt | p.3 | SECTION 4]
-* **HSR Filing Fee:** $260,000 [📄 regulatory_and_data_privacy_memo.txt | p.1 | SECTION 1]
-* **German Turnover:** EUR 14.2 million (below EUR 17.5 million threshold) [📄 regulatory_and_data_privacy_memo.txt | p.2 | SECTION 1]
-
----
-
-### Caveats and Missing Information
-* The provided text references Article VIII indemnification provisions for post-closing customer consent risk, but the specific caps, baskets, or limitation details of Article VIII are not included in the provided context chunks.
-* Penetration testing identified 2 medium-severity findings in FY2023 (remediated within the 30-day SLA), with no high/critical findings reported. [📄 regulatory_and_data_privacy_memo.txt | p.3 | SECURITY INCIDENTS]
+2. **Antitrust & Merger Control Approval:**
+   The transaction ($696 million value) is reportable under the U.S. Hart-Scott-Rodino (HSR) Act and closing is conditioned on HSR expiration/
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -890,40 +707,47 @@ Additional regulatory and data privacy risk factors evaluated in the deal docume
   - *Recalled*: ['$4.5', 'restructuring', 'Austin development center', '32 employees', '$92.8', '$97.3']
   - *Missing*: ['add back']
 - **Citations Match**: ✅ Yes
-- **Total Latency**: 22484.00 ms
+- **Total Latency**: 52953.00 ms
 - **Answer**:
 ```
 ### 1. Direct Answer
 
-In **FY2023**, the restructuring charge has a **$4.5 million ($4,500,000 USD)** financial impact. 
+The numerical impact of Aurora's FY2023 restructuring charge on Adjusted EBITDA is a **+$4.5 million** positive add-back (increasing reported EBITDA from $92.8 million to $97.3 million on a company-reported basis). 
 
-* **Accounting Treatment:** The $4.5 million charge is treated as a non-recurring normalization adjustment and is **added back** to reported EBITDA ($92.8 million) in calculating Adjusted EBITDA.
-* **Operational Drivers:** The charge was driven by operational restructuring in **Q3 FY2023**, specifically the closure of the Austin development center. This involved severance costs for **32 affected employees** and facility exit costs associated with terminating the Austin facility lease. Management represents that this restructuring program is complete and no further charges are expected.
+The underlying operational events that caused this restructuring charge were:
+* The **closure of the Austin development center** in Q3 FY2023.
+* **Severance costs** associated with 32 affected employees.
+* **Facility exit costs and lease termination** for the Austin location in Q3 FY2023.
 
 ---
 
 ### 2. Supporting Evidence & Citations
 
-* **Financial Impact & Accounting Treatment:**
-  * In FY2023, reported EBITDA of **$92.8 million** is adjusted upward by **+$4.5 million** for restructuring charges [📊 aurora_financials_fy2023.txt | p.2 | Section: KEY FINANCIAL METRICS AND NOTES].
-  * The Quality of Earnings report considers this add-back appropriate and non-recurring [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.2 | Note 1 - Restructuring Charges ($4.5M, FY2023)].
+* **Numerical Impact on EBITDA:**
+  * Operating income (EBIT) of $68.0 million plus Depreciation & Amortization of $24.8 million yields a reported EBITDA of $92.8 million [📄 aurora_financials_fy2023.txt | FY2023 | p.2 | KEY FINANCIAL METRICS AND NOTES].
+  * Adding back the **$4.5 million** restructuring charge increases company-reported Adjusted EBITDA to **$97.3 million** (21.5% margin) [📄 aurora_financials_fy2023.txt | FY2023 | p.2 | KEY FINANCIAL METRICS AND NOTES].
+  * Operating expenses in the Income Statement record exact Restructuring Charges of **$4.5 million** for FY2023, compared to **$0.0 million** in FY2022 [📄 aurora_financials_fy2023.txt | FY2023 | p.1 | CONSOLIDATED INCOME STATEMENT].
 
 * **Operational Drivers:**
-  * **Severance & Employee Count:** Severance costs were incurred due to the downsizing/closure impacting 32 employees at the Austin development center [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.2 | Note 1 - Restructuring Charges ($4.5M, FY2023)].
-  * **Facility Exit Costs:** The Austin facility lease was terminated in Q3 FY2023, and the lease exit costs are included within the $4.5 million charge [📄 credit_agreement_summary.txt | p.4 | Section: Operating lease commitments].
+  * The charge consists of severance and facility exit costs associated with closing the Austin development center in Q3 FY2023, affecting 32 employees [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.2 | Note 1 - Restructuring Charges ($4.5M, FY2023)].
+  * CFO Sarah Chen confirmed during board discussions that the $4.5 million restructuring charge directly related to the Austin center closure and 32 affected personnel [📄 board_deck_strategic_review_mar2024.txt | FY2024 | p.4 | SPEAKER NOTES].
+  * The Austin facility lease was officially terminated in Q3 FY2023 as part of the restructuring program, with the exit costs captured inside the $4.5 million charge [📄 credit_agreement_summary.txt | FY2023 | p.4 | SECTION].
 
 ---
 
-### 3. Normalized Values & Inconsistencies / Observations
+### 3. Caveats, Inconsistencies, & Missing Information
 
-#### Normalized Values & Context
-* **Restructuring Charge Add-back:** $4.5 million ($4,500,000 USD)
-* **Reported EBITDA (FY2023):** $92.8 million ($92,800,000 USD) [📊 aurora_financials_fy2023.txt | p.2]
-* **Adjusted EBITDA (Excluding Restructuring Only):** $97.3 million ($97,300,000 USD); Margin: 21.5% [📊 aurora_financials_fy2023.txt | p.2]
-* **Final Quality of Earnings Adjusted EBITDA:** $99.0 million ($99,000,000 USD); Margin: 21.9% [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.2 | Section: ADJUSTED EBITDA BRIDGE]
+* **Completion Status:** Management represents that this restructuring program is fully complete and no further charges are expected in future periods [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.2 | Note 1 - Restructuring Charges ($4.5M, FY2023)].
+* **EBITDA Presentation Inconsistency:** While company financials reflect an Adjusted EBITDA of **$97.3 million** solely adding back the $4.5 million restructuring charge [📄 aurora_financials_fy2023.txt | FY2023 | p.2 | KEY FINANCIAL METRICS AND NOTES], the independent Quality of Earnings (QoE) report presents an overall Adjusted EBITDA of **$99.0 million** [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.2 | SECTION 2: ADJUSTED EBITDA BRIDGE]. This difference is due to additional QoE adjustments (e.g., legal fee add-backs, capitalized software adjustments), but both documents agree on the $4.5 million restructuring add-back itself.
 
-#### Reconciling Document Inconsistencies
-* **Adjusted EBITDA Totals:** `aurora_financials_fy2023.txt` shows an Adjusted EBITDA of **$97.3 million**, which reflects *only* the $4.5 million restructuring add-back to reported EBITDA ($92.8 million) [📊 aurora_financials_fy2023.txt | p.2]. Conversely, `quality_of_earnings_report_fy2023.txt` presents a final Adjusted EBITDA of **$99.0 million** [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.2]. This difference arises because the Quality of Earnings analysis incorporates additional net normalization adjustments beyond restructuring, such as legal fee add-backs ($2.8M), capitalized software adjustments (-$3.2M), and founder compensation normalizations [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.2–3].
+---
+
+### 4. Normalized Financial Values & Scale Context
+
+* **FY2023 Restructuring Charge:** $4.5 million USD ($4,500,000 USD) [📄 aurora_financials_fy2023.txt | FY2023 | p.1 | CONSOLIDATED INCOME STATEMENT]
+* **FY2023 Reported EBITDA:** $92.8 million USD ($92,800,000 USD) [📄 aurora_financials_fy2023.txt | FY2023 | p.2 | KEY FINANCIAL METRICS AND NOTES]
+* **FY2023 Company-Reported Adjusted EBITDA:** $97.3 million USD ($97,300,000 USD) [📄 aurora_financials_fy2023.txt | FY2023 | p.2 | KEY FINANCIAL METRICS AND NOTES]
+* **FY2023 Quality of Earnings Adjusted EBITDA:** $99.0 million USD ($99,000,000 USD) [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.2 | SECTION 2: ADJUSTED EBITDA BRIDGE]
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -943,47 +767,46 @@ In **FY2023**, the restructuring charge has a **$4.5 million ($4,500,000 USD)** 
 - **Facts Recalled**: 5/5 (100.0%)
   - *Recalled*: ['$174.0', '25%', 'Fundamental Representations', 'Section 3.5', 'thirty-six']
 - **Citations Match**: ✅ Yes
-- **Total Latency**: 19906.00 ms
+- **Total Latency**: 113672.00 ms
 - **Answer**:
 ```
 ### 1. Direct Answer
 
-Breaches of financial statement representations (Section 3.5) are designated as **Fundamental Representations** under the Merger Agreement. Consequently:
-
-* **Survival Period:** **36 months** following the Closing.
-* **Indemnification Exposure Amount (Cap):** Up to **$174.0 million** (representing 25% of the aggregate Merger Consideration).
-* **Deductible Threshold:** Subject to a **$3.48 million** aggregate Deductible (0.5% of aggregate Merger Consideration), after which liability applies from the first dollar.
+For breaches of financial statement representations (defined under **Section 3.5**), which is classified as a **Fundamental Representation**:
+* **Survival Period:** **36 months** following the Closing [📄 merger_agreement_v2_final.txt | p.3 | Section 8.1 — Survival of Representations].
+* **Indemnification Exposure Limit (Cap):** **$174.0 million**, which represents **25%** of the aggregate Merger Consideration [📄 merger_agreement_v2_final.txt | p.3 | Section 8.2 — Indemnification Cap].
 
 ---
 
 ### 2. Supporting Evidence & Citations
 
-* **Fundamental Representation Status:** Section 3.5 covers the representations and warranties for the audited FY2022/FY2023 consolidated financial statements and unaudited Q1 2024 quarterly statements [📄 merger_agreement_v2_final.txt | p.1 | Section 3.5 — Financial Statements].
-* **Survival Period:** While general representations survive for 18 months, Section 8.1 explicitly lists Section 3.5 as a Fundamental Representation (along with Sections 3.1, 3.2, and 3.12), extending its survival period to **36 months** [📄 merger_agreement_v2_final.txt | p.3 | Section 8.1 — Survival of Representations].
-* **Indemnification Cap:** Section 8.2 sets the general cap at $69.6 million (10% of Merger Consideration), but provides an elevated cap for Fundamental Representations of **$174.0 million** (25% of the aggregate Merger Consideration) [📄 merger_agreement_v2_final.txt | p.3 | Section 8.2 — Indemnification Cap].
-* **Deductible / Basket:** Indemnification claims are subject to an aggregate threshold of **$3.48 million** (0.5% of aggregate Merger Consideration). Once Losses exceed this amount, stockholders are liable for all Losses from the first dollar [📄 merger_agreement_v2_final.txt | p.3 | Section 8.3 — Deductible].
+* **Classification as Fundamental Representation:** Financial Statements representations are set forth in Section 3.5 [📄 merger_agreement_v2_final.txt | p.1 | Section 3.5 — Financial Statements]. Section 8.1 explicitly designates **Section 3.5** as a Fundamental Representation alongside Sections 3.1, 3.2, and 3.12 [📄 merger_agreement_v2_final.txt | p.3 | Section 8.1 — Survival of Representations].
+* **Survival Period:** While general representations survive for 18 months, Fundamental Representations (including Section 3.5) survive for **36 months** [📄 merger_agreement_v2_final.txt | p.3 | Section 8.1 — Survival of Representations].
+* **Indemnification Cap:** The liability cap for general claims is $69.6 million (10% of aggregate Merger Consideration), but claims based on Fundamental Representations are subject to a higher cap of **$174.0 million** (25% of aggregate Merger Consideration) [📄 merger_agreement_v2_final.txt | p.3 | Section 8.2 — Indemnification Cap].
+* **Deductible Requirement:** Company stockholders are not liable for claims until total aggregate Losses exceed the deductible threshold of **$3.48 million** (0.5% of aggregate Merger Consideration). Once exceeded, liability attaches from the first dollar [📄 merger_agreement_v2_final.txt | p.3 | Section 8.3 — Deductible].
 
 ---
 
-### 3. Financial Summary & Scale Context
+### 3. Caveats, Inconsistencies, & Missing Information
 
-* **Implied Total Merger Consideration:** $696.0 million (derived from $69.6M = 10%, $174.0M = 25%, and $3.48M = 0.5%).
-* **General Rep Cap:** $69.6 million (10% of aggregate Merger Consideration).
-* **Financial Statement / Fundamental Rep Cap:** $174.0 million (25% of aggregate Merger Consideration).
-* **Deductible Amount:** $3.48 million (0.5% of aggregate Merger Consideration; first-dollar recovery after threshold is met).
+* **Loss Accrual Note:** A disclosure schedule notes that the Company has not recorded a loss accrual for pending litigation (*DataFlow Systems Inc. v. Aurora Technologies Inc.*, exposure estimated at $3.5 million to $8.0 million) on the basis that no loss is both probable and reasonably estimable under ASC 450 [📄 ip_portfolio_and_litigation_schedule.txt | p.2 | Financial statement treatment]. Buyer's accounting advisers have flagged this accounting treatment as an area of judgment.
+* **No Material Inconsistencies:** There are no contradictory terms found regarding Section 3.5 or Article VIII indemnification provisions across the provided documents.
 
 ---
 
-### 4. Caveats & Missing Information
+### 4. Financial Terms Summary (Normalized Scale Context)
 
-* No conflicting terms or inconsistencies were identified regarding Section 3.5 or Article VIII indemnification provisions within the provided text chunks.
+* **Implied Total Merger Consideration:** **$696.0 million** (derived from $69.6 million General Cap = 10% of Merger Consideration).
+* **General Representations Cap:** **$69.6 million** (10.0% of Merger Consideration) [📄 merger_agreement_v2_final.txt | p.3 | Section 8.2].
+* **Financial Statement / Fundamental Cap:** **$174.0 million** (25.0% of Merger Consideration) [📄 merger_agreement_v2_final.txt | p.3 | Section 8.2].
+* **Deductible Threshold:** **$3.48 million** (0.5% of Merger Consideration; first-dollar recovery applies after threshold is crossed) [📄 merger_agreement_v2_final.txt | p.3 | Section 8.3].
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
   - **retrieval_executor**:  ()
+  - **financial_verifier**:  ()
   - **quality_assessor**:  ()
   - **answer_synthesizer**:  ()
-  - **hallucination_validator**:  ()
 
 ---
 
@@ -993,45 +816,14 @@ Breaches of financial statement representations (Section 3.5) are designated as 
 - **Status**: ✅ PASS
 - **Confidence Score**: 1.00
 - **Validation Status**: passed
-- **Facts Recalled**: 6/6 (100.0%)
-  - *Recalled*: ['$3.5', '$8.0', 'DataFlow', '$3.48', 'deductible', 'exceeds']
-- **Citations Match**: ✅ Yes
-- **Total Latency**: 29454.00 ms
+- **Facts Recalled**: 0/6 (0.0%)
+  - *Recalled*: []
+  - *Missing*: ['$3.5', '$8.0', 'DataFlow', '$3.48', 'deductible', 'exceeds']
+- **Citations Match**: ❌ No
+- **Total Latency**: 153406.00 ms
 - **Answer**:
 ```
-### 1. Direct Answer
-The estimated monetary exposure of the DataFlow Systems litigation exceeds the merger agreement's indemnification deductible across all assessed probable outcomes:
-
-* **Estimated Exposure Range:** Outside counsel (Wilson Sonsini) assesses the probable exposure at **$3.5 million to $8.0 million**, with the most likely outcome being a licensing settlement of **$4 million to $6 million**.
-* **Indemnification Deductible:** **$3.48 million** (representing 0.5% of the aggregate Merger Consideration).
-* **Comparison:** At the minimum probable exposure ($3.5 million), liability exceeds the deductible by **$0.02 million ($20,000)**. At the maximum probable exposure ($8.0 million), it exceeds the deductible by **$4.52 million**. Based on the most likely settlement range ($4 million to $6 million), the exposure exceeds the deductible by **$0.52 million to $2.52 million**. Consequently, any loss within these estimated ranges would breach the $3.48 million deductible threshold, causing stockholders to become liable for all losses from the first dollar.
-
----
-
-### 2. Supporting Evidence & Metrics
-
-| Metric / Item | Exact Value | Document Source / Citation |
-| :--- | :--- | :--- |
-| **Probable Litigation Exposure Range** | $3.5 million to $8.0 million | [📄 merger_agreement_v2_final.txt | p. 2 | Section 3.15 — Litigation] <br> [📄 ip_portfolio_and_litigation_schedule.txt | p. 2 | Exposure assessment by outside counsel (Wilson Sonsini)] |
-| **Most Likely Outcome (Licensing Settlement)** | $4 million to $6 million | [📄 ip_portfolio_and_litigation_schedule.txt | p. 2 | Exposure assessment by outside counsel (Wilson Sonsini)] |
-| **Indemnification Deductible** | $3.48 million (0.5% of aggregate Merger Consideration) | [📄 merger_agreement_v2_final.txt | p. 3 | Section 8.3 — Deductible] |
-| **General Indemnification Cap** | $69.6 million (10% of aggregate Merger Consideration) | [📄 merger_agreement_v2_final.txt | p. 3 | Section 8.2 — Indemnification Cap] |
-
-#### Detailed Comparative Breakdown:
-1. **Low-End Probable Exposure vs. Deductible:**
-   $$\$3.50\text{ million} - \$3.48\text{ million} = +\$0.02\text{ million } (+\$20,000 \text{ over deductible})$$
-2. **High-End Probable Exposure vs. Deductible:**
-   $$\$8.00\text{ million} - \$3.48\text{ million} = +\$4.52\text{ million over deductible}$$
-3. **Most Likely Settlement Range vs. Deductible:**
-   * Low end ($4.0 million): Exceeds deductible by **$0.52 million ($520,000)**
-   * High end ($6.0 million): Exceeds deductible by **$2.52 million**
-
----
-
-### 3. Key Observations & Caveats
-* **Deductible Mechanics:** Under Section 8.3 of the Merger Agreement, once the aggregate amount of Losses exceeds the **$3.48 million** Deductible, stockholders are liable for all Losses **from the first dollar** (not merely for amounts in excess of the deductible) [📄 merger_agreement_v2_final.txt | p. 3 | Section 8.3 — Deductible].
-* **Injunction Risk:** Counsel assesses the probability of an injunction as **low**, because DataFlow does not practice the asserted patents and would face difficulty demonstrating irreparable harm [📄 ip_portfolio_and_litigation_schedule.txt | p. 2 | Exposure assessment by outside counsel (Wilson Sonsini)].
-* **Inconsistencies:** None. The exposure figures quoted in the Merger Agreement (Section 3.15) and the IP Portfolio & Litigation Schedule (Section 2) are completely aligned.
+I could not generate an answer for this question because the language model did not return a usable response. The retrieved context may still be relevant — please retry the query.
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -1046,32 +838,33 @@ The estimated monetary exposure of the DataFlow Systems litigation exceeds the m
 **Query**: What is the implied EV/EBITDA multiple of the Vertex deal based on the agreed price and Aurora's FY2023 EBITDA?
 
 - **Status**: ✅ PASS
-- **Confidence Score**: 1.00
-- **Validation Status**: passed
-- **Facts Recalled**: 1/3 (33.3%)
-  - *Recalled*: ['$92.8']
-  - *Missing*: ['$696', '7.5x']
+- **Confidence Score**: 0.85
+- **Validation Status**: warning
+- **Facts Recalled**: 2/3 (66.7%)
+  - *Recalled*: ['$696', '$92.8']
+  - *Missing*: ['7.5x']
 - **Citations Match**: ✅ Yes
-- **Total Latency**: 47313.00 ms
+- **Total Latency**: 46375.00 ms
 - **Answer**:
 ```
 ### 1. Direct Answer
-The implied Enterprise Value to EBITDA multiple **cannot be calculated** based on the provided context because essential inputs—specifically the **total number of diluted shares outstanding** (needed to calculate total Equity Value) and the **total long-term non-current debt balance**—are missing from the documents.
+The implied transaction multiple for Vertex Capital Partners' acquisition of Aurora Technologies Inc. varies depending on which FY2023 EBITDA metric is utilized:
+
+* **Implied Multiple on Reported FY2023 EBITDA ($92.8M):** **7.50x** [📊 COMPUTED: $696.0M Transaction Value / $92.8M Reported EBITDA]
+* **Implied Multiple on Company Adjusted FY2023 EBITDA ($97.3M):** **7.15x** [📊 COMPUTED: $696.0M Transaction Value / $97.3M Company Adjusted EBITDA]
+* **Implied Multiple on QoE Adjusted FY2023 EBITDA ($99.0M):** **7.03x** [📊 COMPUTED: $696.0M Transaction Value / $99.0M QoE Adjusted EBITDA]
 
 ---
 
-### 2. Available Supporting Inputs
+### 2. Supporting Evidence & Citations
 
-#### Transaction Price:
-* **Per Share Merger Consideration:** $58.00 per share in cash [📄 merger_agreement_v2_final.txt | p.1 | Section 1.2 — Consideration].
-
-#### Aurora FY2023 EBITDA Metrics:
-* **Reported EBITDA:** $92.8 million [📄 aurora_financials_fy2023.txt | p.2 | Key Financial Metrics]
-* **Management Adjusted EBITDA (excluding restructuring):** $97.3 million [📄 aurora_financials_fy2023.txt | p.2 | Key Financial Metrics]
-* **Grant Thornton Quality of Earnings (QoE) Adjusted EBITDA:** $99.0 million [📄 quality_of_earnings_report_fy2023.txt | p.2 | Section 6: Key Observations for the Buyer]
-
-#### Balance Sheet & Net Debt Details:
-* **Cash and Cash Equivalents:** $89.4 million [📄 aurora_financials_fy202
+* **Agreed Transaction Consideration & Value:**
+  * **Per Share Merger Consideration:** $58.00 per share in cash [📄 merger_agreement_v2_final.txt | p. 1 | Section 1.2 — Consideration].
+  * **Approximate Transaction Value:** $696 million ($696,000,000 USD) [📄 regulatory_and_data_privacy_memo.txt | p. 1 | Section 1: Antitrust and Merger Control].
+* **FY2023 EBITDA Breakdown:**
+  * **Reported EBITDA:** $92.8 million ($92,800,000 USD) [📄 aurora_financials_fy2023.txt | p. 2 | Key Financial Metrics] [📄 quality_of_earnings_report_fy2023.txt | p. 1 | Section 2].
+  * **Company Adjusted EBITDA:** $97.3 million ($97,300,000 USD), calculated by adding back $4.5 million in restructuring charges to reported EBITDA [📄 aurora_financials_fy2023.txt | p. 2 | Key Financial Metrics].
+  * **Quality of Earnings (
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -1091,13 +884,13 @@ The implied Enterprise Value to EBITDA multiple **cannot be calculated** based o
 - **Facts Recalled**: 0/0 (100.0%)
   - *Recalled*: []
 - **Citations Match**: ❌ No
-- **Total Latency**: 33953.00 ms
+- **Total Latency**: 9172.00 ms
 - **Answer**:
 ```
 I was unable to find sufficient relevant information in the data room to answer this question, even after refining the search. This may mean the relevant documents haven't been uploaded yet, or the question falls outside the scope of the available materials.
 
 Search attempts: 3
-Best quality score achieved: 0.48
+Best quality score achieved: 0.03
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -1117,25 +910,30 @@ Best quality score achieved: 0.48
 - **Facts Recalled**: 0/0 (100.0%)
   - *Recalled*: []
 - **Citations Match**: ❌ No
-- **Total Latency**: 17437.00 ms
+- **Total Latency**: 64969.00 ms
 - **Answer**:
 ```
 ### 1. Direct Answer
-The provided context **does not contain financial data for FY2024 quarterly periods** (specifically Q1 FY2024 and Q2 FY2024). Consequently, the specific revenue amounts for Aurora in Q1 FY2024 and Q2 FY2024 are missing from the provided context.
+The provided context **does not contain revenue figures for Q1 or Q2 of fiscal year 2024**. The available documentation only covers financial data for fiscal years 2022 and 2023 (periods ended December 31, 2022, and December 31, 2023), along with select non-financial subsequent event disclosures through March 15, 2024.
 
 ---
 
-### 2. Supporting Evidence
-The provided documentation only includes financial information for the fiscal years ended December 31, 2022, and December 31, 2023:
+### 2. Supporting Evidence & Scale Context
+While quarterly results for FY2024 are missing, the available annual revenue figures for prior periods provide context on the scale of the company's revenue:
 
-* **FY2023 Total Revenue:** $452.8 million [📄 aurora_financials_fy2023.txt | FY2023 | p. 1 | CONSOLIDATED INCOME STATEMENT]
-* **FY2022 Total Revenue:** $387.1 million [📄 aurora_financials_fy2023.txt | FY2022 | p. 1 | CONSOLIDATED INCOME STATEMENT]
-* **Period Under Review:** The Quality of Earnings report scope is explicitly restricted to FY2022 – FY2023 [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p. 1 | SECTION 1: SCOPE AND BASIS OF PRESENTATION].
+* **FY2022 Total Revenue:** $387.1 million USD [📄 aurora_financials_fy2023.txt | p.1 | Section: AURORA TECHNOLOGIES INC.]
+* **FY2023 Total Revenue:** $452.8 million USD (representing a 17.0% YoY growth rate) [📄 aurora_financials_fy2023.txt | p.1 | Section: AURORA TECHNOLOGIES INC.] / [📄 aurora_financials_fy2023.txt | p.3 | Section: Revenue Growth: 17.0% YoY]
+
+**FY2023 Revenue Breakdown by Stream:**
+* **Software Licenses:** $198.4 million USD [📄 aurora_financials_fy2023.txt | p.1 | Section: AURORA TECHNOLOGIES INC.]
+* **SaaS Subscriptions:** $189.6 million USD [📄 aurora_financials_fy2023.txt | p.1 | Section: AURORA TECHNOLOGIES INC.]
+* **Professional Services:** $64.8 million USD [📄 aurora_financials_fy2023.txt | p.1 | Section: AURORA TECHNOLOGIES INC.]
 
 ---
 
 ### 3. Missing Information & Caveats
-* **Missing Information:** Quarterly financial reports, 10-Q filings, or interim management accounts covering Q1 FY2024 and Q2 FY2024 are required to determine these amounts.
+* **Missing Documents/Data:** To evaluate Q1 and Q2 FY2024 performance, interim financial statements or quarterly financial reports for the periods ending March 31, 2024 (Q1 FY2024) and June 30, 2024 (Q2 FY2024) must be requested from management.
+* **Subsequent Event Context:** The company engaged Goldman Sachs on February 15, 2024, to explore strategic alternatives [📄 aurora_financials_fy2023.txt | p.3 | Section: Note 12 — Subsequent Events:], but no interim financial disclosures from this engagement period are present in the provided context.
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -1155,7 +953,7 @@ The provided documentation only includes financial information for the fiscal ye
 - **Facts Recalled**: 0/0 (100.0%)
   - *Recalled*: []
 - **Citations Match**: ❌ No
-- **Total Latency**: 32578.00 ms
+- **Total Latency**: 11109.00 ms
 - **Answer**:
 ```
 I was unable to find sufficient relevant information in the data room to answer this question, even after refining the search. This may mean the relevant documents haven't been uploaded yet, or the question falls outside the scope of the available materials.
@@ -1181,32 +979,10 @@ Best quality score achieved: 0.01
 - **Facts Recalled**: 0/0 (100.0%)
   - *Recalled*: []
 - **Citations Match**: ❌ No
-- **Total Latency**: 26563.00 ms
+- **Total Latency**: 89750.00 ms
 - **Answer**:
 ```
-Based on the provided context, the exact customer churn rates for Aurora and its competitors are **not available**. 
-
-### 1. Direct Answer
-The provided documents do not contain information regarding Aurora's customer churn rate, nor do they state the customer churn rates for its primary competitors.
-
----
-
-### 2. Related Metrics Available in Context
-While customer churn rate is missing, the following related metrics are provided:
-
-* **Aurora's Customer Retention / Expansion:** Aurora has a **118% Net Revenue Retention** [📄 board_deck_strategic_review_mar2024.txt | p.1 | Section: Aurora's Position:].
-* **Market Position & Primary Competitors:** 
-  * #1 Market Leader: Palantir (18.4% market share) [📄 board_deck_strategic_review_mar2024.txt | p.1 | Section: Aurora's Position:]
-  * #2 Market Leader: Snowflake (12.1% market share) [📄 board_deck_strategic_review_mar2024.txt | p.1 | Section: Aurora's Position:]
-  * #3 Market Leader: Aurora (est. 8.2% market share) [📄 board_deck_strategic_review_mar2024.txt | p.1 | Section: Aurora's Position:]
-
----
-
-### 3. Missing Information & Caveats
-* **Missing Data:** 
-  * Aurora's gross revenue churn or logo/customer churn rate.
-  * Logo or revenue churn rates for Palantir, Snowflake, or any third competitor.
-  * Identification of a third specific competitor (only Palantir and Snowflake are explicitly named alongside Aurora).
+I could not generate an answer for this question because the language model did not return a usable response. The retrieved context may still be relevant — please retry the query.
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -1221,58 +997,70 @@ While customer churn rate is missing, the following related metrics are provided
 **Query**: What is Aurora's Adjusted EBITDA for FY2023 and how does it differ from reported EBITDA?
 
 - **Status**: ✅ PASS
-- **Confidence Score**: 0.85
-- **Validation Status**: warning
+- **Confidence Score**: 0.98
+- **Validation Status**: passed
 - **Facts Recalled**: 3/3 (100.0%)
   - *Recalled*: ['$99.0', '$92.8', '$6.2']
 - **Citations Match**: ✅ Yes
-- **Total Latency**: 25859.00 ms
+- **Total Latency**: 33969.00 ms
 - **Answer**:
 ```
 ### 1. Direct Answer
+For FY2023, Aurora's **Reported EBITDA** is **$92.8 million**. However, the **Adjusted EBITDA** varies depending on the report/source:
 
-For **FY2023**:
-* **Reported EBITDA:** **$92.8 million**
-* **Adjusted EBITDA:** 
-  * **$99.0 million** as determined in the Quality of Earnings (QoE) report (a net upward bridge of **+$6.2 million** over reported EBITDA).
-  * **$97.3 million** as presented in management's internal financial statements (which only excludes restructuring charges of $4.5 million).
+* **Management Financial Statements:** **$97.3 million** (a **$4.5 million** upward adjustment over reported EBITDA).
+* **Quality of Earnings (QoE) Report:** **$99.0 million** (a **$6.2 million** net upward adjustment over reported EBITDA).
 
-#### **Specific Reconciling Adjustments (Reported EBITDA to QoE Adjusted EBITDA):**
-1. **Restructuring Charges:** **+$4.5 million** (Add-back of non-recurring operating restructuring charges)
-2. **DataFlow Legal Fee Add-back:** **+$2.8 million** (Add-back of litigation fees)
-3. **Founder Compensation Normalization:** **+$1.9 million** (Add-back/normalization of founder compensation)
-4. **Capitalized Software Adjustment:** **-$3.2 million** (Downward adjustment to expense internal-use software in alignment with peer accounting practices)
+The specific reconciliation adjustments identified in the context are:
+* **Restructuring Charges Add-back (Management):** +$4.5 million
+* **DataFlow Legal Fee Add-back (QoE):** +$2.8 million
+* **Founder Compensation Normalization Add-back (QoE):** +$1.9 million
+* **Capitalized Software Adjustment (QoE):** Downward normalization (exact numerical value not provided in the context).
 
 ---
 
-### 2. Supporting Evidence & Reconciling Bridge
+### 2. Supporting Evidence & Citations
 
-| Line Item | FY2023 Amount ($M) | Normalized Value ($) | Citation |
-| :--- | :--- | :--- | :--- |
-| **Operating Income (EBIT)** | $68.0M | $68,000,000 | [📄 aurora_financials_fy2023.txt \| FY2023 \| p.2 \| KEY FINANCIAL METRICS AND NOTES] |
-| **(+) Depreciation & Amortization** | $24.8M | $24,800,000 | [📄 aurora_financials_fy2023.txt \| FY2023 \| p.2 \| KEY FINANCIAL METRICS AND NOTES] |
-| **Reported EBITDA** | **$92.8M** | **$92,800,000** | [📄 aurora_financials_fy2023.txt \| FY2023 \| p.2 \| KEY FINANCIAL METRICS AND NOTES] |
-| *(+) Restructuring Charges* | +$4.5M | +$4,500,000 | [📄 aurora_financials_fy2023.txt \| FY2023 \| p.1 & p.2 \| Operating Expenses] |
-| **Management Adjusted EBITDA** | **$97.3M** | **$97,300,000** | [📄 aurora_financials_fy2023.txt \| FY2023 \| p.2 \| KEY FINANCIAL METRICS AND NOTES] |
-| *(+) DataFlow Legal Fee Add-back* | +$2.8M | +$2,800,000 | [📄 quality_of_earnings_report_fy2023.txt \| FY2023 \| p.3 \| SECTION 6: KEY OBSERVATIONS] |
-| *(+) Founder Compensation Normalization* | +$1.9M | +$1,900,000 | [📄 quality_of_earnings_report_fy2023.txt \| FY2023 \| p.3 \| SECTION 6: KEY OBSERVATIONS] |
-| *(-) Capitalized Software Adjustment* | -$3.2M | -$3,200,000 | [📄 quality_of_earnings_report_fy2023.txt \| FY2023 \| p.2 \| Note 5 - Capitalized Software Adjustment] |
-| **QoE Adjusted EBITDA** | **$99.0M** | **$99,000,000** | [📄 quality_of_earnings_report_fy2023.txt \| FY2023 \| p.2 & p.3 \| SECTION 6: KEY OBSERVATIONS] |
+#### Reported EBITDA (FY2023)
+* **Operating Income (EBIT):** $68.0 million [📄 aurora_financials_fy2023.txt | FY2023 | p.2 | KEY FINANCIAL METRICS AND NOTES]
+* **Depreciation & Amortization:** $24.8 million ($11.4M Depreciation + $13.4M Amortization) [📄 aurora_financials_fy2023.txt | FY2023 | p.2 | KEY FINANCIAL METRICS AND NOTES] [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.1 | Add: Income Tax Expense]
+* **Reported EBITDA:** **$92.8 million** [📄 aurora_financials_fy2023.txt | FY2023 | p.2 | KEY FINANCIAL METRICS AND NOTES] [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.1 | Add: Income Tax Expense]
+
+#### Management Adjusted EBITDA (FY2023)
+* **Reported EBITDA:** $92.8 million [📄 aurora_financials_fy2023.txt | FY2023 | p.2 | KEY FINANCIAL METRICS AND NOTES]
+* **Restructuring Charges Add-back:** +$4.5 million [📄 aurora_financials_fy2023.txt | FY2023 | p.2 | KEY FINANCIAL METRICS AND NOTES]
+* **Management Adjusted EBITDA:** **$97.3 million** [📄 aurora_financials_fy2023.txt | FY2023 | p.2 | KEY FINANCIAL METRICS AND NOTES]
+
+#### Quality of Earnings (QoE) Adjusted EBITDA (FY2023)
+* **Reported EBITDA:** $92.8 million [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.1 | Add: Income Tax Expense]
+* **QoE Adjusted EBITDA:** **$99.0 million** [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.2 / p.3 | SECTION 6: KEY OBSERVATIONS FOR THE BUYER]
+* **Net Difference:** +$6.2 million [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | SECTION 6: KEY OBSERVATIONS FOR THE BUYER]
+
+**Specific QoE Adjustments Mentioned:**
+1. **DataFlow Legal Fee Add-back:** +$2.8 million [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | SECTION 6: KEY OBSERVATIONS FOR THE BUYER]
+2. **Founder Compensation Normalization:** +$1.9 million [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | SECTION 6: KEY OBSERVATIONS FOR THE BUYER]
+3. **Capitalized Software Adjustment:** Mentioned as the single largest downward normalization [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | SECTION 6: KEY OBSERVATIONS FOR THE BUYER]
 
 ---
 
-### 3. Caveats, Nuances & Due Diligence Observations
+### 3. Caveats, Inconsistencies, & Missing Information
 
-1. **Two Adjusted EBITDA Figures:**
-   * Management presents an Adjusted EBITDA of **$97.3 million** [📄 aurora_financials_fy2023.txt | FY2023 | p.2 | KEY FINANCIAL METRICS AND NOTES], considering only the **$4.5 million** restructuring add-back.
-   * The Quality of Earnings report derives an Adjusted EBITDA of **$99.0 million** [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.2 | SECTION 2], incorporating further QoE normalization adjustments.
+* **Inconsistency Between Sources:** Management reports FY2023 Adjusted EBITDA of **$97.3 million** (adding back only restructuring charges), whereas the QoE report presents **$99.0 million** (incorporating quality-of-earnings normalizations).
+* **Missing Data:** The context does not provide a complete line-by-line quantitative reconciliation table for the QoE adjustments to fully bridge the $6.2 million net variance (e.g., the exact negative dollar impact of the capitalized software downward adjustment is missing from the provided excerpts).
+* **Quality / Durability Caveats:**
+  * **Legal Fees:** The $2.8 million DataFlow legal fee add-back is qualified; if litigation continues into FY2024, Adjusted EBITDA is overstated by that amount [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | SECTION 6: KEY OBSERVATIONS FOR THE BUYER].
+  * **Founder Compensation:** The $1.9 million founder comp add-back assumes both founders remain; if either departs, market replacement cost may exceed this add-back [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | SECTION 6: KEY OBSERVATIONS FOR THE BUYER].
 
-2. **Sum of Individual Adjustments vs. Stated Net Bridge:**
-   * Stated QoE Net Bridge: **+$6.2 million** ($99.0M QoE Adjusted EBITDA - $92.8M Reported EBITDA) [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | SECTION 6].
-   * Sum of explicitly listed adjustment details ($4.5M restructuring + $2.8M legal fees + $1.9M compensation - $3.2M capitalized software) equals **+$6.0 million**. The remaining **+$0.2 million** difference is due to undisclosed minor adjustments or rounding within the QoE bridge schedule.
+---
 
-3. **Earnings Quality Risks Identified in QoE:**
-   * **DataFlow Legal Fee ($2.8M):** Qualified as non-recurring; if litigation continues into FY2024, Adjusted EBITDA would be overstated by this amount [📄 quality
+### 4. Normalized Financial Values with Scale Context
+
+* **Reported EBITDA (FY2023):** $92.8 million ($92,800,000 USD)
+* **Management Adjusted EBITDA (FY2023):** $97.3 million ($97,300,000 USD)
+* **QoE Adjusted EBITDA (FY2023):** $99.0 million ($99,000,000 USD)
+* **Management Restructuring Add-back:** $4.5 million ($4,500,000 USD)
+* **QoE DataFlow Legal Fee Add-back:** $2.8 million ($2,800,000 USD)
+* **QoE Founder Compensation Add-back:** $1.9 million ($1,900,000 USD)
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -1292,31 +1080,36 @@ For **FY2023**:
 - **Facts Recalled**: 2/2 (100.0%)
   - *Recalled*: ['$55.8', 'peg']
 - **Citations Match**: ✅ Yes
-- **Total Latency**: 24844.00 ms
+- **Total Latency**: 22406.00 ms
 - **Answer**:
 ```
-### Direct Answer
-Based on the Quality of Earnings (QoE) Report for FY2023, the 12-month average Net Working Capital (NWC) was **($55.8) million**. The QoE report recommends establishing a working capital peg of **($55.8) million** at closing, structured with a **dollar-for-dollar adjustment** against the actual closing balance sheet NWC.
+### 1. Direct Answer
+The Quality of Earnings (QoE) report recommends a working capital target peg of **($55.8) million** at closing, derived from the twelve-month average Net Working Capital (NWC). The report recommends that any deviation from this peg at closing be settled via a **dollar-for-dollar adjustment** on the closing balance sheet.
 
 ---
 
-### Supporting Evidence
-* **12-Month Average NWC:** Historical 12-month average NWC was determined to be ($55.8) million [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p. 3 | Twelve-month average NWC was ($55.8) million | Current].
-* **Recommended Working Capital Peg:** A working capital peg of ($55.8) million is recommended at closing [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p. 3 | Twelve-month average NWC was ($55.8) million | Current].
-* **Adjustment Mechanism:** The recommended peg includes a dollar-for-dollar closing adjustment [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p. 3 | Twelve-month average NWC was ($55.8) million | Current].
-* **Receivables / Collections Observation:** Days Sales Outstanding (DSO) moved from 65 days in FY2022 to 63 days in FY2023, with no material deterioration in collections identified [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p. 3 | Days Sales Outstanding (DSO) increased from 65 days in FY2022 to 63 days in FY2023 | Current].
+### 2. Supporting Evidence
+* **Working Capital Peg Recommendation**: The Quality of Earnings report states: *"Twelve-month average NWC was ($55.8) million. We recommend a working capital peg of ($55.8) million at closing, with a dollar-for-dollar adjustment."* [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | Section: Twelve-month average NWC was ($55.8) million. We recommend a working capital]
+* **Accounts Receivable / DSO Context**: Days Sales Outstanding (DSO) moved from 65 days in FY2022 to 63 days in FY2023, with no material deterioration in collections identified during the QoE review [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | Section: Days Sales Outstanding (DSO) increased from 65 days in FY2022 to 63 days in].
+* **Balance Sheet Liabilities Impacting NWC**: The DataFlow litigation reserve of $5.0 million is recognized on the FY2023 balance sheet under Accrued Liabilities [📄 board_deck_strategic_review_mar2024.txt | p.4 | Section: SPEAKER NOTES:].
 
 ---
 
-### Normalized Financial Metrics
-* **12-Month Average NWC:** `-$55,800,000 USD` (-$55.8 million)
-* **Recommended Closing NWC Peg:** `-$55,800,000 USD` (-$55.8 million)
+### 3. Caveats, Inconsistencies, & Missing Information
+* **Litigation Expense & Liability Exposure**: The $5.0 million litigation reserve is currently reflected in Accrued Liabilities [📄 board_deck_strategic_review_mar2024.txt | p.4 | Section: SPEAKER NOTES:]. In addition, $2.8 million of legal fees were incurred in FY2023; because the litigation remains unresolved and comparable legal costs are expected in FY2024, buyer counsel/advisors qualify this item [📄 ip_portfolio_and_litigation_schedule.txt | p.2 | Section: Legal fees of $2.8 million were incurred in FY2023 in connection with this].
+* **Inconsistencies**: No direct inconsistencies were found regarding the working capital peg figure across the provided sources.
+* **Missing Information**: The provided context does not include the month-by-month historical NWC breakdown, target working capital definition exclusions (e.g., cash, indebtedness, transaction expense exclusions), or whether a working capital collar/bandwidth was negotiated.
 
 ---
 
-### Caveats and Missing Information
-* **Missing Closing Balance Sheet Details:** The provided context does not contain the detailed line-item breakdown (e.g., individual current asset and current liability balances) for the projected closing balance sheet. Consequently, an estimated dollar impact of the closing NWC purchase price adjustment cannot be pre-calculated from the context.
-* **Inconsistencies:** No inconsistencies regarding the working capital peg or 12-month average NWC were identified across the provided context chunks.
+### 4. Normalized Financial Metrics
+
+| Metric | Reported / Recommended Value | Normalized / Scale Context | Source Citation |
+| :--- | :--- | :--- | :--- |
+| **Recommended Working Capital Peg** | ($55.8) million | -$55,800,000 USD | [📄 quality_of_earnings_report_fy2023.txt \| FY2023 \| p.3] |
+| **12-Month Average NWC** | ($55.8) million | -$55,800,000 USD | [📄 quality_of_earnings_report_fy2023.txt \| FY2023 \| p.3] |
+| **Adjustment Mechanism** | Dollar-for-dollar | Post-closing NWC true-up | [📄 quality_of_earnings_report_fy2023.txt \| FY2023 \| p.3] |
+| **DataFlow Litigation Reserve** | $5.0 million | $5,000,000 USD (Accrued Liabilities) | [📄 board_deck_strategic_review_mar2024.txt \| p.4] |
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -1336,48 +1129,37 @@ Based on the Quality of Earnings (QoE) Report for FY2023, the 12-month average N
 - **Facts Recalled**: 2/2 (100.0%)
   - *Recalled*: ['$331.7', '73.3%']
 - **Citations Match**: ✅ Yes
-- **Total Latency**: 19547.00 ms
+- **Total Latency**: 46938.00 ms
 - **Answer**:
 ```
 ### 1. Direct Answer
-
-In fiscal year 2023, Aurora recorded:
-* **Total Recurring Revenue:** **$331.7 million**
-* **Percentage of Total Revenue:** **73.3%**
+In fiscal year 2023, Aurora’s total recurring revenue was **$331.7 million**, which accounted for **73.3%** of total revenue.
 
 ---
 
-### 2. Supporting Evidence & Breakdown
+### 2. Supporting Evidence & Revenue Breakdown
+According to the Quality of Earnings Report, total recurring revenue of **$331.7 million** is composed of two distinct recurring revenue streams [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | Total Recurring Revenue $331.7 73.3%]:
 
-According to the Quality of Earnings Report prepared by Grant Thornton LLP, FY2023 recurring revenue is composed of SaaS subscriptions and term software licenses [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.1 | Section 1: Scope and Basis of Presentation] [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | Total Recurring Revenue]:
+* **SaaS Subscriptions (recurring):** $189.6 million (**41.9%** of total revenue) [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | SaaS Subscriptions (recurring) $189.6 41.9%]
+* **Software Licenses - Term (recurring):** $142.1 million (**31.4%** of total revenue) [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | SaaS Subscriptions (recurring) $189.6 41.9%]
 
-| Revenue Component | FY2023 Amount ($M) | % of Total Revenue | Classification | Citation |
-| :--- | :--- | :--- | :--- | :--- |
-| **SaaS Subscriptions** | $189.6 | 41.9% | Recurring | [📄 quality_of_earnings_report_fy2023.txt \| FY2023 \| p.3 \| SaaS Subscriptions (recurring)] |
-| **Software Licenses – Term** | $142.1 | 31.4% | Recurring | [📄 quality_of_earnings_report_fy2023.txt \| FY2023 \| p.3 \| Software Licenses - term (recurring)] |
-| **Total Recurring Revenue** | **$331.7** | **73.3%** | **Recurring** | [📄 quality_of_earnings_report_fy2023.txt \| FY2023 \| p.3 \| Total Recurring Revenue] |
-| **Software Licenses – Perpetual** | $56.3 | 12.4% | Non-Recurring (One-time) | [📄 quality_of_earnings_report_fy2023.txt \| FY2023 \| p.3 \| Software Licenses - perpetual (one-time)] |
-| **Professional Services** | $64.8 | 14.3% | Non-Recurring | [📄 quality_of_earnings_report_fy2023.txt \| FY2023 \| p.3 \| Professional Services (non-recurring)] |
-| **Total Revenue** | **$452.8** | **100.0%** | | [📄 aurora_financials_fy2023.txt \| FY2023 \| p.1 \| CONSOLIDATED INCOME STATEMENT] |
+The non-recurring portion of FY2023 total revenue ($452.8 million) consists of [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | SaaS Subscriptions (recurring) $189.6 41.9%]:
+* **Software Licenses - Perpetual (one-time):** $56.3 million (**12.4%** of total revenue)
+* **Professional Services (non-recurring):** $64.8 million (**14.3%** of total revenue)
 
 ---
 
-### 3. Financial Breakdown & Scale Context
-
-* **Reported Figures:**
-  * **Recurring Revenue:** $331.7 million
-  * **Total Revenue:** $452.8 million
-  * **Recurring Revenue Ratio:** 73.3%
-* **Normalized / Full Scale Figures:**
-  * **Recurring Revenue:** $331,700,000 USD
-  * **Total Revenue:** $452,800,000 USD
+### 3. Normalized Values & Scale Context
+* **Total Recurring Revenue:** $331.7 million = **$331,700,000 USD** (**73.3%** / 0.733) [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | Total Recurring Revenue $331.7 73.3%]
+* **SaaS Subscriptions Revenue:** $189.6 million = **$189,600,000 USD** (**41.9%** / 0.419) [📄 aurora_financials_fy2023.txt | FY2023 | p.1 | CONSOLIDATED INCOME STATEMENT] [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | SaaS Subscriptions (recurring) $189.6 41.9%]
+* **Term Software Licenses Revenue:** $142.1 million = **$142,100,000 USD** (**31.4%** / 0.314) [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | SaaS Subscriptions (recurring) $189.6 41.9%]
+* **Total Revenue:** $452.8 million = **$452,800,000 USD** (**100.0%**) [📄 aurora_financials_fy2023.txt | FY2023 | p.1 | CONSOLIDATED INCOME STATEMENT]
 
 ---
 
-### 4. Important Context & Observations
+### 4. Caveats, Inconsistencies, & Observations
 
-* **Software License Reclassification:** The Audited Income Statement lists total Software Licenses as a single line item of **$198.4 million** [📄 aurora_financials_fy2023.txt | FY2023 | p.1 | CONSOLIDATED INCOME STATEMENT]. The Quality of Earnings report provides the detail separating this into **$142.1 million** in term licenses (recurring) and **$56.3 million** in perpetual licenses (one-time) [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | SaaS Subscriptions (recurring)].
-* **Transition away from Perpetual Licensing:** Perpetual license revenue declined from $61.2 million in FY2022 to $56.3 million in FY2023 due to Aurora's ongoing migration to subscription pricing [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | Net Revenue Retention (NRR)].
+* **Revenue Sustainability Note:** The Quality of Earnings report emphasizes that perpetual license revenue declined from $61.2 million in FY2022 to $56.3 million in FY2023 as Aurora migrates customers to subscription pricing; buyers are cautioned not to model perpetual license revenue as sustainable [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | Net Revenue Retention (NRR) was 118% in FY2023 and 114% in FY2022.
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -1392,66 +1174,22 @@ According to the Quality of Earnings Report prepared by Grant Thornton LLP, FY20
 **Query**: Which customer contracts require consent for the change of control, and what revenue do they represent?
 
 - **Status**: ✅ PASS
-- **Confidence Score**: 1.00
-- **Validation Status**: passed
-- **Facts Recalled**: 4/4 (100.0%)
-  - *Recalled*: ['Northstar Financial Group', 'Pacific Data Systems', '$92.8', '20.5%']
-- **Citations Match**: ✅ Yes
-- **Total Latency**: 36500.00 ms
+- **Confidence Score**: 0.85
+- **Validation Status**: warning
+- **Facts Recalled**: 2/4 (50.0%)
+  - *Recalled*: ['Northstar Financial Group', 'Pacific Data Systems']
+  - *Missing*: ['$92.8', '20.5%']
+- **Citations Match**: ❌ No
+- **Total Latency**: 63437.00 ms
 - **Answer**:
 ```
-### Direct Answer
+### 1. Direct Answer
 
-Based on the provided M&A context, the customer contracts mandating consent (or providing termination rights) upon a change of control are as follows:
+The specific customer contracts that contain change of control clauses requiring prior consent are:
 
-1. **Northstar Financial Group**: **$54.3M** (Written consent required not less than 30 days prior to closing)
-2. **Pacific Data Systems**: **$38.5M** (Written consent required in customer's sole discretion)
-3. **Ironbridge Manufacturing**: **$18.1M** (Conditional: Consent required only if the acquirer is a competitor; deemed *not applicable* as the buyer, Vertex Capital Partners, is a financial sponsor)
-
-Additionally, **Section 9.2 of the Merger Agreement** lists different/contradictory entities and annual contract values requiring consent or providing change of control termination rights:
-4. **Northstar Defense Systems** (Master Services Agreement): **$12.4M** annual value (requires 60-day notice and consent)
-5. **Pacific Data Corp** (Technology License Agreement): **$8.7M** annual value (provides counterparty right to terminate within 90 days)
-
----
-
-### Supporting Evidence & Contract Breakdown
-
-#### 1. Disclosure Schedule 3.14(a) (Schedule of Material Customer Contracts)
-[📄 customer_contracts_schedule.txt | FY2023 | p.1 | SECTION 2: CHANGE OF CONTROL PROVISIONS]
-
-* **Northstar Financial Group**
-  * **Revenue Generated:** $54.3M (represents 12.0% of total revenue) [📄 customer_contracts_schedule.txt | FY2023 | p.1 | SECTION 1]
-  * **Provision:** Written consent required not less than 30 days prior to closing. Consent may not be unreasonably withheld. Status: **NOT YET OBTAINED**.
-* **Pacific Data Systems**
-  * **Revenue Generated:** $38.5M
-  * **Provision:** Written consent required. Customer has an absolute right to withhold consent in its sole discretion. Status: **NOT YET OBTAINED**.
-* **Ironbridge Manufacturing** *(Conditional)*
-  * **Revenue Generated:** $18.1M
-  * **Provision:** Consent required only if the acquirer is a competitor. Vertex Capital Partners is a financial sponsor and not a competitor; thus noted as **NOT APPLICABLE**.
-
-**Aggregate Consent-Exposed Revenue:**
-* Northstar Financial Group + Pacific Data Systems = **$92.8 million** (representing **20.5% of FY2023 revenue**) [📄 customer_contracts_schedule.txt | FY2023 | p.1 | SECTION 2].
-
----
-
-#### 2. Merger Agreement (Article IX / Section 9.2)
-[📄 merger_agreement_v2_final.txt | p.3 | Section 9.2 — Effect on Material Contracts]
-
-* **Northstar Defense Systems** (Master Services Agreement)
-  * **Annual Contract Value:** $12.4M
-  * **Provision:** Requires 60-day notice and consent.
-* **Pacific Data Corp** (Technology License Agreement)
-  * **Annual Contract Value:** $8.7M
-  * **Provision:** Counterparty has right to terminate within 90 days of Change of Control.
-
----
-
-### Inconsistencies & Caveats
-
-* **Document Inconsistency:** There is a notable mismatch between the disclosure schedule (`customer_contracts_schedule.txt`) and the merger agreement (`merger_agreement_v2_final.txt`):
-  * **Schedule 3.14(a)** identifies **Northstar Financial Group ($54.3M)** and **Pacific Data Systems ($38.5M)**.
-  * **Section 9.2 of the Merger Agreement** identifies **Northstar Defense Systems ($12.4M)** and **Pacific Data Corp ($8.7M)**.
-* **Missing Information / Diligence Item:** Buyer's legal team should reconcile whether "Northstar Defense Systems" and "Pacific Data Corp" are distinct legal entities or errors in drafting compared to Disclosure Schedule 3.14(a).
+* **Northstar Financial Group** ($54.3M revenue) — Requires written consent not less than 30 days prior to closing (consent may not be unreasonably withheld; consent is **not yet obtained**).
+* **Pacific Data Systems** ($38.5M revenue) — Requires written consent; the customer has an absolute right to withhold consent in its sole discretion (consent is **not yet obtained**).
+* **Ironbridge
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -1471,44 +1209,56 @@ Additionally, **Section 9.2 of the Merger Agreement** lists different/contradict
 - **Facts Recalled**: 2/2 (100.0%)
   - *Recalled*: ['AGPL', '$340,000']
 - **Citations Match**: ✅ Yes
-- **Total Latency**: 34875.00 ms
+- **Total Latency**: 176188.00 ms
 - **Answer**:
 ```
 ### 1. Direct Answer
 
-During due diligence, a software composition analysis by Black Duck identified **4 strong copyleft components (GPL/AGPL)** out of 1,847 total open source software components [📄 ip_portfolio_and_litigation_schedule.txt | p.2 | Section: SECTION 4: OPEN SOURCE SOFTWARE]. 
+A January 2024 Black Duck software composition analysis identified **1,847 open source components** in the target company's codebase, including **four strong copyleft components (GPL/AGPL)** [📄 ip_portfolio_and_litigation_schedule.txt | FY2024 | p.2 | SECTION 4: OPEN SOURCE SOFTWARE]. 
 
-* **Material Risk Identified:** An **AGPL-licensed graph rendering library** linked into the customer-facing analytics module was identified as a material finding because AGPL obligations may extend to network-delivered software [📄 ip_portfolio_and_litigation_schedule.txt | p.3 | Section: 2. An AGPL-licensed graph rendering library linked into the customer-facing].
-* **Other Strong Copyleft Components (Non-Material / Low Risk):**
-  * One GPL-licensed database driver used only in an internal build tool (not distributed to customers; no copyleft obligation triggered) [📄 ip_portfolio_and_litigation_schedule.txt | p.2 | Section: SECTION 4: OPEN SOURCE SOFTWARE].
-  * Two GPL command-line utilities invoked as separate processes (counsel advises process separation avoids derivative work treatment) [📄 ip_portfolio_and_litigation_schedule.txt | p.3 | Section: 3. and 4. Two GPL command-line utilities invoked as separate processes. Counsel].
+The primary material risk is an **AGPL-licensed graph rendering library** linked directly into the customer-facing analytics module. Because AGPL copyleft obligations can extend to network-delivered software, this presents a material legal risk to the target's proprietary software [📄 ip_portfolio_and_litigation_schedule.txt | FY2024 | p.3 | SECTION 4: OPEN SOURCE SOFTWARE]. 
 
-**Estimated Remediation Cost:** 
-* **$340,000** to replace the AGPL component, with replacement targeted for completion in **Q3 2024** [📄 ip_portfolio_and_litigation_schedule.txt | p.3 | Section: 2. An AGPL-licensed graph rendering library linked into the customer-facing].
+The estimated financial cost to remediate this issue by replacing the component is **$340,000**, with completion targeted for Q3 2024 [📄 ip_portfolio_and_litigation_schedule.txt | FY2024 | p.3 | SECTION 4: OPEN SOURCE SOFTWARE].
 
 ---
 
-### 2. Supporting Evidence with Citations
+### 2. Supporting Evidence & Analysis
 
-* **Audit Overview (January 2024 Black Duck Analysis):**
-  * Total open source components: 1,847 [📄 ip_portfolio_and_litigation_schedule.txt | p.2 | Section: SECTION 4: OPEN SOURCE SOFTWARE]
-  * Permissive licenses (MIT, Apache 2.0, BSD): 1,792 [📄 ip_portfolio_and_litigation_schedule.txt | p.2 | Section: SECTION 4: OPEN SOURCE SOFTWARE]
-  * Weak copyleft (LGPL, MPL): 51 [📄 ip_portfolio_and_litigation_schedule.txt | p.2 | Section: SECTION 4: OPEN SOURCE SOFTWARE]
-  * Strong copyleft (GPL, AGPL): 4 [📄 ip_portfolio_and_litigation_schedule.txt | p.2 | Section: SECTION 4: OPEN SOURCE SOFTWARE]
-* **Disclosure & Qualification:** Section 3.9(f) of the Merger Agreement regarding open source compliance is specifically qualified by the disclosure of the AGPL component [📄 ip_portfolio_and_litigation_schedule.txt | p.3 | Section: 3. and 4. Two GPL command-line utilities invoked as separate processes. Counsel].
+#### Open Source Breakdown
+The Black Duck software composition analysis performed in January 2024 revealed [📄 ip_portfolio_and_litigation_schedule.txt | FY2024 | p.2 | SECTION 4: OPEN SOURCE SOFTWARE]:
+* **Total Components:** 1,847
+* **Permissive Licenses (MIT, Apache 2.0, BSD):** 1,792
+* **Weak Copyleft (LGPL, MPL):** 51
+* **Strong Copyleft (GPL, AGPL):** 4
+
+#### Detail of Strong Copyleft Components & Risk Exposure
+1. **AGPL Graph Rendering Library (Material Risk):**
+   * **Usage:** Linked into the customer-facing analytics module [📄 ip_portfolio_and_litigation_schedule.txt | FY2024 | p.3 | SECTION 4: OPEN SOURCE SOFTWARE].
+   * **Risk Assessment:** AGPL terms may force the open-sourcing of proprietary source code delivered over a network [📄 ip_portfolio_and_litigation_schedule.txt | FY2024 | p.3 | SECTION 4: OPEN SOURCE SOFTWARE].
+   * **Action Plan:** The company engaged counsel and is actively replacing the component [📄 ip_portfolio_and_litigation_schedule.txt | FY2024 | p.3 | SECTION 4: OPEN SOURCE SOFTWARE].
+   * **Remediation Cost & Timeline:** Estimated at **$340,000**, targeted for Q3 2024 completion [📄 ip_portfolio_and_litigation_schedule.txt | FY2024 | p.3 | SECTION 4: OPEN SOURCE SOFTWARE].
+2. **GPL Database Driver (Low/No Risk):**
+   * **Usage:** Internal build tool only [📄 ip_portfolio_and_litigation_schedule.txt | FY2024 | p.2 | SECTION 4: OPEN SOURCE SOFTWARE].
+   * **Risk Assessment:** Not distributed to customers; no copyleft obligation is triggered [📄 ip_portfolio_and_litigation_schedule.txt | FY2024 | p.2 | SECTION 4: OPEN SOURCE SOFTWARE].
+3. & 4. **Two GPL Command-Line Utilities (Low Risk):**
+   * **Usage:** Invoked as separate processes [📄 ip_portfolio_and_litigation_schedule.txt | FY2024 | p.3 | SECTION 4: OPEN SOURCE SOFTWARE].
+   * **Risk Assessment:** Outside counsel advises that process separation avoids derivative work treatment [📄 ip_portfolio_and_litigation_schedule.txt | FY2024 | p.3 | SECTION 4: OPEN SOURCE SOFTWARE].
+
+#### Merger Agreement Impacts
+* Section 3.9(f) of the Merger Agreement (open source compliance representation) is explicitly qualified by the disclosure of the AGPL component [📄 ip_portfolio_and_litigation_schedule.txt | FY2024 | p.3 | SECTION 4: OPEN SOURCE SOFTWARE].
 
 ---
 
-### 3. Caveats, Inconsistencies, or Missing Information
+### 3. Financial Context & Normalized Values
 
-* **Caveats:** The remediation is currently in progress (targeted for completion in Q3 2024), so there is execution risk until the replacement library is fully deployed and validated in the customer-facing analytics module.
-* **Inconsistencies:** None identified in the provided context regarding open source software risks.
+* **AGPL Remediation Cost:** **$340,000** [📄 ip_portfolio_and_litigation_schedule.txt | FY2024 | p.3 | SECTION 4: OPEN SOURCE SOFTWARE]
+* **Scale Context:** This remediation expense is an isolated software engineering/legal cost targeted for resolution in Q3 2024, separate from major litigation exposures such as the *DataFlow Systems* patent suit ($3.5 million to $8.0 million probable exposure range) [📄 ip_portfolio_and_litigation_schedule.txt | FY2024 | p.2 | SECTION 2: THE DATAFLOW SYSTEMS LITIGATION].
 
 ---
 
-### 4. Normalized Financial Metrics
+### 4. Caveats, Inconsistencies, & Missing Information
 
-* **AGPL Remediation Cost:** $340,000 (Exact, USD) [📄 ip_portfolio_and_litigation_schedule.txt | p.3 | Section: 2. An AGPL-licensed graph rendering library linked into the customer-facing]
+* **Status Verification:** The schedule confirms a target replacement date in Q3 2024, but no post-remediation confirmation or progress milestone documents are provided in the context
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -1523,55 +1273,16 @@ During due diligence, a software composition analysis by Black Duck identified *
 **Query**: What happens to the revolving credit facility when the merger closes?
 
 - **Status**: ✅ PASS
-- **Confidence Score**: 1.00
-- **Validation Status**: passed
-- **Facts Recalled**: 3/3 (100.0%)
-  - *Recalled*: ['35%', '$85', 'immediately due']
-- **Citations Match**: ✅ Yes
-- **Total Latency**: 33000.00 ms
+- **Confidence Score**: 0.50
+- **Validation Status**: warning
+- **Facts Recalled**: 0/3 (0.0%)
+  - *Recalled*: []
+  - *Missing*: ['35%', '$85', 'immediately due']
+- **Citations Match**: ❌ No
+- **Total Latency**: 294500.00 ms
 - **Answer**:
 ```
-### Direct Answer
-
-Under the terms of the transaction and the existing credit facilities, the proposed merger with Vertex Capital Partners constitutes a **Change of Control** under Section 8.1(k) of the Company's Credit Agreement, triggering an automatic Event of Default. Consequently, Buyer's financing plan requires the existing **$150 million senior secured revolving credit facility** to be fully repaid and replaced upon completion of the merger. 
-
-As a condition to Buyer's obligation to close, the merger agreement requires the Company to deliver a customary **payoff letter** and **lien releases** at closing [📄 credit_agreement_summary.txt | p. 3 | Section 4: CHANGE OF CONTROL AND THE TRANSACTION].
-
----
-
-### Key Details & Closing Actions
-
-#### 1. Facility Background & Change of Control
-* **Facility Overview**: Amended and Restated Credit Agreement dated June 30, 2021; $150 million commitment ($85 million drawn, $65 million available as of December 31, 2023) with JPMorgan Chase Bank, N.A. as Administrative Agent [📄 credit_agreement_summary.txt | p. 1 | Agreement].
-* **Security**: First priority lien on substantially all assets, including a pledge of intellectual property [📄 credit_agreement_summary.txt | p. 1 | Agreement].
-* **Change of Control Trigger**: Section 8.1(k) defines an Event of Default to include any transaction where a person or group acquires >35% of the voting equity. The merger triggers this clause [📄 credit_agreement_summary.txt | p. 3 | Section 4: CHANGE OF CONTROL AND THE TRANSACTION].
-* **Impact**: All commitments terminate automatically, and all outstanding principal, accrued interest, and fees become immediately due and payable upon the change of control [📄 credit_agreement_summary.txt | p. 3 | Section 4: CHANGE OF CONTROL AND THE TRANSACTION].
-
-#### 2. Payoff, Repayment, & Closing Actions
-* **Consent Status**: The Company has **NOT** sought a consent or waiver from the lending syndicate [📄 credit_agreement_summary.txt | p. 3 | Section 4: CHANGE OF CONTROL AND THE TRANSACTION].
-* **Closing Condition**: Delivery of a customary payoff letter and full lien releases at closing is a required condition to Buyer's obligation to close [📄 credit_agreement_summary.txt | p. 3 | Section 4: CHANGE OF CONTROL AND THE TRANSACTION].
-* **Financial Payoff Obligation**:
-  * **Principal Repayment**: Full **$85,000,000** drawn balance must be repaid at closing [📄 credit_agreement_summary.txt | p. 3 | Consequence for the transaction].
-  * **Prepayment Penalties**: None [📄 credit_agreement_summary.txt | p. 3 | Consequence for the transaction].
-  * **Interest & Breakage Costs**: Accrued interest plus a breakage indemnity for any SOFR period terminated mid-period are payable at closing (estimated breakage cost: less than **$50,000**) [📄 credit_agreement_summary.txt | p. 3 | Consequence for the transaction].
-
----
-
-### Financial Summary & Scale Context
-
-| Metric / Obligation | Value | Source |
-| :--- | :--- | :--- |
-| **Total Facility Commitment** | $150,000,000 | [📄 credit_agreement_summary.txt \| p. 1 \| Agreement] |
-| **Drawn Balance to Repay at Closing** | $85,000,000 | [📄 credit_agreement_summary.txt \| p. 1 \| Agreement] |
-| **Available Credit** | $65,000,000 | [📄 credit_agreement_summary.txt \| p. 1 \| Agreement] |
-| **Estimated Breakage Indemnity** | < $50,000 | [📄 credit_agreement_summary.txt \| p. 3 \| Consequence for the transaction] |
-| **Prepayment Penalty** | $0 (None) | [📄 credit_agreement_summary.txt \| p. 3 \| Consequence for the transaction] |
-
----
-
-### Caveats & Missing Information
-
-* The specific section numbers within `merger_agreement_v2_final.txt` governing the delivery of the payoff letter and debt financing cooperation are summarized in the credit agreement summary document, but the verbatim contractual provisions/clause text from the Merger Agreement itself were not included in the provided text chunks.
+I could not generate an answer for this question because the language model did not return a usable response. The retrieved context may still be relevant — please retry the query.
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -1591,69 +1302,48 @@ As a condition to Buyer's obligation to close, the merger agreement requires the
 - **Facts Recalled**: 4/4 (100.0%)
   - *Recalled*: ['20.5%', '19.2%', '21.9%', '19.1%']
 - **Citations Match**: ✅ Yes
-- **Total Latency**: 37625.00 ms
+- **Total Latency**: 112328.00 ms
 - **Answer**:
 ```
 ### 1. Direct Answer
-Aurora's EBITDA margins expanded from **FY2022 to FY2023** across both reported and adjusted metrics, driven by revenue growth and operational performance:
 
-* **FY2022:**
-  * **Reported EBITDA Margin:** **19.1%** (Company Financials) / **19.2%** (Quality of Earnings Report)
-  * **Adjusted EBITDA Margin:** **19.1%** (Company Financials) / **19.1%** (Quality of Earnings Report)
-* **FY2023:**
-  * **Reported EBITDA Margin:** **20.5%** (Both sources)
-  * **Adjusted EBITDA Margin:** **21.5%** (Company Financials - excluding restructuring) / **21.9%** (Quality of Earnings Report - full quality of earnings adjustments)
+Aurora's EBITDA margins expanded from FY2022 to FY2023 across both reported and adjusted metrics. However, there are notable differences between the figures presented in **Aurora's Company Financial Statements** and the **Quality of Earnings (QoE) Report**:
 
----
-
-### 2. Supporting Evidence & Reconciliation
-
-#### **A. Company Financial Statements (`aurora_financials_fy2023.txt`)**
-* **Revenue Base:** $387.1 million (FY2022) | $452.8 million (FY2023) [📄 aurora_financials_fy2023.txt | FY2023/FY2022 | p. 1 | Consolidated Income Statement]
-* **FY2022 Metrics:**
-  * **Reported EBITDA:** $74.0 million → **Reported EBITDA Margin: 19.1%** [📄 aurora_financials_fy2023.txt | FY2022 | p. 2 | EBITDA Reconciliation]
-  * **Restructuring Add-back:** $0.0 million
-  * **Adjusted EBITDA:** $74.0 million → **Adjusted EBITDA Margin: 19.1%** [📄 aurora_financials_fy2023.txt | FY2022 | p. 2 | Adjusted EBITDA]
-* **FY2023 Metrics:**
-  * **Reported EBITDA:** $92.8 million → **Reported EBITDA Margin: 20.5%** [📄 aurora_financials_fy2023.txt | FY2023 | p. 2 | EBITDA Reconciliation]
-  * **Restructuring Add-back:** $4.5 million
-  * **Adjusted EBITDA:** $97.3 million → **Adjusted EBITDA Margin: 21.5%** [📄 aurora_financials_fy2023.txt | FY2023 | p. 2 | Adjusted EBITDA]
+* **EBITDA Margin (Reported):**
+  * **FY2022:** **19.1%** per Company Financial Statements ($74.0M EBITDA) / **19.2%** per QoE Report ($74.2M EBITDA).
+  * **FY2023:** **20.5%** per both sources ($92.8M EBITDA on $452.8M Revenue).
+* **Adjusted EBITDA Margin:**
+  * **FY2022:** **19.1%** per both sources (Company: $74.0M; QoE: $73.8M).
+  * **FY2023:** **21.5%** per Company Financial Statements ($97.3M Adjusted EBITDA) / **21.9%** per QoE Report ($99.0M Adjusted EBITDA).
 
 ---
 
-#### **B. Quality of Earnings (QoE) Report (`quality_of_earnings_report_fy2023.txt`)**
-* **FY2022 Metrics:**
-  * **Reported EBITDA:** $74.2 million → **Reported EBITDA Margin: 19.2%** [📄 quality_of_earnings_report_fy2023.txt | FY2022 | p. 1 | Section 1]
-  * **Adjusted EBITDA:** $73.8 million → **Adjusted EBITDA Margin: 19.1%** [📄 quality_of_earnings_report_fy2023.txt | FY2022 | p. 2 | Section 2]
-* **FY2023 Metrics:**
-  * **Reported EBITDA:** $92.8 million → **Reported EBITDA Margin: 20.5%** [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p. 1 | Section 1]
-  * **Adjusted EBITDA:** $99.0 million → **Adjusted EBITDA Margin: 21.9%** [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p. 2 | Section 2]
+### 2. Detailed Breakdown & Supporting Evidence
 
----
+#### **FY2022 Comparison**
+* **Company Financial Statements:**
+  * **Revenue:** $387.1 million [📄 aurora_financials_fy2023.txt | FY2022 | p.1 | CONSOLIDATED INCOME STATEMENT]
+  * **Reported EBITDA:** $74.0 million [📄 aurora_financials_fy2023.txt | FY2022 | p.2 | KEY FINANCIAL METRICS AND NOTES]
+  * **Reported EBITDA Margin:** **19.1%** [📄 aurora_financials_fy2023.txt | FY2022 | p.2 | KEY FINANCIAL METRICS AND NOTES]
+  * **Adjusted EBITDA:** $74.0 million (no restructuring add-back in FY2022) [📄 aurora_financials_fy2023.txt | FY2022 | p.2 | KEY FINANCIAL METRICS AND NOTES]
+  * **Adjusted EBITDA Margin:** **19.1%** [📄 aurora_financials_fy2023.txt | FY2022 | p.2 | KEY FINANCIAL METRICS AND NOTES]
+* **Quality of Earnings Report:**
+  * **Reported EBITDA:** $74.2 million [📄 quality_of_earnings_report_fy2023.txt | FY2022 | p.1 | Section 1]
+  * **Reported EBITDA Margin:** **19.2%** [📄 quality_of_earnings_report_fy2023.txt | FY2022 | p.1 | Section 1]
+  * **Adjusted EBITDA:** $73.8 million [📄 quality_of_earnings_report_fy2023.txt | FY2022 | p.2 | Adjusted EBITDA]
+  * **Adjusted EBITDA Margin:** **19.1%** [📄 quality_of_earnings_report_fy2023.txt | FY2022 | p.2 | Adjusted EBITDA Margin]
 
-### 3. Inconsistencies and Caveats
-
-1. **Discrepancy in FY2022 Reported EBITDA:**
-   * `aurora_financials_fy2023.txt` reports FY2022 EBITDA as **$74.0 million (19.1% margin)**.
-   * `quality_of_earnings_report_fy2023.txt` reports FY2022 EBITDA as **$74.2 million (19.2% margin)**.
-
-2. **Discrepancy in FY2023 Adjusted EBITDA / Adjusted EBITDA Margin:**
-   * The **Company's Financial Statements** define Adjusted EBITDA strictly by adding back restructuring charges ($4.5 million), yielding **$97.3 million (21.5% margin)**.
-   * The **QoE Report** includes additional normalization adjustments (e.g., DataFlow legal fees add-back of $2.8M, capitalized software adjustments, founder compensation), yielding a higher Adjusted EBITDA of **$99.0 million (21.9% margin)**.
-
-3. **Qualification of QoE Adjustments:**
-   * The QoE Report notes that the DataFlow legal fee add-back ($2.8 million) is qualified; if litigation continues into FY2024, FY2023 Adjusted EBITDA will be overstated by that amount [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p. 3 | Section 6].
-
----
-
-### 4. Summary Table with Scale Context (in $ Millions)
-
-| Metric | FY2022 (Company) | FY2022 (QoE) | FY2023 (Company) | FY2023 (QoE) |
-| :--- | :--- | :--- | :--- | :--- |
-| **Revenue** | $387.1M | $387.1M | $452.8M | $452.8M |
-| **Reported EBITDA** | $74.0M | $74.2M | $92.8M | $92.8M |
-| **Reported EBITDA Margin** | **19.1%** | **19.2%** | **20.5%** | **20.5%** |
-| **Adjusted EBITDA** | $
+#### **FY2023 Comparison**
+* **Company Financial Statements:**
+  * **Revenue:** $452.8 million [📄 aurora_financials_fy2023.txt | FY2023 | p.1 | CONSOLIDATED INCOME STATEMENT]
+  * **Reported EBITDA:** $92.8 million [📄 aurora_financials_fy2023.txt | FY2023 | p.2 | KEY FINANCIAL METRICS AND NOTES]
+  * **Reported EBITDA Margin:** **20.5%** [📄 aurora_financials_fy2023.txt | FY2023 | p.2 | KEY FINANCIAL METRICS AND NOTES]
+  * **Add-back:** $4.5 million Restructuring Charges [📄 aurora_financials_fy2023.txt | FY2023 | p.2 | KEY FINANCIAL METRICS AND NOTES]
+  * **Adjusted EBITDA:** $97.3 million [📄 aurora_financials_fy2023.txt | FY2023 | p.2 | KEY FINANCIAL METRICS AND NOTES]
+  * **Adjusted EBITDA Margin:** **21.5%** [📄 aurora_financials_fy2023.txt | FY2023 | p.2 | KEY FINANCIAL METRICS AND NOTES]
+* **Quality of Earnings Report:**
+  * **Reported EBITDA:** $92.8 million [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.1 | Section 1]
+  * **Reported EBITDA Margin:** **20.5%** [📄 quality_of_earnings_report_fy2023.txt | FY2023 |
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -1670,31 +1360,38 @@ Aurora's EBITDA margins expanded from **FY2022 to FY2023** across both reported 
 - **Status**: ✅ PASS
 - **Confidence Score**: 1.00
 - **Validation Status**: passed
-- **Facts Recalled**: 2/5 (40.0%)
-  - *Recalled*: ['2.0x', '1.5x']
-  - *Missing*: ['3.0x', '2.5x', 'Elena Marsh']
+- **Facts Recalled**: 3/5 (60.0%)
+  - *Recalled*: ['2.0x', '1.5x', 'Elena Marsh']
+  - *Missing*: ['3.0x', '2.5x']
 - **Citations Match**: ✅ Yes
-- **Total Latency**: 24500.00 ms
+- **Total Latency**: 47235.00 ms
 - **Answer**:
 ```
-### Direct Answer
-The provided context **does not contain the specific change of control severance multiples** for each of Aurora's executive officers. 
-
-While the documentation establishes that all five named executive officers have employment agreements with "double trigger" severance provisions, the specific numerical multiples and costs associated with each executive officer are omitted/cut off in the provided text.
+### 1. Direct Answer
+The provided context **does not contain sufficient information** to compare the specific change of control severance multipliers for each of Aurora's executive officers. While the documents establish that all five named executive officers are subject to "double trigger" change of control employment agreements, the specific multiplier figures (e.g., 2.0x, 1.5x) for individual officers are missing from the text provided.
 
 ---
 
-### Supporting Evidence with Citations
-
-* **Double-Trigger Requirement:** All five named executive officers have employment agreements containing a "double trigger" change of control severance provision. Severance is payable only if an executive is terminated without cause or resigns for good reason within 24 months following a change of control [📄 employment_and_retention_agreements.txt | p.1 | Section: Each named executive officer is party to an employment agreement providing for].
-* **Missing Severance Data:** Page 1 of the agreement schedule includes the heading *"Severance multiples and estimated cost, assuming all five executives are terminated immediately following closing:"* [📄 employment_and_retention_agreements.txt | p.1 | Section: Severance multiples and estimated cost, assuming all five executives are], but the text/table detailing the officer names, individual multiples (e.g., 2.0x, 1.5x), and payout estimates is missing from the chunk.
-* **Key Executive Status:** Dr. James Wu (first/sole inventor on 12 issued patents) has not executed a post-closing employment agreement with buyer Vertex Capital Partners, which has been identified as a material integration risk [📄 employment_and_retention_agreements.txt | p.2 | Section: Dr. Wu has NOT executed a post-closing employment agreement with Vertex Capital; 📄 ip_portfolio_and_litigation_schedule.txt | p.1 | Section: SECTION 1: PATENT PORTFOLIO].
+### 2. Supporting Evidence
+* **Structure & Scope of Agreements**: All five named executive officers are party to double-trigger employment agreements, under which severance is payable only if the executive is terminated without cause or resigns for good reason within 24 months after a change of control [📄 employment_and_retention_agreements.txt | p.1 | Each named executive officer is party to an employment agreement providing for].
+* **Executive Context**:
+  * **CEO Elena Marsh**: Has indicated an intention to depart at closing, meaning her severance is expected to be triggered [📄 employment_and_retention_agreements.txt | p.2 | CEO Elena Marsh has indicated she intends to depart at closing. Her severance is].
+  * **Dr. James Wu**: Has not executed a post-closing employment agreement with Vertex Capital Partners (noted as a material integration risk), though management represents he verbally indicated a willingness to remain for a transition period of at least 12 months [📄 employment_and_retention_agreements.txt | p.2 | Dr. Wu has NOT executed a post-closing employment agreement with Vertex Capital].
 
 ---
 
-### Missing Information & Caveats
+### 3. Caveats, Inconsistencies, & Missing Information
+* **Missing Information**: 
+  * The section titled *"Severance multiples and estimated cost, assuming all five executives are terminated immediately following closing:"* is truncated in the provided context [📄 employment_and_retention_agreements.txt | p.1 | Severance multiples and estimated cost, assuming all five executives are]. Consequently, individual severance multipliers, individual executive titles/names (beyond CEO Elena Marsh and Dr. James Wu), and baseline salary/bonus figures are completely absent.
+  * No separate severance plans are documented or detailed in the provided chunks beyond these individual employment agreements.
+* **Inconsistencies**: None noted among the provided chunks.
 
-* **Insufficient Context:** To fully answer this question, the complete table or text following the header on Page 1 of `employment_and_retention_agreements.txt` (listing each named executive officer alongside their specific salary/bonus severance multiple and estimated cash payout) is required.
+---
+
+### 4. Financial & Scale Context
+* **Equity Acceleration Costs**: While severance cash multipliers are missing, equity plan acceleration metrics at closing are provided across named executives and other employees:
+  * **Unvested Options Acceleration Cost**: $11,545,000 across named executives ($4,180,000 for all other employees) [📄 employment_and_retention_agreements.txt | p.2 | At the effective time, each outstanding option and restricted stock unit will be].
+  * **Total Equity Plan Cost at Closing**: $15,725,000 across all holders [📄 employment_and_retention_agreements.txt | p.2 | Total equity plan cost at closing across all holders: $15,725,000.].
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -1711,51 +1408,20 @@ While the documentation establishes that all five named executive officers have 
 - **Status**: ✅ PASS
 - **Confidence Score**: 1.00
 - **Validation Status**: passed
-- **Facts Recalled**: 3/3 (100.0%)
-  - *Recalled*: ['Hart-Scott-Rodino', '$260,000', '30 calendar days']
-- **Citations Match**: ✅ Yes
-- **Total Latency**: 34000.00 ms
+- **Facts Recalled**: 1/3 (33.3%)
+  - *Recalled*: ['Hart-Scott-Rodino']
+  - *Missing*: ['$260,000', '30 calendar days']
+- **Citations Match**: ❌ No
+- **Total Latency**: 172547.00 ms
 - **Answer**:
 ```
 ### 1. Direct Answer
 
-Under Article VI of the Merger Agreement between **Aurora Technologies Inc.** and **Vertex Capital Partners LLC**, the regulatory conditions to closing are:
-1. **Expiration or early termination of the Hart-Scott-Rodino (HSR) Act waiting period.**
-2. **Absence of any injunction or order** prohibiting the transaction.
-3. **Absence of any law enacted after signing** that makes the transaction illegal.
+Under Article VI of the Merger Agreement, the closing of the transaction is subject to specific regulatory conditions and government clearances:
 
-No foreign investment or national security filings/approvals are required. Additionally, while delivery of credit facility payoff letters and lien releases is a closing condition to Buyer's obligations, customer consents do not serve as closing conditions (that risk sits with the Buyer post-closing).
-
----
-
-### 2. Supporting Evidence & Regulatory Details
-
-#### A. Regulatory Closing Conditions (Article VI)
-* **HSR Act Expiration/Termination:** The regulatory condition requires the expiration or early termination of the HSR waiting period [📄 regulatory_and_data_privacy_memo.txt | p.3 | SECTION 4: CONDITIONS TO CLOSING].
-* **No Legal Impediment:** No injunction, order, or law enacted after signing prohibiting or making the transaction illegal [📄 regulatory_and_data_privacy_memo.txt | p.3 | SECTION 4: CONDITIONS TO CLOSING].
-
-#### B. HSR Act Regulatory Filing Details
-* **Reportability:** The transaction is reportable under the Hart-Scott-Rodino Antitrust Improvements Act because the transaction value of approximately **$696 million** exceeds size-of-transaction thresholds, and both parties exceed size-of-person thresholds [📄 regulatory_and_data_privacy_memo.txt | p.1 | SECTION 1: ANTITRUST AND MERGER CONTROL].
-* **Filing Date & Fees:**
-  * Filed on: **March 20, 2024** [📄 regulatory_and_data_privacy_memo.txt | p.1 | SECTION 1: ANTITRUST AND MERGER CONTROL].
-  * Filing Fee: **$260,000** (for $500M to $1B tier) [📄 regulatory_and_data_privacy_memo.txt | p.1 | SECTION 1: ANTITRUST AND MERGER CONTROL].
-  * Fee Allocation: **Buyer pays 100%** per the merger agreement [📄 regulatory_and_data_privacy_memo.txt | p.1 | SECTION 1: ANTITRUST AND MERGER CONTROL].
-* **Waiting Period:** 30 calendar days, set to expire on **April 19, 2024** (absent a Second Request) [📄 regulatory_and_data_privacy_memo.txt | p.1 | SECTION 1: ANTITRUST AND MERGER CONTROL].
-* **Substantive Risk Assessment:** Counsel assesses the likelihood of a Second Request as **low** because Vertex Capital Partners is a financial sponsor with no existing portfolio company in enterprise data analytics, resulting in no horizontal overlap or vertical relationship [📄 regulatory_and_data_privacy_memo.txt | p.1 | SECTION 1: ANTITRUST AND MERGER CONTROL].
-
-#### C. Foreign & Other Governmental Consents
-* **Foreign Investment / National Security:** **No foreign investment or national security filings are required.** Aurora holds no government contracts, no facility security clearances, and no controlled technology subject to ITAR or EAR (other than mass-market encryption eligible for License Exception ENC) [📄 regulatory_and_data_privacy_memo.txt | p.2 | SECTION 2: DATA PRIVACY POSTURE].
-
-#### D. Non-Regulatory Closing Conditions & Financing Payoff
-* **Payoff Letter & Lien Releases:** Delivery of a customary payoff letter and lien releases for the Company's credit facility at closing is a condition to Buyer's obligation to close [📄 credit_agreement_summary.txt | p.3 | Section: The Company has NOT sought a consent].
-
----
-
-### 3. Outside Date & Extensions
-
-* **Outside Date:** Section 7.1(b) sets the outside date as **December 31, 2024** [📄 regulatory_and_data_privacy_memo.txt | p.4 | SECTION 5: OUTSIDE DATE AND TERMINATION].
-* **Automatic Extension:** Subject to a **single automatic extension of 90 days** if the only unsatisfied condition is the HSR waiting period [📄 regulatory_and_data_privacy_memo.txt | p.4 | SECTION 5: OUTSIDE DATE AND TERMINATION].
-* **Headroom:** Counsel notes that this provides substantial
+*   **Antitrust / HSR Clearance**: Expiration or early termination of the Hart-Scott-Rodino (HSR) Act waiting period is a mandatory condition to closing.
+*   **Absence of Legal Restraints**: No injunction or order prohibiting the transaction may be in effect, and no law enacted after signing may make the transaction illegal.
+*   **Government Agency Consents & Foreign Investment**:
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -1770,60 +1436,20 @@ No foreign investment or national security filings/approvals are required. Addit
 **Query**: Summarize the key person dependency risk at Aurora.
 
 - **Status**: ✅ PASS
-- **Confidence Score**: 1.00
-- **Validation Status**: passed
-- **Facts Recalled**: 3/3 (100.0%)
-  - *Recalled*: ['James Wu', '12', 'non-competition']
-- **Citations Match**: ✅ Yes
-- **Total Latency**: 44796.00 ms
+- **Confidence Score**: 0.85
+- **Validation Status**: warning
+- **Facts Recalled**: 1/3 (33.3%)
+  - *Recalled*: ['James Wu']
+  - *Missing*: ['12', 'non-competition']
+- **Citations Match**: ❌ No
+- **Total Latency**: 199094.00 ms
 - **Answer**:
 ```
-### 1. Direct Answer
+Wu's patents: [📄 ip_portfolio_and_litigation_schedule.txt | FY2023 | p.2 | SECTION 2: THE DATAFLOW SYSTEMS LITIGATION | N/A]
 
-Aurora Technologies Inc. faces significant **key person dependency and retention risks** surrounding its core technical and executive leadership—specifically **CTO Dr. James Wu**, who holds 12 critical patents and has not executed a post-closing employment agreement. Additionally, **CEO Elena Marsh** intends to depart at closing. 
+Let's double-check all details to ensure accuracy and strict adherence to rules. Everything looks precise.### 1. Direct Answer
 
-To manage post-closing risk and operational continuity, the Board approved a **$6,500,000 non-executive retention pool** covering 77 critical employees, alongside a **$4,500,000 CTO retention package** noted in strategic review materials. However, enforcement of Dr. Wu’s 12-month non-compete remains uncertain due to his California residency.
-
----
-
-### 2. Detailed Findings & Supporting Evidence
-
-#### A. Key Person Dependency & Executive Retention Risks
-* **CTO Dr. James Wu:**
-  * **Patent Concentration:** Dr. Wu holds 12 critical patents vital to Aurora's enterprise data analytics platform [📄 board_deck_strategic_review_mar2024.txt | Slide 1 | Competitive Risks].
-  * **Unexecuted Post-Closing Agreement:** Buyer (Vertex Capital Partners) has identified Dr. Wu's unexecuted post-closing agreement as a **material integration risk**. Dr. Wu has only verbally indicated willingness to remain for a transition period of not less than 12 months, which is undocumented [📄 employment_and_retention_agreements.txt | p. 2 | Section 4].
-  * **CTO Retention Package:** Board strategic materials outline a proposed $4,500,000 CTO retention package through the transition [📄 board_deck_strategic_review_mar2024.txt | p. 3 | Key Risk Factors].
-* **CEO Elena Marsh:**
-  * Has indicated an intention to depart at closing, which is expected to trigger her severance package [📄 employment_and_retention_agreements.txt | p. 2 | Section 4].
-* **Executive Above-Market Compensation:** CEO Elena Marsh and CTO Dr. James Wu received aggregate cash compensation approximately $1,900,000 above the 75th percentile benchmark [📄 quality_of_earnings_report_fy2023.txt | p. 2 | Note 4].
-
-#### B. Restrictive Covenants & Executive Employment Agreements
-* **Double-Trigger Severance:** All 5 named executive officers are covered by employment agreements with double-trigger severance (payable if terminated without cause or resigning for good reason within 24 months post-change of control) [📄 employment_and_retention_agreements.txt | p. 1 | Section 1].
-* **Dr. Wu's Restrictive Covenants:**
-  * **Non-Competition:** 12 months post-termination covenant, enforceable in Delaware but of **uncertain enforceability in California**, where Dr. Wu resides [📄 employment_and_retention_agreements.txt | p. 2 | Section 4].
-  * **Non-Solicitation:** 24-month non-solicitation covenant [📄 employment_and_retention_agreements.txt | p. 2 | Section 4].
-  * **Inventions Assignment:** Assignment-of-inventions clause covering all work product [📄 employment_and_retention_agreements.txt | p. 2 | Section 4].
-
-#### C. Non-Executive Critical Personnel Retention Pool
-On March 1, 2024, the Board approved a **$6,500,000 retention pool** for 77 non-executive employees critical to post-closing continuity [📄 employment_and_retention_agreements.txt | p. 2 | Section 3]:
-
-| Department | Covered Employees | Allocation |
-| :--- | :--- | :--- |
-| **Engineering** | 41 employees | $3,900,000 |
-| **Customer Success** | 18 employees | $1,300,000 |
-| **Finance and Operations** | 11 employees | $780,000 |
-| **Other** | 7 employees | $520,000 |
-| **Total** | **77 employees** | **$6,500,000** |
-
-* **Vesting Schedule:** Vests 50% at 12 months post-closing and 50% at 24 months post-closing, subject to continued employment [📄 employment_and_retention_agreements.txt | p. 2 | Section 3].
-* **Funding Context:** Funded directly by Aurora and not deducted from merger consideration [📄 employment_and_retention_agreements.txt | p. 2 | Section 3].
-
----
-
-### 3. Key Risks, Caveats & Missing Information
-
-1. **Enforceability of Non-Compete:** Because Dr. Wu resides in California, the 12-month post-termination non-competition clause faces legal enforceability risks under California law despite being governed/enforceable in Delaware [📄 employment_and_retention_agreements.txt | p. 2 | Section 4].
-2. **Undocumented Transition Commitment:** Dr. Wu’s agreement to stay for a 12-month transition relies entirely on a verbal representation and is not formally documented [📄 employment_and_retention_agreements.txt | p. 2
+Aurora Technologies Inc. faces significant key personnel retention and founder dependency risks, particularly surrounding its technical leadership. CEO Elena Marsh plans to depart upon closing (triggering severance), while CTO Dr. James Wu—who holds 1
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -1838,65 +1464,32 @@ On March 1, 2024, the Board approved a **$6,500,000 retention pool** for 77 non-
 **Query**: What is the implied EV/EBITDA multiple on adjusted EBITDA rather than reported EBITDA?
 
 - **Status**: ✅ PASS
-- **Confidence Score**: 1.00
-- **Validation Status**: passed
-- **Facts Recalled**: 3/3 (100.0%)
-  - *Recalled*: ['$696', '$99.0', '$92.8']
+- **Confidence Score**: 0.85
+- **Validation Status**: warning
+- **Facts Recalled**: 2/3 (66.7%)
+  - *Recalled*: ['$99.0', '$92.8']
+  - *Missing*: ['$696']
 - **Citations Match**: ✅ Yes
-- **Total Latency**: 47266.00 ms
+- **Total Latency**: 31219.00 ms
 - **Answer**:
 ```
-### **1. Direct Answer**
+### 1. Direct Answer
+The exact numerical implied **Enterprise Value to Adjusted EBITDA multiple** for the 2024 Aurora–Vertex transaction **cannot be calculated** because the Enterprise Value (or transaction purchase price/equity valuation) is **missing from the provided context chunks**.
 
-Substituting reported EBITDA with Adjusted EBITDA lowers the implied transaction multiple for the Aurora Vertex deal from **7.50x** (based on reported EBITDA) to:
-* **7.03x** using the Grant Thornton Quality of Earnings (QoE) Adjusted EBITDA of **$99.0 million**.
-* **7.15x** using Management's Adjusted EBITDA of **$97.3 million**.
+However, based on the provided financial reports:
+* **Reported EBITDA (FY2023):** $92.8 million
+* **Adjusted EBITDA (FY2023):** $99.0 million (Quality of Earnings Report) / $97.3 million (Management Financials)
 
----
-
-### **2. Supporting Evidence & Computations**
-
-#### **Key Inputs:**
-* **Transaction Value / Enterprise Value:** **$696.0 million** [📄 regulatory_and_data_privacy_memo.txt | FY2024 | p.1 | Section 1: Antitrust and Merger Control]
-* **FY2023 Reported EBITDA:** **$92.8 million** [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.1 | Section 2] [📄 aurora_financials_fy2023.txt | FY2023 | p.2 | Key Financial Metrics]
-* **FY2023 QoE Adjusted EBITDA (Grant Thornton):** **$99.0 million** [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.2 | Section 2]
-* **FY2023 Company Adjusted EBITDA (Management):** **$97.3 million** [📄 aurora_financials_fy2023.txt | FY2023 | p.2 | Key Financial Metrics]
-
-#### **Implied Multiples:**
-1. **Implied Multiple on Reported EBITDA:**
-   $$\frac{\$696.0\text{ million}}{\$92.8\text{ million}} = 7.50\text{x}$$
-   [📊 regulatory_and_data_privacy_memo.txt & aurora_financials_fy2023.txt | COMPUTED: EV to Reported EBITDA multiple for FY2023]
-
-2. **Implied Multiple on QoE Adjusted EBITDA (Primary):**
-   $$\frac{\$696.0\text{ million}}{\$99.0\text{ million}} = 7.0303...\text{x} \approx 7.03\text{x}$$
-   [📊 regulatory_and_data_privacy_memo.txt & quality_of_earnings_report_fy2023.txt | COMPUTED: EV to QoE Adjusted EBITDA multiple for FY2023]
-
-3. **Implied Multiple on Management Adjusted EBITDA:**
-   $$\frac{\$696.0\text{ million}}{\$97.3\text{ million}} = 7.1531...\text{x} \approx 7.15\text{x}$$
-   [📊 regulatory_and_data_privacy_memo.txt & aurora_financials_fy2023.txt | COMPUTED: EV to Management Adjusted EBITDA multiple for FY2023]
+Substituting Reported EBITDA ($92.8 million) with Adjusted EBITDA ($99.0 million) increases the EBITDA denominator by **$6.2 million**, which produces a **materially lower implied valuation multiple** for any given Enterprise Value [📄 quality_of_earnings_report_fy2023.txt | p. 3 | Section 6: Key Observations for the Buyer].
 
 ---
 
-### **3. Normalized Financial Summary**
+### 2. Supporting Evidence with Citations
 
-| Metric | Amount (USD) | Scale Context | Source / Citation |
-| :--- | :--- | :--- | :--- |
-| **Transaction Value** | $696,000,000 | Millions ($696.0M) | [📄 regulatory_and_data_privacy_memo.txt \| p.1] |
-| **Reported EBITDA (FY2023)** | $92,800,000 | Millions ($92.8M) | [📄 quality_of_earnings_report_fy2023.txt \| p.1] |
-| **Management Adjusted EBITDA (FY2023)** | $97,300,000 | Millions ($97.3M) | [📄 aurora_financials_fy2023.txt \| p.2] |
-| **QoE Adjusted EBITDA (FY2023)** | $99,000,000 | Millions ($99.0M) | [📄 quality_of_earnings_report_fy2023.txt \| p.2] |
-
----
-
-### **4. Caveats & Inconsistencies**
-
-1. **Discrepancy in Adjusted EBITDA Definition:**
-   * **Company Financials** state Adjusted EBITDA is **$97.3 million**, which only adds back restructuring charges of **$4.5 million** to reported EBITDA [📄 aurora_financials_fy2023.txt | FY2023 | p.2 | Key Financial Metrics].
-   * **QoE Report (Grant Thornton)** calculates Adjusted EBITDA at **$99.0 million**, representing a net **$6.2 million** add-back above reported EBITDA [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | Section 6].
-
-2. **Qualifying Risks to QoE Adjusted EBITDA:**
-   * The **DataFlow legal fee add-back ($2.8 million)** is qualified; if litigation continues into FY2024, Adjusted EBITDA would be overstated by $2.8 million [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | Section 6].
-   * Founder compensation normalization assumes both founders remain; if either departs, market replacement costs could reduce
+* **Reported EBITDA (FY2023):** $92.8 million [📄 quality_of_earnings_report_fy2023.txt | p. 1 | Section 2] [📄 aurora_financials_fy2023.txt | p. 2 | Key Financial Metrics and Notes]
+* **Adjusted EBITDA (FY2023 per QoE Report):** $99.0 million [📄 quality_of_earnings_report_fy2023.txt | p. 2 | Section 2] [📄 quality_of_earnings_report_fy2023.txt | p. 3 | Section 6]
+* **Difference in EBITDA:** Adjusted EBITDA exceeds Reported EBITDA by $6.2 million ($99.0M - $92.8M = $6.2M), resulting in a materially lower implied transaction multiple [📄 quality_of_earnings_report_fy2023.txt | p. 3 | Section 6].
+* **Net Debt Context (FY2023):** Total Debt of $110.0 million less Cash and Cash Equivalents of $89.4 million yields Net Debt of $
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -1911,71 +1504,39 @@ Substituting reported EBITDA with Adjusted EBITDA lowers the implied transaction
 **Query**: What is the total cash required at closing for executive severance, the retention pool, and repaying the revolver?
 
 - **Status**: ✅ PASS
-- **Confidence Score**: 0.85
-- **Validation Status**: warning
-- **Facts Recalled**: 1/3 (33.3%)
-  - *Recalled*: ['$6,500,000']
-  - *Missing*: ['$9,065,750', '$85']
+- **Confidence Score**: 0.20
+- **Validation Status**: failed
+- **Facts Recalled**: 3/3 (100.0%)
+  - *Recalled*: ['$9,065,750', '$6,500,000', '$85']
 - **Citations Match**: ✅ Yes
-- **Total Latency**: 38640.00 ms
+- **Total Latency**: 130297.00 ms
 - **Answer**:
 ```
-### Direct Answer
+### 1. Direct Answer
 
-Based on the provided M&A due diligence documents, here are the details regarding the sources and uses of cash at closing, executive severance payments, retention bonus pool funding, and revolver debt payoff:
+The aggregate direct cash amount required at closing to fund executive cash severance, the retention pool, and the repayment of the revolving credit facility principal is **$100,565,750** (or approximately **$100.57 million**), excluding accrued interest and estimated breakage costs of less than $50,000. 
 
-1. **Sources and Uses of Cash / Transaction Value:**
-   - **Transaction Value / Price:** Approximately $696,000,000, with merger consideration set at $58.00 per share in cash.
-   - **Equity Plan Cashout:** Total cost of $15,725,000 at closing to settle options and restricted stock units.
-   - **HSR Filing Fee:** $260,000, allocated 100% to the Buyer (Vertex Capital Partners).
-   - *Note:* A consolidated Sources and Uses table is not provided in the context; however, individual cash requirements at closing are outlined below.
-
-2. **Executive Severance Payments:**
-   - CEO Elena Marsh intends to depart at closing, which will trigger her severance agreement.
-   - The unvested equity acceleration cost for named executives is $11,545,000 (part of the total $15,725,000 equity plan payout).
-   - Specific non-equity severance cash amounts/multiples for the executive team are omitted/truncated in the provided context.
-
-3. **Retention Bonus Pool Funding:**
-   - **Amount:** $6,500,000 approved by the Board on March 1, 2024 for 77 non-executive employees.
-   - **Funding Source:** Funded directly by the Company and **not** deducted from the merger consideration.
-   - **Vesting Terms:** 50% payable at 12 months post-closing and 50% at 24 months post-closing, contingent on continued employment.
-
-4. **Revolver Debt Payoff Amount:**
-   - **Drawn Principal:** $110,000,000 drawn as of December 31, 2023 under the $150,000,000 senior secured revolving credit facility with JPMorgan Chase.
-   - **Payoff Obligation:** The merger constitutes a Change of Control under Section 8.1(k) of the Credit Agreement, causing all commitments to terminate and making all outstanding principal ($110,000,000 as of Dec 31, 2023), accrued interest, and fees immediately due and payable at closing via a customary payoff letter.
+A breakdown of the cash required for each component is as follows:
+* **Executive Cash Severance:** **$9,065,750**
+* **Retention Pool:** **$6,500,000**
+* **Revolver Principal Repayment:** **$85,000,000**
 
 ---
 
-### Supporting Evidence & Citations
+### 2. Supporting Evidence & Component Breakdown
 
-#### 1. Sources and Uses / Transaction Value
-* **Transaction Value:** "The transaction value of approximately $696 million exceeds the size-of-transaction threshold..." [📄 regulatory_and_data_privacy_memo.txt | p.1 | SECTION 1: ANTITRUST AND MERGER CONTROL]
-* **Merger Consideration:** "Each share of Company Common Stock issued and outstanding immediately prior to the Effective Time shall be converted into the right to receive $58.00 per share in cash..." [📄 merger_agreement_v2_final.txt | p.1 | Section 1.2 — Consideration]
-* **HSR Filing Fee Allocation:** Fee of $260,000 with allocation per merger agreement: "Buyer pays 100%" [📄 regulatory_and_data_privacy_memo.txt | p.1 | SECTION 1: ANTITRUST AND MERGER CONTROL]
-* **Equity Plan Cashout:** "Total equity plan cost at closing across all holders: $15,725,000." [📄 employment_and_retention_agreements.txt | p.2 | SECTION 5: EQUITY PLAN TREATMENT]
-
-#### 2. Executive Severance Payments
-* **CEO Departure:** "CEO Elena Marsh has indicated she intends to depart at closing. Her severance is therefore expected to be triggered." [📄 employment_and_retention_agreements.txt | p.2 | SECTION 4: KEY PERSON DEPENDENCY]
-* **Executive Equity Acceleration:** "Total acceleration cost: $11,545,000 across named executives and $4,180,000 for all other employees." [📄 employment_and_retention_agreements.txt | p.2 | SECTION 5: EQUITY PLAN TREATMENT]
-
-#### 3. Retention Bonus Pool Funding
-* **Pool Approval & Allocation:** "The Board approved a retention pool of $6,500,000 on March 1, 2024, payable to non-executive employees identified as critical to post-closing continuity." [📄 employment_and_retention_agreements.txt | p.2 | SECTION 3: RETENTION POOL]
-  * Engineering (41 employees): $3,900,000
-  * Customer Success (18 employees): $1,300,000
-  * Finance and Operations (11 employees): $780,000
-  * Other (7 employees): $520,000
-* **Funding & Deductions:** "The pool is funded by the Company and is not deducted from the merger consideration." [📄 employment_and_retention_agreements.txt | p.2 | SECTION 3: RETENTION POOL]
-* **Vesting Schedule:** "Retention payments vest 50% at 12 months post-closing and 50% at 24 months post-closing, subject to continued employment." [📄 employment_and_retention_agreements.txt | p.2 | SECTION 3: RETENTION POOL]
-
-#### 4. Revolver Debt Payoff Amounts
-* **Facility Terms & Outstanding Balance:** "The Company maintains a $1
+#### A. Executive Cash Severance ($9,065,750)
+Assuming all five named executives are terminated immediately following closing, the required cash severance payments are [📄 employment_and_retention_agreements.txt | p.1 | Section: Severance multiples and estimated cost]:
+* **Elena Marsh (CEO):** $3,187,500 (3.0x multiple)
+* **Dr. James Wu (CTO):** $2,160,000 (2.5x multiple)
+* **Robert Chen:** $1,424
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
   - **retrieval_executor**:  ()
   - **financial_verifier**:  ()
   - **quality_assessor**:  ()
-  - **query_rewriter**:  ()
+  - **answer_synthesizer**:  ()
 
 ---
 
@@ -1985,40 +1546,17 @@ Based on the provided M&A due diligence documents, here are the details regardin
 - **Status**: ✅ PASS
 - **Confidence Score**: 1.00
 - **Validation Status**: passed
-- **Facts Recalled**: 4/4 (100.0%)
-  - *Recalled*: ['$2.8', 'qualified', '$3.5 million', '$8.0 million']
-- **Citations Match**: ✅ Yes
-- **Total Latency**: 40782.00 ms
+- **Facts Recalled**: 2/4 (50.0%)
+  - *Recalled*: ['$3.5 million', '$8.0 million']
+  - *Missing*: ['$2.8', 'qualified']
+- **Citations Match**: ❌ No
+- **Total Latency**: 24343.00 ms
 - **Answer**:
 ```
 ### 1. Direct Answer
 
-**Current Litigation Status:**
-The litigation—*DataFlow Systems Inc. v. Aurora Technologies Inc.* (Case No. 2023-CV-04821)—is active and unresolved. Filed on September 14, 2023, in the U.S. District Court for the Northern District of California, the lawsuit alleges patent infringement regarding Aurora's real-time data reconciliation engine. Outside counsel estimates probable exposure to be between **$3.5 million and $8.0 million**.
-
-**Justifiability and Safety of Legal Fee Add-back:**
-No, the **$2.8 million** legal fee add-back is **not considered a safe or fully justifiable adjustment**. The Quality of Earnings (QoE) report explicitly flags this as a **qualified adjustment**. Because the litigation remains unresolved and is ongoing, comparable legal fees are likely to recur in future periods (such as FY2024). If the litigation continues, treating these expenses as non-recurring overstates Adjusted EBITDA by **$2.8 million**.
-
----
-
-### 2. Supporting Evidence & Citations
-
-* **Litigation Details & Probable Exposure:**
-  * **Case Caption & Court:** *DataFlow Systems Inc. v. Aurora Technologies Inc.*, Case No. 2023-CV-04821, U.S. District Court, Northern District of California, filed September 14, 2023 [📄 ip_portfolio_and_litigation_schedule.txt | As of March 15, 2024 | p.1 | Section 2: THE DATAFLOW SYSTEMS LITIGATION].
-  * **Allegations:** DataFlow alleges that Aurora's real-time data reconciliation engine infringes U.S. Patent Nos. 9,847,221 and 10,112,905 [📄 ip_portfolio_and_litigation_schedule.txt | As of March 15, 2024 | p.1 | Section 2: THE DATAFLOW SYSTEMS LITIGATION].
-  * **Company Position & Exposure:** Aurora believes the claims are without merit and intends to defend vigorously. Outside counsel assesses probable financial exposure at **$3.5 million to $8.0 million** [📄 merger_agreement_v2_final.txt | p.2 | Section 3.15 — Litigation].
-
-* **Quality of Earnings (QoE) Assessment of Legal Fees:**
-  * **Add-Back Amount:** Aurora added back **$2.8 million** in FY2023 external counsel legal fees associated with the defense [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.2 | Section: Note 2 - Non-recurring Legal Fees ($2.8M, FY2023)].
-  * **Qualification & Safety Warning:** The report notes that the matter remains unresolved and future periods may incur comparable fees. The add-back is flagged as a **QUALIFIED ADJUSTMENT** and is only genuinely non-recurring if the litigation concludes [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.2 | Section: Note 2 - Non-recurring Legal Fees ($2.8M, FY2023)].
-  * **Impact on EBITDA:** If litigation continues into FY2024, Adjusted EBITDA (reported at $99.0 million vs. $92.8 million reported EBITDA) is overstated by $2.8 million [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | Section 6: KEY OBSERVATIONS FOR THE BUYER].
-
----
-
-### 3. Key Observations & Caveats
-
-* **EBITDA Impact:** Buyers should treat the $2.8 million add-back with caution and consider deducting ongoing legal defense fees from normalized run-rate EBITDA until the litigation is formally settled or dismissed.
-* **Potential Liabilities Excluded from Normalization:** The add-back only covers past legal fees ($2.8 million in FY2023) and does not account for potential settlement costs or damages, which outside counsel estimates could reach **$3.5 million to $8.0 million**.
+* **Current Litigation Status:** The patent infringement lawsuit (*DataFlow Systems Inc. v. Aurora Technologies Inc.*, Case No. 2023-CV-04821) is **pending and unresolved** in the U.S. District Court, Northern District of California. Aurora Technologies is actively defending its real-time data reconciliation engine against DataFlow's claims. Aurora's outside legal counsel has estimated potential exposure in the matter to be between **$3.5 million and $8.0 million**.
+*
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -2033,44 +1571,18 @@ No, the **$2.8 million** legal fee add-back is **not considered a safe or fully 
 **Query**: How does the key person risk around Dr. Wu relate to the DataFlow patent litigation?
 
 - **Status**: ✅ PASS
-- **Confidence Score**: 1.00
-- **Validation Status**: passed
-- **Facts Recalled**: 3/3 (100.0%)
-  - *Recalled*: ['James Wu', 'DataFlow', 'first inventor']
-- **Citations Match**: ✅ Yes
-- **Total Latency**: 45531.00 ms
+- **Confidence Score**: 0.85
+- **Validation Status**: warning
+- **Facts Recalled**: 2/3 (66.7%)
+  - *Recalled*: ['James Wu', 'DataFlow']
+  - *Missing*: ['first inventor']
+- **Citations Match**: ❌ No
+- **Total Latency**: 144438.00 ms
 - **Answer**:
 ```
-### Direct Answer
+### 1. Direct Answer
 
-The key person risk associated with CTO Dr. James Wu is directly linked to the *DataFlow Systems Inc. v. Aurora Technologies Inc.* patent litigation because **Dr. Wu is the sole or first inventor on all four of Aurora's patents that underlie the disputed technology**. 
-
-DataFlow alleges that Aurora's real-time data reconciliation engine infringes its patents. Because Dr. Wu personally developed and holds the primary intellectual property behind this core engine, losing him—especially given that he has **not executed a post-closing employment agreement**—poses a severe operational and legal risk to defending Aurora’s proprietary technology and supporting counsel in the litigation.
-
----
-
-### Supporting Evidence & Detail
-
-1. **Invention of Disputed Patents**:
-   * DataFlow Systems Inc. claims Aurora’s real-time data reconciliation engine infringes U.S. Patent Nos. 9,847,221 and 10,112,905 [📄 ip_portfolio_and_litigation_schedule.txt | p.1 | Section 2].
-   * Aurora’s four patents most closely related to the accused functionality—U.S. Patent Nos. 10,445,882, 10,662,013, 11,004,776, and 11,238,450—all name Dr. James Wu as sole or first inventor [📄 ip_portfolio_and_litigation_schedule.txt | p.1 | Section 2; 📄 employment_and_retention_agreements.txt | p.2].
-   * In total, Dr. Wu is named as sole or first inventor on 12 issued U.S. patents, all of which fall within Aurora's real-time data reconciliation technology area [📄 board_deck_strategic_review_mar2024.txt | p.1 | Competitive Risks; 📄 ip_portfolio_and_litigation_schedule.txt | p.1 | Section 1].
-
-2. **Key Person Retention & Integration Risk**:
-   * Dr. Wu has **not signed** a post-closing employment agreement with Buyer (Vertex Capital Partners), which Buyer has designated as a material integration risk [📄 employment_and_retention_agreements.txt | p.2].
-   * Although management reports Dr. Wu verbally indicated a willingness to stay for a transition period of at least 12 months, this commitment is completely undocumented [📄 employment_and_retention_agreements.txt | p.2].
-   * While Dr. Wu’s employment agreement includes an assignment-of-inventions clause and a 12-month post-termination non-competition covenant, the non-compete is of uncertain enforceability under California law (where Dr. Wu resides) [📄 employment_and_retention_agreements.txt | p.2].
-
-3. **Financial Exposure Context**:
-   * Outside counsel (Wilson Sonsini) assesses the probable exposure from the DataFlow litigation between $3.5 million and $8.0 million, with a licensing settlement between $4.0 million and $6.0 million considered the most likely outcome [📄 ip_portfolio_and_litigation_schedule.txt | p.2 | Section 2; 📄 merger_agreement_v2_final.txt | p.2 | Section 3.15].
-   * Dr. Wu's separation potential includes a parachute cost totaling $5,755,000 ($2,160,000 cash severance + $3,595,000 equity acceleration) under a 2.5x severance multiple [📄 employment_and_retention_agreements.txt | p.1 | Section 1].
-
----
-
-### Caveats & Missing Information
-
-* **Undocumented Retention Commitment**: Dr. Wu’s agreement to remain for a 12-month post-closing transition period is verbal only and not contractually binding [📄 employment_and_retention_agreements.txt | p.2].
-* **Legal Restraints**: If Dr. Wu departs, enforcing his 12-month non-compete may be difficult due to California's strict public policy against restrictive covenants, potentially allowing him to consult or work for competitors/litigants despite Delaware governing law [📄 employment_and_retention_agreements.txt | p.2].
+The key person risk associated with Dr. James Wu (Chief Technology Officer) is directly tied to the ongoing DataFlow patent litigation (*DataFlow Systems Inc. v. Aurora Technologies Inc.*). Dr. Wu is the primary inventor of Aurora’s real-time data reconciliation engine, which is the exact technology accused of patent infringement in the litigation [📄 employment_and_retention_agreements.txt | p.2 | Dr. James Wu] [📄 ip_portfolio_and_litigation_schedule.txt | p.1 | Section
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -2090,37 +1602,37 @@ DataFlow alleges that Aurora's real-time data reconciliation engine infringes it
 - **Facts Recalled**: 5/5 (100.0%)
   - *Recalled*: ['280G', '$2.4 million', 'Marsh', 'Wu', 'Chen']
 - **Citations Match**: ✅ Yes
-- **Total Latency**: 18547.00 ms
+- **Total Latency**: 117515.00 ms
 - **Answer**:
 ```
 ### 1. Direct Answer
+The total estimated potential Section 280G excise tax exposure resulting from the transaction is **$2.4 million** ($2,400,000). 
 
-* **Total Section 280G Excise Tax Exposure:** **$2.4 million**
-* **Specific Executives Exceeding Safe Harbor:**
-  * **Elena Marsh** (CEO)
-  * **Wu** *(first name not provided in context)*
-  * **Chen** *(first name not provided in context)*
-
----
-
-### 2. Supporting Evidence & Citations
-
-* **Tax Exposure & Exceeded Safe Harbor:**
-  * Marsh, Wu, and Chen are expected to exceed the Section 280G safe harbor, exposing the Company to a 20% excise tax and the loss of the corresponding tax deduction [📄 employment_and_retention_agreements.txt | p.2 | Section 280G].
-  * The estimated excise tax exposure is **$2.4 million** [📄 employment_and_retention_agreements.txt | p.2 | Section 280G].
-* **Executive Departure:**
-  * CEO Elena Marsh has indicated she intends to depart at closing, which is expected to trigger her severance payments [📄 employment_and_retention_agreements.txt | p.2 | CEO Elena Marsh].
-* **Transaction & Cost Structure:**
-  * The Company has **NOT** obtained a shareholder cleansing vote to mitigate or eliminate the tax liability [📄 employment_and_retention_agreements.txt | p.2 | Section 280G].
-  * The merger agreement allocates this excise tax cost to the Company at closing [📄 employment_and_retention_agreements.txt | p.2 | Section 280G].
+The specific executives expected to exceed the Section 280G safe harbour and trigger excess parachute payments are:
+* **Elena Marsh** (CEO)
+* **Wu**
+* **Chen**
 
 ---
 
-### 3. Caveats & Missing Information
+### 2. Supporting Evidence
+* **Executivess Exceeding Safe Harbour**: Marsh, Wu, and Chen are expected to exceed the Section 280G safe harbour limit [📄 employment_and_retention_agreements.txt | p.2 | Section 280G].
+* **Tax Consequences & Exposure**: Exceeding the safe harbour exposes the Company to a 20% excise tax and the loss of the corresponding corporate tax deduction, resulting in an estimated total excise tax exposure of $2.4 million [📄 employment_and_retention_agreements.txt | p.2 | Section 280G].
+* **Cost Allocation**: The merger agreement explicitly allocates this excise tax cost to the Company at closing [📄 employment_and_retention_agreements.txt | p.2 | Section 280G].
+* **Trigger Event Context**: CEO Elena Marsh has indicated her intention to depart at closing, which will trigger her severance package [📄 employment_and_retention_agreements.txt | p.2 | CEO Elena Marsh].
 
-* **Missing Details:** The provided context specifies the full name and title for CEO Elena Marsh, but only lists the last names for **Wu** and **Chen** without providing their full first names or specific executive titles.
-* **Lack of Cleansing Vote:** Because a 280G shareholder cleansing vote was not obtained, the Company remains subject to both the 20% excise tax and the unmitigated loss of tax deduction associated with these payments.
-* **Estimate Status:** The tax exposure of $2.4 million is stated as an estimated figure in the documentation.
+---
+
+### 3. Caveats, Inconsistencies, and Missing Information
+* **Cleansing Vote**: The Company has **NOT** obtained a shareholder cleansing vote (Section 280G(b)(5) vote) to eliminate or waive the excess parachute payments and potential tax exposure [📄 employment_and_retention_agreements.txt | p.2 | Section 280G].
+* **Missing Executive Breakdown**: The provided context does not include the individual dollar breakdown of Section 280G excise tax exposure attributable to each executive (Marsh vs. Wu vs. Chen), nor does it supply the individual base amounts (historical average W-2 compensation) used to compute the excess parachute payments.
+* **Inconsistencies**: No document inconsistencies were identified regarding Section 280G tax treatment in the provided text.
+
+---
+
+### 4. Normalized Financial Summary
+* **Total Section 280G Excise Tax Exposure**: $2,400,000 ($2.4 million) [📄 employment_and_retention_agreements.txt | p.2 | Section 280G]
+* **Excise Tax Rate**: 20% on excess parachute payments (in addition to loss of corporate income tax deduction) [📄 employment_and_retention_agreements.txt | p.2 | Section 280G]
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -2135,56 +1647,18 @@ DataFlow alleges that Aurora's real-time data reconciliation engine infringes it
 **Query**: Customer consents are not a condition to closing. Which customers does that expose the buyer to, and how much revenue is at risk?
 
 - **Status**: ✅ PASS
-- **Confidence Score**: 1.00
-- **Validation Status**: passed
-- **Facts Recalled**: 4/4 (100.0%)
-  - *Recalled*: ['Northstar', 'Pacific Data', '$92.8', 'not a condition']
+- **Confidence Score**: 0.85
+- **Validation Status**: warning
+- **Facts Recalled**: 0/4 (0.0%)
+  - *Recalled*: []
+  - *Missing*: ['Northstar', 'Pacific Data', '$92.8', 'not a condition']
 - **Citations Match**: ✅ Yes
-- **Total Latency**: 36703.00 ms
+- **Total Latency**: 24094.00 ms
 - **Answer**:
 ```
 ### 1. Direct Answer
-The specific customer contracts that require change-of-control consent—and for which obtaining consent was **omitted as a closing condition**—are:
-1. **Northstar Financial Group**
-2. **Pacific Data Systems**
 
-The total revenue at risk from these two customers is **$92.8 million** (representing **20.5% of FY2023 revenue**). Because obtaining customer consents is not a condition to closing, the Buyer bears the full financial and transactional risk if these consents are not obtained prior to closing.
-
----
-
-### 2. Supporting Evidence & Breakdown
-
-* **Northstar Financial Group**: 
-  * **Revenue at Risk:** $54.3 million [📄 customer_contracts_schedule.txt | p.1 | SECTION 2: CHANGE OF CONTROL PROVISIONS]
-  * **Provision Details:** Requires written consent not less than 30 days prior to closing. Consent may not be unreasonably withheld, but has **not yet been obtained** [📄 customer_contracts_schedule.txt | p.1 | SECTION 2: CHANGE OF CONTROL PROVISIONS].
-* **Pacific Data Systems**: 
-  * **Revenue at Risk:** $38.5 million [📄 customer_contracts_schedule.txt | p.1 | SECTION 2: CHANGE OF CONTROL PROVISIONS]
-  * **Provision Details:** Requires written consent; the customer has an absolute right to withhold consent in its sole discretion. Consent has **not yet been obtained** [📄 customer_contracts_schedule.txt | p.1 | SECTION 2: CHANGE OF CONTROL PROVISIONS].
-* **Omission as Closing Condition:** 
-  * The regulatory memo confirms that *"[t]here is no condition relating to obtaining customer consents, notwithstanding that two material customer contracts (Northstar Financial Group and Pacific Data Systems, together representing $92.8 million or 20.5% of FY2023 revenue) contain consent-based termination rights. Buyer therefore bears the risk of those consents not being obtained."* [📄 regulatory_and_data_privacy_memo.txt | p.3 | Section: There is no financing condition]
-
----
-
-### 3. Financial Summary & Scale Context
-
-| Customer Name | Annual Revenue | % of FY2023 Revenue | Consent Status | Termination Discretion |
-| :--- | :--- | :--- | :--- | :--- |
-| **Northstar Financial Group** | $54.3M | 12.0% | Not yet obtained | May not be unreasonably withheld |
-| **Pacific Data Systems** | $38.5M | 8.5% | Not yet obtained | Sole discretion (absolute right) |
-| **Total Revenue at Risk** | **$92.8M** | **20.5%** | **Unsatisfied** | **Customer Termination Rights Triggered** |
-
-*(Note: Exact values from source documents without rounding [📄 customer_contracts_schedule.txt | p.1 | SECTION 2: CHANGE OF CONTROL PROVISIONS]).*
-
----
-
-### 4. Document Inconsistencies & Caveats
-
-* **Document Inconsistency regarding Entity Names and Values:** 
-  * Section 9.2 of `merger_agreement_v2_final.txt` lists *(a) Master Services Agreement with Northstar Defense Systems (annual value $12.4M)* and *(b) Technology License Agreement with Pacific Data Corp (annual value $8.7M)* [📄 merger_agreement_v2_final.txt | p.3 | Section 9.2 — Effect on Material Contracts]. 
-  * This directly contradicts `customer_contracts_schedule.txt` (Disclosure Schedule 3.14(a)) and `regulatory_and_data_privacy_memo.txt`, which identify the counterparties and associated revenue values as **Northstar Financial Group** ($54.3M) and **Pacific Data Systems** ($38.5M) [📄 customer_contracts_schedule.txt | p.1 | SECTION 2] [📄 regulatory_and_data_privacy_memo.txt | p.3].
-* **Other Contracts with Change of Control Clauses (Not at Risk / Notice Only):**
-  * **Ironbridge Manufacturing ($18.1M):** Requires consent only if the acquirer is a competitor. Because acquirer Vertex Capital Partners is a financial sponsor and not a competitor, this clause is **not applicable** [📄 customer_contracts_schedule.txt | p.1 | SECTION 2].
-  * **Meridian Health Networks ($27.2M), Cascade Logistics Corp ($21.7M), and Summit Insurance Holdings ($15.4M):** Require written notice only (30–60 days) and do not grant termination rights upon a change of control [📄 customer_contracts_schedule.txt | p.1 | SECTION 2].
+In the acquisition agreement itself, **there is no closing condition relating to obtaining customer consents** for any customer account; the Buyer bears the full risk of any failure to obtain customer consents prior to closing [📄 regulatory_and_data_privacy_memo.txt | p.3 | Section: There is no financing condition]. Consequently, **all customer accounts** lack a customer consent closing condition in the acquisition agreement. The total FY2023 revenue generated by the top ten customers is **$216.4M** [📄
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -2204,23 +1678,43 @@ The total revenue at risk from these two customers is **$92.8 million** (represe
 - **Facts Recalled**: 0/0 (100.0%)
   - *Recalled*: []
 - **Citations Match**: ❌ No
-- **Total Latency**: 14219.00 ms
+- **Total Latency**: 80563.00 ms
 - **Answer**:
 ```
 ### 1. Direct Answer
-The provided context does **not** contain management's operating plan or revenue projections for fiscal year 2025. 
+The provided context **does not contain management's financial forecasts, operating plan, or projected revenue for FY2025**. The available documents cover actual audited financial results for FY2022 and FY2023, along with quality of earnings and debt summary details up to early 2024, but exclude forward-looking projections for FY2025.
 
 ---
 
-### 2. Supporting Evidence
-The provided documentation contains historical financial data through Fiscal Year 2023 only:
-* **FY2022 Actual Revenue:** $387.1 million [📄 aurora_financials_fy2023.txt | FY2023 | p. 1 | CONSOLIDATED INCOME STATEMENT]
-* **FY2023 Actual Revenue:** $452.8 million (reflecting 17.0% YoY revenue growth) [📄 aurora_financials_fy2023.txt | FY2023 | p. 1, 3 | CONSOLIDATED INCOME STATEMENT / Revenue Growth]
+### 2. Supporting Evidence & Historical Context
+* **FY2023 Actual Revenue:** Aurora reported total revenue of **$452.8M** for FY2023 (17.0% YoY growth from **$387.1M** in FY2022) [📄 aurora_financials_fy2023.txt | FY2023 | p.1 | CONSOLIDATED INCOME STATEMENT].
+* **Revenue Breakdown (FY2023):**
+  * Software Licenses: **$198.4M** [📄 aurora_financials_fy2023.txt | FY2023 | p.1 | CONSOLIDATED INCOME STATEMENT]
+  * SaaS Subscriptions: **$189.6M** [📄 aurora_financials_fy2023.txt | FY2023 | p.1 | CONSOLIDATED INCOME STATEMENT]
+  * Professional Services: **$64.8M** [📄 aurora_financials_fy2023.txt | FY2023 | p.1 | CONSOLIDATED INCOME STATEMENT]
+* **SaaS ARR Context:** SaaS ARR stood at **$210.5M** as of December 31, 2023 (growth of 27.9% YoY) [📄 aurora_financials_fy2023.txt | FY2023 | p.3 | Revenue Growth: 17.0% YoY].
 
 ---
 
 ### 3. Missing Information & Caveats
-* **Missing Documents/Data:** Management forecasts, projected operating plans, long-term financial models (LTM/P&L forecasts), and projections for FY2024 and FY2025 are completely missing from the provided context chunks.
+* **Missing Documents:** To determine FY2025 projected revenue, management financial model outputs, forward-looking projection decks, or budget/plan documentation for FY2024–FY2025 are required.
+* **Product Mix Note:** The Quality of Earnings report notes that perpetual license revenue declined from $61.2M in FY2022 to $56.3M in FY2023 due to a strategic shift toward subscription pricing, and advises buyers not to model perpetual license revenue as sustainable [📄 quality_of_earnings_report_fy2023.txt | FY2023 | p.3 | Net Revenue Retention].
+* **Debt Inconsistency Noted in Documents:** 
+  * Note 7 of the financial statements states that **$110M** was drawn under the revolving credit facility as of December 31, 2023 [📄 aurora_financials_fy2023.txt | FY2023 | p.3 | Note 7 — Debt].
+  * Disclosure Schedule 3.7 reports revolving credit facility debt of **$85.0M** as of December 31, 2023 [📄 credit_agreement_summary.txt | FY2023 | p.1 | SECTION 1: OUTSTANDING INDEBTEDNESS].
+
+---
+
+### 4. Normalized Financial Overview (Historical Basis)
+
+| Metric | FY2022 Actual | FY2023 Actual | FY2025 Projection |
+| :--- | :--- | :--- | :--- |
+| **Total Revenue** | $387.1M | $452.8M | **Not Provided in Context** |
+| **SaaS Subscriptions** | $148.2M | $189.6M | **Not Provided in Context** |
+| **Software Licenses** | $172.3M | $198.4M | **Not Provided in Context** |
+| **Professional Services** | $66.6M | $64.8M | **Not Provided in Context** |
+
+*(Scale: All financial amounts are reported in millions of USD).* [📄 aurora_financials_fy2023.txt | FY2023 | p.1 | CONSOLIDATED INCOME STATEMENT]
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()
@@ -2240,13 +1734,13 @@ The provided documentation contains historical financial data through Fiscal Yea
 - **Facts Recalled**: 0/0 (100.0%)
   - *Recalled*: []
 - **Citations Match**: ❌ No
-- **Total Latency**: 32843.00 ms
+- **Total Latency**: 10828.00 ms
 - **Answer**:
 ```
 I was unable to find sufficient relevant information in the data room to answer this question, even after refining the search. This may mean the relevant documents haven't been uploaded yet, or the question falls outside the scope of the available materials.
 
 Search attempts: 3
-Best quality score achieved: 0.01
+Best quality score achieved: 0.04
 ```
 - **Agent Trace Summary**:
   - **query_intelligence**:  ()

@@ -244,3 +244,21 @@ All architecture decisions that deviated from or resolved ambiguities in p4.md a
 - **Resolution**: `run_demo.py` performs and *checks* each step, starting Docker Desktop itself if needed. It fails with the specific remedy rather than a stack trace.
 - **Also fixed here**: the Qdrant healthcheck ran `curl`, which that image does not ship — 1932 consecutive failed checks on one container. Since `api` waits on `condition: service_healthy`, the fully containerized `docker compose up` path could never have started the API or the UI. Replaced with a bash `/dev/tcp` probe.
 - **Impact**: run_demo.py (new), docker-compose.yml
+
+## Decision 35: A 503 is not a quota refusal, and neither is a timeout
+- **Date**: Session 8
+- **Context**: Re-running the evaluation after Decision 32, `gemini-3.6-flash` began returning 503 *"This model is currently experiencing high demand"* on roughly a third of synthesis calls. Each failure cost ~125 seconds before the provider dropped the connection, average query latency went from 30s to 80s, and five answerable questions never produced an answer at all.
+- **Three separate defects, all exposed by one bad afternoon**:
+  - **No request timeout.** LiteLLM defaults to 600s, which is not a timeout so much as its absence. `STRUCTURED_TIMEOUT_SECONDS = 60` and `PROSE_TIMEOUT_SECONDS = 120` are generous against healthy latencies (1-3s and 10-30s) and only fire when something is genuinely wrong.
+  - **503 misclassified.** It fell through to the generic transport-retry path, so a model that was down provider-wide got three retries with backoff before anything else was tried. A 429 means *this key* is spent and another key is the right move; a 503 means the *model* is down and only another model helps. `is_service_unavailable()` now separates them, and `skip_model_for_request()` puts the model in a 90-second cooldown **without debiting quota** — the opposite mistake would retire the best synthesis model for a whole day over a blip.
+  - **Uncited answers were published.** Under stress the model returned answers at 10-22% of their normal length with zero citation markers. One shipped at `validation=passed` with `confidence=1.0` and no sources; another leaked the model's own working notes ("Let's double-check all details to ensure accuracy") as the answer body. `_is_usable_answer()` now treats a response with no citations, or with scratchpad markers, as a failed generation and retries on another rung. Deliberately narrow: a genuine refusal has nothing to cite and passes through untouched.
+- **Guarded by**: `TestRequestTimeouts`, `TestServiceUnavailableHandling`, `TestUsableAnswerGuard`.
+- **Impact**: litellm_wrapper.py, budget_tracker.py, answer_synthesizer.py
+
+## Decision 36: Evaluation reports must carry their run conditions
+- **Date**: Session 8
+- **Context**: The end-to-end recall metric has now been misread twice for reasons that had nothing to do with the engine. First when it swung 15 points between identical runs purely on which synthesis model the daily quota allowed (Decision 25). Then when the provider incident above produced truncated, uncited answers and a 62.1% score that looked exactly like a retrieval regression — while a retrieval-only A/B on the same index showed a **+5.4pp improvement with zero regressions**.
+- **Resolution**: `RESULTS.md` is generated with a **Run conditions** section recording the synthesis model mix, how many queries were decomposed, and how many answers were lost to upstream synthesis failure. A non-zero failure count is the signal that the run is not comparable to a clean one.
+- **Why this rather than more careful reading**: the number gets quoted out of the document it lives in. Attaching the conditions to the artefact is the only version that survives being copied into a slide.
+- **Measured this run**: 62.1% mean recall, 30/35 answered, 6/6 controls held, 80.4s average latency, 38/41 syntheses on `gemini-3.6-flash`, 6 answers lost upstream. The comparable clean run scored 85.9% on the same model mix.
+- **Impact**: tests/run_end_to_end_validation.py, RESULTS.md, README.md
