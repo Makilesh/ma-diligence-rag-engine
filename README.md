@@ -260,7 +260,15 @@ Recall is reported with its dependency stated, because that dependency turned ou
 
 Per-type recall on the full-quota run: legal 98.2%, multi-hop 85.2%, summary 83.3%, financial 83.8%, comparative 73.0%.
 
-**These numbers predate one later fix and have not been re-measured against it.** Sub-question decomposition was additionally gated on `query_type`, so a question the model decomposed correctly but classified as `financial` had its sub-questions discarded (see below). Removing that veto can only add decomposition, never remove it, so the effect should be neutral-to-positive — but "should be" is not a measurement, and the table above is what was actually run.
+**The re-run after the decomposition fix scored 62.1%, and that number is not what it looks like.** It was measured during a Gemini incident: `gemini-3.6-flash` returned 503 *"currently experiencing high demand"* on roughly a third of synthesis calls. Both runs used the same synthesis model (38 of 41 answers on `gemini-3.6-flash`), so the usual model-mix explanation does not apply here. What does:
+
+- **5 answerable questions never got an answer** — synthesis exhausted its retries and degraded to a refusal. Those score 0%, which is 12.1pp of the 23.8pp drop on its own.
+- **The questions that did answer came back truncated.** The regressed ones produced answers **10–22% of their previous length** with **0–1 citations instead of 4–13**. `comp_02` went from 3,624 characters and 7 citations to 349 and none. That is a generation failure, not a retrieval one.
+- **Retrieval, measured independently, improved.** The A/B below shows +5.4pp fact coverage with zero regressions on the same index. Context did not get worse; the model writing from it did.
+
+This is the same lesson as the model-mix confound, in a new costume: on a 35-question set, one bad afternoon at the provider moves the headline metric further than any change in this repository has. `RESULTS.md` now records the synthesis model mix and the upstream-failure count in every report, so the number can never again be read without the conditions that produced it.
+
+**Three fixes came out of the incident**, all of which make the engine fail more honestly under provider stress: explicit per-request timeouts (LiteLLM's 600s default is not a timeout), 503 classified as *model unavailable* rather than *quota exhausted* — so the ladder tries a different model instead of retrying a dead one on five keys, without burning the day's quota — and a guard that treats an uncited or scratchpad-leaking answer as a failed generation. That last one matters most: this run shipped an answer with **zero citations at `validation=passed` and confidence 1.00**, in a tool whose entire premise is that every claim is traceable.
 
 **Three defects found by measurement rather than inspection.** Each was invisible to code review — the pipeline ran, returned plausible output, and logged no error:
 
@@ -279,6 +287,17 @@ Two details make it work rather than merely exist:
 - **The classifier must not veto the decomposer.** Sub-questions were originally kept only when `query_type` was `multi_hop` or `comparative`. Asked for the implied EV/EBITDA multiple, Agent 1 decomposed the question correctly into price, share count and EBITDA — and classified it `financial`, so the veto discarded all three and the engine answered about the offer price instead. Emitting sub-questions *is* the model's judgment that the answer spans several facts; classification is a separate judgment made for routing. Requiring two independent guesses to agree made the feature fail silently whenever they disagreed. Now the prompt decides and `MAX_SUB_QUESTIONS` bounds the cost. Same question after the fix: 4 retrieval passes, 0 rewrite loops, confidence 1.00, and the multiple actually computed — **7.03x on Adjusted EBITDA of $99.0M versus 7.15x reported**.
 
 Measured in isolation — retrieval only, no synthesis, so model choice cannot influence it — **fact coverage in the retrieved context rose from 64.2% to 84.7% (+20.4pp) across the 15 decomposable questions, with no regressions.** `comp_02` went 10% → 100%, `mh_06` 33% → 100%, `mh_07` 50% → 100%.
+
+Re-measured after the classifier veto was removed, now across **all 35 answerable questions** rather than only the two types the veto allowed:
+
+| | baseline | with decomposition |
+|---|---|---|
+| All 35 answerable | 69.6% | **75.0% (+5.4pp)** |
+| comparative (n=5) | 54.0% | **70.0% (+16.0)** |
+| multi-hop (n=10) | 70.8% | **81.7% (+10.8)** |
+| financial / legal / summary | — | unchanged |
+
+**4 improved, 0 regressed**, with Agent 1 choosing to decompose 14 of the 35. The types it does not decompose are untouched, which is the expected shape: decomposition should help questions that span documents and do nothing to the ones that do not.
 
 **Why the end-to-end number is measured separately from that.** Answer recall across runs is dominated by which synthesis model served the run, and that drifts within a day as the top rung's 20-request daily quota drains. Four runs of the same 41 questions scored 86.6%, 73.9%, 71.0% and 85.9% as the mix shifted between `gemini-3.6-flash` and `gemini-3.5-flash` — and question types that are **never** decomposed moved in lockstep (legal 100% → 73% → 98%, summary 72% → 50% → 83%). The fourth run tested the explanation rather than just restating it: run on fresh quota, 38 of its 41 answers were written by `gemini-3.6-flash`, and recall returned to the top of the range. Cross-run end-to-end comparison at this sample size therefore cannot attribute a change to a retrieval improvement, which is why the decomposition result above is measured on retrieval alone.
 

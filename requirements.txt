@@ -57,6 +57,20 @@ openpyxl>=3.1.0,<4.0.0
 # Database
 asyncpg>=0.29.0,<1.0.0
 psycopg2-binary>=2.9.9,<3.0.0
+# KNOWN MISMATCH, deliberately not "fixed" by version roulette.
+# 2.0.25 warns "You're using incompatible versions of langgraph and
+# checkpoint-postgres" because its guard wants langgraph >= 0.5, while this
+# project pins langgraph <0.3 (the graph is written against the 0.2 API).
+#
+# Left as-is because the alternative changes are both worse bets than a warning:
+# upgrading langgraph crosses three minor versions of a library this project's
+# entire control flow is built on, and downgrading the checkpointer trades a
+# known-good component for an unknown one. The Postgres saver was verified
+# working on this pair — 764 checkpoints across 105 threads written and read
+# back (see DECISIONS_LOG Decision 26) — so the warning describes a risk that
+# has not materialised here.
+#
+# Revisit when the graph is next touched, not before a demo.
 langgraph-checkpoint-postgres>=2.0.0,<3.0.0
 psycopg[binary]>=3.1.0,<4.0.0
 
