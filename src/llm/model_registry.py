@@ -68,26 +68,36 @@ class ModelLimits:
 # Provider free-tier quotas, exactly as reported by the Google AI Studio console.
 # Change these ONLY to match the provider — never to make an allocation fit.
 MODEL_LIMITS: dict[str, ModelLimits] = {
-    "gemini/gemini-3.6-flash":      ModelLimits(rpm=5,  tpm=250_000, rpd=20,  reasoning=True),
-    "gemini/gemini-3.5-flash":      ModelLimits(rpm=5,  tpm=250_000, rpd=20,  reasoning=True),
-    "gemini/gemini-3.5-flash-lite": ModelLimits(rpm=15, tpm=250_000, rpd=500, reasoning=False),
-    "gemini/gemini-3.1-flash-lite": ModelLimits(rpm=15, tpm=250_000, rpd=500, reasoning=False),
-    # REMOVED — gemini-3-flash, gemini-2.5-flash and gemini-2.5-flash-lite were
-    # listed here and on the ladders, and none of them exist on this API. Every
-    # one returns
-    #   404 "models/... is not found for API version v1alpha, or is not
-    #   supported for generateContent"
-    # confirmed on two independent keys. Half the fallback ladder was therefore
-    # phantom: once the top rungs were spent or failing, the router descended
-    # into models that could only 404, burning an attempt and a timeout each
-    # before reaching anything real. Graceful degradation that degrades into
-    # nothing is worse than no fallback, because it looks like it works.
+    # Verified against the Google AI Studio rate-limit console AND against a live
+    # generateContent call per model. Both checks are necessary: the console
+    # lists models this key cannot actually call, and ListModels advertises them
+    # too — `gemini-2.5-flash` and `gemini-2.5-flash-lite` appear in both and
+    # return 404 on every request. Availability is what the endpoint does, not
+    # what a catalogue says.
     #
-    # Availability is a provider fact, not a config choice — re-probe before
-    # adding a rung rather than assuming a plausible-looking name resolves.
+    # Reasoning tier — 5 RPM / 250K TPM / 20 RPD each, newest first.
+    "gemini/gemini-3.7-flash":        ModelLimits(rpm=5,  tpm=250_000, rpd=20,  reasoning=True),
+    "gemini/gemini-3.6-flash":        ModelLimits(rpm=5,  tpm=250_000, rpd=20,  reasoning=True),
+    "gemini/gemini-3.5-flash":        ModelLimits(rpm=5,  tpm=250_000, rpd=20,  reasoning=True),
+    # "Gemini 3 Flash" in the console; the servable id carries the -preview
+    # suffix. Calling it `gemini-3-flash` returns 404, which was previously
+    # misread as the model not existing at all.
+    "gemini/gemini-3-flash-preview":  ModelLimits(rpm=5,  tpm=250_000, rpd=20,  reasoning=True),
+
+    # Volume tier — 15 RPM / 250K TPM / 500 RPD. The only models that can carry
+    # sustained agent traffic.
+    "gemini/gemini-3.5-flash-lite":   ModelLimits(rpm=15, tpm=250_000, rpd=500, reasoning=False),
+    "gemini/gemini-3.1-flash-lite":   ModelLimits(rpm=15, tpm=250_000, rpd=500, reasoning=False),
+
+    # NOT LISTED, deliberately:
+    #   gemini-2.5-flash, gemini-2.5-flash-lite — console shows 5/250K/20 and
+    #     10/250K/20, and both 404 on generateContent for this key.
+    #   gemini-2-flash, gemini-2-flash-lite, gemini-2.5-pro, gemini-3.1-pro —
+    #     console shows 0/0/0, i.e. no free-tier access at all.
+    #
     # Local fallback. Not provider-metered; the numbers just mean "effectively
     # unlimited" so the same accounting code path works without special-casing.
-    "ollama/qwen2.5:14b":           ModelLimits(rpm=1000, tpm=10**9, rpd=10**6, reasoning=True),
+    "ollama/qwen2.5:14b":             ModelLimits(rpm=1000, tpm=10**9, rpd=10**6, reasoning=True),
 }
 
 LOCAL_MODEL = "ollama/qwen2.5:14b"
@@ -102,8 +112,10 @@ SAFETY_MARGIN = 0.95
 # per key, then it falls through. The lite model is last so synthesis degrades
 # gracefully rather than failing once the reasoning models are spent.
 SYNTHESIS_LADDER: list[str] = [
+    "gemini/gemini-3.7-flash",
     "gemini/gemini-3.6-flash",
     "gemini/gemini-3.5-flash",
+    "gemini/gemini-3-flash-preview",
     "gemini/gemini-3.5-flash-lite",
     "gemini/gemini-3.1-flash-lite",
     LOCAL_MODEL,

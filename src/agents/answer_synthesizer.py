@@ -99,6 +99,30 @@ _SCRATCHPAD_MARKERS = (
 # generations during the incident came back at 349-575.
 _MIN_ANSWER_CHARS = 220
 
+# An answer may legitimately carry no citations when it is saying the corpus
+# does not support the question. That is a designed outcome, not a failure —
+# and often the *better* one, since naming the specific gap beats a blanket
+# refusal (see DECISIONS_LOG Decision 22).
+#
+# This list exists because the citation guard originally had no exception for
+# it, and the result was worse than the bug it was added to fix: asked for a
+# multiple the corpus cannot support, gemini-3.6-flash, gemini-3.5-flash and
+# gemini-3-flash-preview each correctly replied that the transaction value was
+# not stated — 285-438 characters, no markers to cite — and each was rejected
+# as a failed generation. The ladder burned three scarce 20-RPD reasoning slots
+# in a row, took 183 seconds, and then accepted the *weakest* model's answer.
+# A guard that spends the good models to reach the worst one is worse than no
+# guard.
+_DECLINES_TO_ANSWER = re.compile(
+    r"do(?:es)? not contain|not contain(?:ed)?"
+    r"|insufficient|not sufficient|unable to (?:find|determine|calculate|compute)"
+    r"|cannot be (?:calculated|computed|determined|established)"
+    r"|no (?:information|evidence|mention|disclosure|reference|record|data)"
+    r"|not (?:disclosed|provided|available|specified|present|stated|included)"
+    r"|is absent|are absent",
+    re.IGNORECASE,
+)
+
 
 def _is_usable_answer(answer: str | None, chunks: list[dict]) -> bool:
     """
@@ -116,9 +140,11 @@ def _is_usable_answer(answer: str | None, chunks: list[dict]) -> bool:
     one. Retrying costs a few seconds; publishing an unsourced figure in a due
     diligence report is the failure this project exists to prevent.
 
-    Deliberately narrow: it only rejects when there is evidence to cite. A
-    genuine refusal (no usable context) has nothing to cite and must pass
-    through untouched.
+    Deliberately narrow, in two directions. It only rejects when there is
+    evidence to cite, so a genuine refusal with no usable context passes
+    through. And it accepts an uncited answer that *declines* — one saying the
+    corpus does not support the question — because that is a designed outcome
+    with nothing to cite, not a failed generation.
 
     Args:
         answer: Raw model output.
@@ -143,7 +169,14 @@ def _is_usable_answer(answer: str | None, chunks: list[dict]) -> bool:
     if any(marker in lowered for marker in _SCRATCHPAD_MARKERS):
         return False
 
-    return bool(_CITATION_MARKER.search(text))
+    if _CITATION_MARKER.search(text):
+        return True
+
+    # No citations. Acceptable only when the answer is declining rather than
+    # asserting — an answer that states facts with nothing to trace them to is
+    # the failure this guard exists for; an answer that says the corpus does not
+    # support the question has nothing to trace in the first place.
+    return bool(_DECLINES_TO_ANSWER.search(text))
 
 
 def _select_cited_chunks(answer: str, chunks: list[dict]) -> list[dict]:

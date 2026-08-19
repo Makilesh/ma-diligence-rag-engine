@@ -20,17 +20,22 @@
 # ==============================================================================
 #
 #   model                    RPM     TPM      RPD    role
-#   gemini-3.6-flash           5    250K       20    synthesis (best reasoning)
+#   gemini-3.7-flash           5    250K       20    synthesis (newest)
+#   gemini-3.6-flash           5    250K       20    synthesis
 #   gemini-3.5-flash           5    250K       20    synthesis
+#   gemini-3-flash-preview     5    250K       20    synthesis
 #   gemini-3.5-flash-lite     15    250K      500    agents (volume tier)
 #   gemini-3.1-flash-lite     15    250K      500    agents (volume tier)
 #
-# NOT AVAILABLE on this API, and removed from both ladders after probing:
-#   gemini-3-flash, gemini-2.5-flash, gemini-2.5-flash-lite
-# Each returns 404 "not found for API version v1alpha", confirmed on two keys.
-# They were rungs the router descended into under quota pressure, where they
-# could only fail. Re-probe before adding a rung; availability is a provider
-# fact, not a config choice.
+# Quotas are transcribed from the AI Studio rate-limit console; availability was
+# confirmed separately with a live generateContent call per model, because the
+# two disagree:
+#   gemini-2.5-flash / gemini-2.5-flash-lite — listed in the console AND in
+#     ListModels, and 404 on every request. Not usable on this key.
+#   gemini-2-flash / gemini-2-flash-lite / gemini-2.5-pro / gemini-3.1-pro —
+#     console shows 0/0/0: no free-tier access.
+#   "Gemini 3 Flash" is served as gemini-3-flash-preview; the bare name 404s.
+# Re-probe before adding a rung. A plausible-looking name is not a model.
 #
 # Only the Lite tier can sustain traffic. Every reasoning-grade model is capped
 # at 20 requests/day, which is the single fact that dictates the routing below.
@@ -41,8 +46,10 @@ routing:
   # API key, then it falls through. Lite is last so synthesis degrades rather
   # than fails.
   synthesis_ladder:
+    - gemini/gemini-3.7-flash
     - gemini/gemini-3.6-flash
     - gemini/gemini-3.5-flash
+    - gemini/gemini-3-flash-preview
     - gemini/gemini-3.5-flash-lite
     - gemini/gemini-3.1-flash-lite
     - ollama/qwen2.5:14b

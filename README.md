@@ -120,16 +120,18 @@ The Gemini free tier is lopsided in a way that dictates the entire routing desig
 
 | Model | RPM | RPD | Role |
 |---|---|---|---|
-| `gemini-3.6-flash` | 5 | 20 | Synthesis (best reasoning) |
+| `gemini-3.7-flash` | 5 | 20 | Synthesis (newest reasoning) |
+| `gemini-3.6-flash` | 5 | 20 | Synthesis |
 | `gemini-3.5-flash` | 5 | 20 | Synthesis |
+| `gemini-3-flash-preview` | 5 | 20 | Synthesis |
 | `gemini-3.5-flash-lite` | 15 | **500** | Agents — volume tier |
 | `gemini-3.1-flash-lite` | 15 | **500** | Agents — volume tier |
 
-`gemini-3-flash`, `gemini-2.5-flash` and `gemini-2.5-flash-lite` were on these ladders and are **not served by this API** — each returns 404, confirmed on two keys. They have been removed; see the note on the phantom ladder below.
+Every model here was checked twice: against the AI Studio rate-limit console for its quota, and with a live `generateContent` call for whether this key can reach it at all. Both checks earn their keep — `gemini-2.5-flash` and `gemini-2.5-flash-lite` appear in the console *and* in the ListModels catalogue, and 404 on every request. `gemini-2-flash`, `gemini-2-flash-lite`, `gemini-2.5-pro` and `gemini-3.1-pro` show 0/0/0: no free-tier access.
 
 **Only the Lite tier can sustain traffic.** Every reasoning-grade model is capped at 20 requests/day. A query spends ~4 agent calls (classification, rewriting, quality assessment, validation) and 1 synthesis call — so putting agent traffic on a reasoning model would drain it in five queries, and it would then be unavailable to synthesis, which is the only place reasoning quality reaches the user.
 
-Per API key that works out to **969 agent calls/day (~242 queries)** and **76 syntheses on reasoning-grade models** before any downgrade.
+Per API key that works out to **950 agent calls/day (~237 queries)** and **76 syntheses on reasoning-grade models** (four rungs at 19 usable each) before any downgrade. With five keys configured, that is roughly 1,185 queries and 380 reasoning-grade syntheses per day.
 
 Hence two ladders, both defined in [`src/llm/model_registry.py`](src/llm/model_registry.py):
 
@@ -328,7 +330,15 @@ Fixed by dropping `document_category` from the parent pass too, once a query has
 
 The residual is worth stating: the *computed* 7.5x still appears in 2 of 4 live runs, and both misses were on `gemini-3.5-flash-lite` while both hits were on `gemini-3.6-flash`. Retrieval is now reliable; the arithmetic is model-dependent. The answer still reports the inputs it could not combine.
 
-**Half the fallback ladder did not exist.** Tracing a synthesis failure surfaced `404 models/gemini-3-flash is not found for API version v1alpha`. Probing every laddered model across two keys: `gemini-3-flash`, `gemini-2.5-flash` and `gemini-2.5-flash-lite` all 404. Three of six cloud rungs were phantom, so whenever the working rungs were spent or failing — exactly when a ladder earns its keep — the router descended into models that could only fail, burning an attempt and a timeout each. Every existing registry test checked internal consistency (laddered models have declared quotas, allowances fit under caps); none could check that a model is real, because that is a network fact rather than a config one.
+**Half the fallback ladder was unreachable, for two different reasons.** Tracing a synthesis failure surfaced `404 models/gemini-3-flash is not found for API version v1alpha`. Probing every laddered model: `gemini-3-flash`, `gemini-2.5-flash` and `gemini-2.5-flash-lite` all 404. Three of six cloud rungs were dead, so whenever the working rungs were spent or failing — exactly when a ladder earns its keep — the router descended into models that could only fail, burning an attempt and a timeout each.
+
+The three failed for reasons worth separating, and the first correction is one I had to make to my own earlier conclusion:
+
+- **`gemini-3-flash` was a wrong name, not a missing model.** The console calls it "Gemini 3 Flash"; the servable id is `gemini-3-flash-preview`. It works, and is back on the ladder under its real id. Reading a 404 as "this model does not exist" rather than "I asked for the wrong string" cost a working rung.
+- **`gemini-2.5-flash` and `gemini-2.5-flash-lite` really are unreachable** on this key — present in the console, present in ListModels, 404 on every `generateContent` call. A catalogue entry is not an availability guarantee.
+- **`gemini-3.7-flash` existed and was not being used at all.** Nothing fails when a newer model ships; the pipeline just quietly keeps running on the older one. It now leads the synthesis ladder, and a test asserts that it does.
+
+Every existing registry test checked internal consistency — laddered models have declared quotas, allowances fit under caps. None could catch any of this, because availability is a network fact rather than a config one.
 
 **Why the end-to-end number is measured separately from that.** Answer recall across runs is dominated by which synthesis model served the run, and that drifts within a day as the top rung's 20-request daily quota drains. Four runs of the same 41 questions scored 86.6%, 73.9%, 71.0% and 85.9% as the mix shifted between `gemini-3.6-flash` and `gemini-3.5-flash` — and question types that are **never** decomposed moved in lockstep (legal 100% → 73% → 98%, summary 72% → 50% → 83%). The fourth run tested the explanation rather than just restating it: run on fresh quota, 38 of its 41 answers were written by `gemini-3.6-flash`, and recall returned to the top of the range. Cross-run end-to-end comparison at this sample size therefore cannot attribute a change to a retrieval improvement, which is why the decomposition result above is measured on retrieval alone.
 

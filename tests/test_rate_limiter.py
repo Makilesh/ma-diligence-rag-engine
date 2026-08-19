@@ -870,30 +870,40 @@ class TestLadderModelsExist:
     """
     Every rung must be a model the provider actually serves.
 
-    Three of the six laddered Gemini models did not exist: `gemini-3-flash`,
-    `gemini-2.5-flash` and `gemini-2.5-flash-lite` each returned
-    404 "not found for API version v1alpha, or is not supported for
-    generateContent", confirmed on two independent keys. Half the fallback
-    ladder was phantom, so once the working rungs were spent or failing the
-    router descended into models that could only 404 — burning an attempt and a
-    timeout on each before reaching anything real.
+    Laddered models that returned 404 "not found ... or is not supported for
+    generateContent": `gemini-3-flash`, `gemini-2.5-flash` and
+    `gemini-2.5-flash-lite`. Half the fallback ladder was unreachable, so once
+    the working rungs were spent or failing the router descended into models
+    that could only 404 — burning an attempt and a timeout on each.
+
+    The three failed for two different reasons, and the distinction matters:
+
+      * `gemini-3-flash` was a WRONG NAME. The console calls it "Gemini 3
+        Flash"; the servable id is `gemini-3-flash-preview`. It works, and is
+        back on the ladder under its real id.
+      * `gemini-2.5-flash` and `gemini-2.5-flash-lite` are genuinely
+        unreachable on this key. Both appear in the rate-limit console *and* in
+        the ListModels catalogue, and both 404 on every generateContent call.
+        A catalogue entry is not an availability guarantee.
 
     This cannot assert live availability without a network call, so it pins the
-    ladders to the set that was probed. Changing that set should mean re-probing
-    (scripts in the session scratchpad), not editing this list to match.
+    ladders to the set that was probed end-to-end. Changing that set should mean
+    re-probing, not editing this list until it passes.
     """
 
     PROBED_AVAILABLE = {
+        "gemini/gemini-3.7-flash",
         "gemini/gemini-3.6-flash",
         "gemini/gemini-3.5-flash",
+        "gemini/gemini-3-flash-preview",
         "gemini/gemini-3.5-flash-lite",
         "gemini/gemini-3.1-flash-lite",
     }
 
     PROBED_MISSING = {
-        "gemini/gemini-3-flash",
-        "gemini/gemini-2.5-flash",
-        "gemini/gemini-2.5-flash-lite",
+        "gemini/gemini-3-flash",          # wrong id — the real one is -preview
+        "gemini/gemini-2.5-flash",        # 404s despite being catalogued
+        "gemini/gemini-2.5-flash-lite",   # 404s despite being catalogued
     }
 
     def test_no_ladder_contains_a_known_missing_model(self):
@@ -937,3 +947,42 @@ class TestLadderModelsExist:
                 f"{name} ladder has {len(cloud)} cloud rungs; it needs a real "
                 f"fallback, not just a top choice and the local model"
             )
+
+    def test_console_quotas_are_recorded_faithfully(self):
+        """
+        Declared limits must match the provider console, not a convenient guess.
+
+        Taken from the Google AI Studio rate-limit page: the reasoning tier is
+        5 RPM / 250K TPM / 20 RPD and the volume tier is 15 RPM / 250K TPM /
+        500 RPD. These numbers drive every routing and budget decision, so a
+        drift here silently mis-meters the whole pipeline.
+        """
+        from src.llm.model_registry import MODEL_LIMITS
+
+        reasoning = {
+            "gemini/gemini-3.7-flash", "gemini/gemini-3.6-flash",
+            "gemini/gemini-3.5-flash", "gemini/gemini-3-flash-preview",
+        }
+        volume = {"gemini/gemini-3.5-flash-lite", "gemini/gemini-3.1-flash-lite"}
+
+        for model in reasoning:
+            limits = MODEL_LIMITS[model]
+            assert (limits.rpm, limits.tpm, limits.rpd) == (5, 250_000, 20), model
+            assert limits.reasoning is True, model
+
+        for model in volume:
+            limits = MODEL_LIMITS[model]
+            assert (limits.rpm, limits.tpm, limits.rpd) == (15, 250_000, 500), model
+            assert limits.reasoning is False, model
+
+    def test_newest_reasoning_model_leads_synthesis(self):
+        """
+        The synthesis ladder must start at the newest reasoning model.
+
+        gemini-3.7-flash was released after this ladder was written and sat
+        unused while synthesis ran on 3.6. Nothing fails when a new model is
+        missed — the pipeline just quietly stops using the best thing available.
+        """
+        from src.llm.model_registry import SYNTHESIS_LADDER
+
+        assert SYNTHESIS_LADDER[0] == "gemini/gemini-3.7-flash"

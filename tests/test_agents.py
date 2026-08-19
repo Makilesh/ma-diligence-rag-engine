@@ -727,6 +727,41 @@ class TestUsableAnswerGuard:
         assert not _is_usable_answer("", self._chunks())
         assert not _is_usable_answer(None, self._chunks())
 
+    def test_uncited_decline_is_allowed_through(self):
+        """
+        Declining with evidence present must not be retried.
+
+        This is the counterpart to the uncited-assertion case, and getting it
+        wrong was expensive. Asked for a multiple the corpus cannot support,
+        three successive reasoning models correctly replied that the transaction
+        value was not stated — short, and with nothing to cite. The guard scored
+        each as a failed generation, so the ladder burned three scarce 20-RPD
+        rungs in a row, spent 183 seconds, and finally accepted the *weakest*
+        model's answer. A guard that spends the good models to reach the worst
+        one is worse than no guard.
+        """
+        from src.agents.answer_synthesizer import _is_usable_answer
+
+        decline = (
+            "### 1. Direct Answer. Based on the provided context, the "
+            "information is insufficient to calculate an exact Enterprise Value "
+            "to EBITDA multiple for the Vertex acquisition, because the total "
+            "transaction purchase price is not stated in the retrieved documents."
+        )
+        assert _is_usable_answer(decline, self._chunks())
+
+    def test_uncited_assertion_is_still_rejected(self):
+        """The exception must not swallow the case the guard was built for."""
+        from src.agents.answer_synthesizer import _is_usable_answer
+
+        assertion = (
+            "### 1. Direct Answer. Under Article VI of the Merger Agreement, "
+            "closing is subject to antitrust clearance, CFIUS review, and certain "
+            "foreign competition filings, each of which must be completed before "
+            "the transaction may be consummated by either party hereto."
+        )
+        assert not _is_usable_answer(assertion, self._chunks())
+
     def test_refusal_without_context_is_allowed_through(self):
         """
         A genuine refusal has nothing to cite and must not be retried.
