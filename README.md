@@ -27,8 +27,10 @@ No single passage states all of this. The exposure figure, the affected executiv
 
 ## Table of Contents
 - [Architecture](#architecture)
-- [Handling the hard parts of a data room](#handling-the-hard-parts-of-a-data-room)
-- [Retrieval pipeline](#retrieval-pipeline)
+- [Core Engineering Challenges Solved](#engineering-ma-due-diligence-challenges)
+- [Key Features & Advanced RAG Strategies](#key-features--advanced-rag-strategies)
+- [Sub-question decomposition](#sub-question-decomposition)
+- [Technology Stack](#technology-stack)
 - [Model routing & quota engineering](#model-routing--quota-engineering)
 - [Results](#results)
 - [Quick Start](#quick-start)
@@ -77,27 +79,48 @@ graph TD
 
 ---
 
-## Handling the hard parts of a data room
+## Engineering M&A Due Diligence Challenges
 
-**Tables must survive ingestion intact.** A financial answer is only as good as the cell it lands on. Each table is stored as **four linked representations** sharing a `table_id` — a narrative summary for semantic matching, row-by-row key/value pairs for precise lookup, deterministic pandas-computed metrics (YoY, CAGR, margins) with citation chains, and a clean markdown grid. Retrieval hitting *any* one of them pulls all four, so the synthesizer sees the real grid and arithmetic it never had to perform itself.
+M&A due diligence involves reasoning over massive, multi-format data rooms (e.g., 1000+ page PDFs, financial spreadsheets, legal contracts), where **a wrong number is a hard failure, not graceful degradation**. The engine addresses this through the following mechanisms:
 
-**Tables that span pages get stitched back together.** Continuation tables are fingerprinted by column count and header similarity, then merged into one section with a matching page range — rather than sliced mid-row by a naive chunker.
+**1. Memory-Efficient PDF Streaming** — Loading 1000+ page PDFs into memory causes Out-Of-Memory (OOM) failures. The ingestion pipeline uses **PyMuPDF (fitz)** to stream layout blocks and text page-by-page. It keeps the memory footprint flat regardless of document length.
 
-**Small chunks retrieve well but read badly.** The index holds 512-token chunks for precision, then swaps each hit for its 2048-token parent before synthesis, so the model sees the definition or footnote that gives a number its meaning.
+**2. Multi-Page Table Stitching** — Financial statements and cap tables routinely span page breaks. Naive chunking slices these tables mid-row, destroying structure. The **MultiPageTableStitcher** extracts tables page-by-page using `pdfplumber`, fingerprints their column structures (column counts and header similarities), and automatically stitches continuation tables across page boundaries into a single markdown table section with matching page-range metadata.
 
-**Provenance is first-class.** Superseded document versions are flagged in the citation panel; PII is detected at ingestion and excluded from retrieval unless a caller explicitly overrides it (never the model's decision); risk signals — change of control, MAC clauses, litigation — are extracted deterministically at ingestion and surfaced on a dashboard.
+**3. Cell-Level Numeric Fidelity (4-Representation Tables)** — Financial queries require exact numbers. The engine processes tables into **4 concurrent representations** sharing a single `table_id`:
+- **Narrative**: A text description of key items for semantic dense matching.
+- **Row-by-Row**: Key-value pairs for precise cell lookup.
+- **Metrics Summary**: Deterministic pandas-computed financial metrics (YoY growth, CAGR, margins) with explicit citation chains, preventing LLM arithmetic errors.
+- **Markdown**: A clean markdown grid for answer generation.
 
-**Large PDFs stream.** Layout blocks are read page-by-page via PyMuPDF, keeping memory flat regardless of document length.
+If retrieval finds *any* of these representations, a table-id lookup automatically pulls all 4 sibling chunks from Qdrant. The synthesizer receives the exact markdown grid and verified computed metrics, preventing LLM hallucinations.
+
+**4. Hierarchical Parent-Child Context Expansion** — Retrieving small, high-density chunks is optimal for search relevance, but lacks surrounding context. The engine retrieves 512-token semantic chunks but automatically swaps them for their larger **2048-token parent chunks** (from a dedicated parent collection) before synthesis. This provides the LLM with the full context (such as definitions or footnotes) without fragmenting the retrieval.
+
+**5. Layout-Aware Heading Detection** — Instead of hardcoded formatting rules, headings are identified using per-page statistical font-size distribution (any text block with font size > page median * 1.2 is classified as a heading), maintaining hierarchical lineage across diverse document layouts.
 
 ---
 
-## Retrieval pipeline
+## Key Features & Advanced RAG Strategies
 
-Dense vectors (**BAAI/bge-m3**, 1024-dim) and sparse BM25 are searched in one Qdrant collection and merged with **Reciprocal Rank Fusion** — rank-based, deliberately ignoring raw scores, because dense cosine similarity and BM25 term weights are not on a comparable scale. Survivors are re-scored by a **`bge-reranker-v2-m3` cross-encoder** with sigmoid normalisation, so thresholds mean something in `[0,1]`.
+- **Three-Tier Chunking** — Documents undergo structural parsing, followed by semantic chunking (sentence-boundary aware with 10% overlap) and custom tables/metrics preservation to avoid fragmentation.
+- **Hybrid Dense + Sparse Search** — Merges vector search (**BAAI/bge-m3**, 1024-dim) with sparse lexical search (**FastEmbed BM25**) in a unified Qdrant database.
+- **Reciprocal Rank Fusion (RRF)** — Custom rank-based fusion implementation that de-duplicates overlap and merges dense and sparse rankings, explicitly ignoring raw scores to prevent scale mismatch.
+- **Cross-Encoder Reranking** — Utilizes `BAAI/bge-reranker-v2-m3` for cross-attention query-passage scoring, applying a sigmoid-activation map to normalize scores within `[0,1]`.
+- **Sub-Question Decomposition** — Multi-fact questions are split into atomic sub-questions, each retrieved in its own pass and reranked against *itself*, then merged by quota so every facet reaches the context (measured below).
+- **Document Versioning** — Automatically flags superseded document versions and traces information lineage.
+- **PII & Risk Detection** — Flags PII at ingestion (excluded from retrieval by default) and surfaces risk signals (change-of-control, MAC clauses, litigation, etc.) on a dashboard.
+- **Token-Budget Governance** — Features a Postgres-backed (`BudgetTracker`) daily quota + RPM rate limiting per model, with a graceful in-memory fallback if Postgres is unavailable to keep API consumption under tight guardrails.
 
-**Sub-question decomposition** is what makes multi-hop work. Query expansion rephrases the same question; it cannot retrieve a fact the question never asks for. Asked for an implied EV/EBITDA multiple, the engine decomposes into transaction value, share count and EBITDA, retrieves each in **its own pass reranked against itself**, then merges round-robin so every facet is represented. A passage containing only a share price scores near zero against the parent question and high against "what is the per-share merger consideration?".
+---
 
-Measured on retrieval alone, so model choice cannot influence the result:
+## Sub-question decomposition
+
+This is what makes multi-hop questions work, and it is the retrieval change with the cleanest measurement behind it.
+
+Query expansion rephrases the same question — it cannot retrieve a fact the question never asks for. Asked for an implied EV/EBITDA multiple, the engine decomposes into transaction value, share count and EBITDA, retrieves each in **its own pass reranked against itself**, then merges round-robin so every facet is represented. A passage containing only a share price scores near zero against the parent question and high against "what is the per-share merger consideration?".
+
+Measured on retrieval alone — no synthesis, so model choice cannot influence the result:
 
 | | baseline | with decomposition |
 |---|---|---|
@@ -106,6 +129,22 @@ Measured on retrieval alone, so model choice cannot influence the result:
 | comparative (n=5) | 38.0% | **69.0% (+31.0)** |
 
 **7 improved, 0 regressed.** Question types that are not decomposed are untouched — the gain lands exactly where evidence is genuinely spread across documents.
+
+---
+
+## Technology Stack
+
+| Component | Technology | Detail |
+|---|---|---|
+| **Orchestration** | LangGraph | StateGraph + PostgresSaver (falls back to in-memory checkpointing) |
+| **Vector Database** | Qdrant | Hybrid (dense + sparse) search, self-hosted, with local-disk fallback |
+| **LLMs (Cloud)** | Gemini (via LiteLLM) | Capability-tiered ladders + multi-key rotation (see below) |
+| **LLM (Local)** | Ollama / Qwen2.5-14B | Final fallback when all cloud quota is spent |
+| **Embeddings** | BAAI/bge-m3 | 1024-dimensional dense vectors + FastEmbed BM25 sparse |
+| **Reranker** | BAAI/bge-reranker-v2-m3 | Cross-encoder, sigmoid-normalized |
+| **API Layer** | FastAPI | Structured JSON logging, async lifespan management |
+| **Frontend** | Streamlit | 8 custom dashboard components (citations, risk, version history, agent trace) |
+| **Database** | PostgreSQL | Budget tracking, LangGraph checkpoints |
 
 ---
 

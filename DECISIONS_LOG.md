@@ -351,3 +351,20 @@ All architecture decisions that deviated from or resolved ambiguities in p4.md a
 - **Guarded by**: `TestTimeoutIsTreatedAsUnavailability`, including an assertion that one timeout plus a fallback attempt still fits inside the client's request budget — the invariant that was actually violated.
 - **Note on the model itself**: `gemini-3.7-flash` is new and currently unreliable — 503s earlier in the session, hard timeouts now. It stays at the top of the ladder because it answers when it is healthy, and the cooldown makes an unhealthy day cost one attempt rather than the request.
 - **Impact**: litellm_wrapper.py, answer_synthesizer.py, tests/test_rate_limiter.py
+
+## Decision 46: Model cooldown escalates; a fixed one is wrong in both directions
+- **Date**: Session 9
+- **Context**: with `gemini-3.7-flash` timing out persistently, the flat 90-second cooldown from Decision 35 expired between queries. Every query therefore re-tried it, paid the full 120-second timeout, descended to `gemini-3.6-flash` and answered — putting a 41-question evaluation on course for 95 minutes instead of 30, and spending a scarce 20-RPD slot each time to learn something already known.
+- **Why not just lengthen it**: a long fixed cooldown strands a healthy model after a brief 503 spike, which is the case Decision 35 was written for. The two failure shapes need different treatment and a single constant cannot provide it.
+- **Resolution**: the cooldown doubles per consecutive failure — 90s, 180s, 360s, capped at 30 minutes — and **one success clears the streak**, so a recovered model is back in rotation immediately rather than serving out an escalated penalty. Failure counts are per model, so a sick rung never drags a healthy one into backoff.
+- **Observed live during the evaluation**: `gemini-3.7-flash` escalated 90s → 180s → 360s while `gemini-3.6-flash` and `gemini-3.5-flash` each took an independent 90s after their own single blips.
+- **Guarded by**: `TestEscalatingModelCooldown` — doubling, the cap, per-model isolation, and that a success resets the streak rather than merely clearing the current cooldown.
+- **Impact**: budget_tracker.py, answer_synthesizer.py
+
+## Decision 47: The README is a README, not a second decision log
+- **Date**: Session 9
+- **Context**: the README had grown to 445 lines and was carrying the full narrative of every bug found — three competing A/B tables for one feature, a paragraph contradicting a table three screens earlier, and long war stories that belong here. A reader evaluating the project had to mine it for what the system actually does.
+- **Resolution**: restructured to 333 lines. It now opens with a worked multi-hop answer showing real citations, then architecture, the ingestion and retrieval mechanisms, the quota engineering, results, and setup. Bug narratives collapsed to six short "engineering notes" that state the lesson and point here for the full account.
+- **What was deliberately kept in full**: the five due-diligence ingestion mechanisms (PDF streaming, multi-page table stitching, the 4-representation table model, parent-child expansion, layout-aware headings), the RAG strategy list, and the technology stack table. These are the concrete substance of the system rather than commentary on it — an earlier draft compressed them and lost the specifics that make the work legible.
+- **Also corrected**: stale figures throughout — the summary table still showed a superseded run, the run history listed four runs when six had happened, and the roadmap listed two completed items as outstanding. Verified programmatically that the quota table matches `MODEL_LIMITS`, the capacity figures match what the registry computes, and every headline number matches `RESULTS.md`.
+- **Impact**: README.md
