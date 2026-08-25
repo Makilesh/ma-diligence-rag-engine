@@ -1236,3 +1236,104 @@ class TestTimeoutIsTreatedAsUnavailability:
             "a single timeout plus one fallback attempt must fit inside the "
             "client's request budget"
         )
+
+
+class TestEscalatingModelCooldown:
+    """
+    Repeated failure on one model must get progressively cheaper.
+
+    A fixed cooldown is wrong in both directions. Too long and a model that
+    recovers from a brief 503 spike sits stranded. Too short and a persistently
+    sick model is re-tried on every query: when `gemini-3.7-flash` began timing
+    out, a flat 90s meant each query paid the full 120s timeout before
+    descending, putting a 41-question evaluation on course for 95 minutes
+    instead of 30 — and spending a scarce 20-RPD slot each time to learn
+    nothing.
+    """
+
+    @staticmethod
+    def _tracker():
+        from src.llm.budget_tracker import BudgetTracker
+
+        t = BudgetTracker.__new__(BudgetTracker)
+        t._api_keys = ["k" * 40]
+        t._rate_limiters = {}
+        t._is_mock = True
+        t._mock_budgets = {}
+        return t
+
+    def test_cooldown_doubles_on_consecutive_failures(self):
+        import time
+
+        from src.llm.budget_tracker import SERVICE_COOLDOWN_SECONDS
+
+        t = self._tracker()
+        model = "gemini/gemini-3.7-flash"
+
+        seen = []
+        for _ in range(4):
+            t.skip_model_for_request(model)
+            seen.append(round(t._model_cooldowns[model] - time.monotonic()))
+
+        base = SERVICE_COOLDOWN_SECONDS
+        assert seen[0] == round(base)
+        for i in range(1, len(seen)):
+            assert seen[i] >= seen[i - 1] * 2 - 2, f"not doubling: {seen}"
+
+    def test_cooldown_is_capped(self):
+        import time
+
+        from src.llm.budget_tracker import MAX_SERVICE_COOLDOWN_SECONDS
+
+        t = self._tracker()
+        model = "gemini/gemini-3.7-flash"
+        for _ in range(20):
+            t.skip_model_for_request(model)
+
+        remaining = t._model_cooldowns[model] - time.monotonic()
+        assert remaining <= MAX_SERVICE_COOLDOWN_SECONDS + 1, (
+            "an unbounded backoff would retire a model for the rest of the day"
+        )
+
+    def test_one_success_clears_the_streak(self):
+        """A recovered model must return to rotation immediately, not in 30 minutes."""
+        import time
+
+        from src.llm.budget_tracker import SERVICE_COOLDOWN_SECONDS
+
+        t = self._tracker()
+        model = "gemini/gemini-3.7-flash"
+        for _ in range(5):
+            t.skip_model_for_request(model)
+        assert model in t._models_in_cooldown()
+
+        t.note_model_healthy(model)
+        assert model not in t._models_in_cooldown()
+
+        # And the next failure starts from the base delay, not the escalated one.
+        t.skip_model_for_request(model)
+        assert round(t._model_cooldowns[model] - time.monotonic()) == round(
+            SERVICE_COOLDOWN_SECONDS
+        )
+
+    def test_failure_streaks_are_tracked_per_model(self):
+        """One sick model must not push a healthy one into backoff."""
+        import time
+
+        from src.llm.budget_tracker import SERVICE_COOLDOWN_SECONDS
+
+        t = self._tracker()
+        sick, healthy = "gemini/gemini-3.7-flash", "gemini/gemini-3.6-flash"
+
+        for _ in range(4):
+            t.skip_model_for_request(sick)
+        t.skip_model_for_request(healthy)
+
+        assert round(t._model_cooldowns[healthy] - time.monotonic()) == round(
+            SERVICE_COOLDOWN_SECONDS
+        )
+        assert t._model_cooldowns[sick] > t._model_cooldowns[healthy]
+
+    def test_note_healthy_on_an_unknown_model_is_safe(self):
+        t = self._tracker()
+        t.note_model_healthy("gemini/never-seen")  # must not raise

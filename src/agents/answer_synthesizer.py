@@ -354,6 +354,7 @@ async def answer_synthesizer_node(state: AgentState) -> dict:
                 tracker.skip_model_for_request(model)
                 continue
             answer = candidate
+            tracker.note_model_healthy(model)
             break
         except Exception as e:
             last_error = e

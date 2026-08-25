@@ -41,11 +41,21 @@ from src.utils.logger import setup_logger
 logger = setup_logger(__name__)
 
 
-# How long to skip a model after the provider reports it unavailable (503).
-# Long enough to get past a demand spike, short enough that a model does not sit
-# unused after it recovers — observed spikes on gemini-3.6-flash cleared within
-# a couple of minutes.
+# How long to skip a model after the provider reports it unavailable, or after
+# it burns its whole timeout without answering.
+#
+# The cooldown DOUBLES on each consecutive failure, because a fixed one is wrong
+# in both directions. A brief 503 spike clears in a couple of minutes, so a long
+# fixed cooldown would strand a healthy model. But when gemini-3.7-flash started
+# timing out persistently, a fixed 90s meant every query re-tried it, paid the
+# full 120s timeout, and only then descended — a 41-question evaluation was on
+# course to take 95 minutes instead of 30, and spent a scarce 20-RPD slot each
+# time to learn nothing new.
+#
+# Doubling makes repeated failure cheap: 90s, 180s, 360s, and so on to the cap.
+# One success resets it, so a model that recovers is back in rotation at once.
 SERVICE_COOLDOWN_SECONDS = 90.0
+MAX_SERVICE_COOLDOWN_SECONDS = 1800.0
 
 
 def _utc_today() -> date:
@@ -393,7 +403,39 @@ class BudgetTracker:
             return
         if not hasattr(self, "_model_cooldowns"):
             self._model_cooldowns = {}
-        self._model_cooldowns[model] = time.monotonic() + SERVICE_COOLDOWN_SECONDS
+        if not hasattr(self, "_model_failures"):
+            self._model_failures = {}
+
+        failures = self._model_failures.get(model, 0) + 1
+        self._model_failures[model] = failures
+        backoff = min(
+            SERVICE_COOLDOWN_SECONDS * (2 ** (failures - 1)),
+            MAX_SERVICE_COOLDOWN_SECONDS,
+        )
+        self._model_cooldowns[model] = time.monotonic() + backoff
+        logger.info(
+            "Model cooling down after consecutive failures",
+            extra={"model": model, "consecutive_failures": failures,
+                   "cooldown_seconds": backoff},
+        )
+
+    def note_model_healthy(self, model: str) -> None:
+        """
+        Clears the failure streak after a model answers successfully.
+
+        Without this the backoff would only ever grow, so a model that recovered
+        after a bad spell would stay side-lined for up to half an hour. One good
+        answer is sufficient evidence that the outage is over.
+
+        Args:
+            model: Upstream model that just returned a usable response.
+        """
+        failures = getattr(self, "_model_failures", None)
+        if failures:
+            failures.pop(model, None)
+        cooldowns = getattr(self, "_model_cooldowns", None)
+        if cooldowns:
+            cooldowns.pop(model, None)
 
     def _models_in_cooldown(self) -> set[str]:
         """Models currently skipped after a provider-side unavailability."""
