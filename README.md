@@ -6,117 +6,112 @@
 [![Tests](https://img.shields.io/badge/tests-179%20passed-green.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-A **hybrid agentic RAG engine** for mergers & acquisitions due diligence. It ingests multi-format data rooms (financial statements, legal contracts, board decks) and performs multi-step reasoning over them with **deterministic financial verification, hallucination guarding, and traceable citations** — prioritizing "I don't know" over confident hallucination on high-stakes financial/legal questions.
+A **hybrid agentic RAG engine for M&A(mergers & acquisitions) due diligence**. It ingests a multi-format data room — financial statements, merger agreements, board decks, credit agreements — and answers questions that require combining facts across several documents, with every claim traced to a source.
+
+The design constraint that shapes everything: **in due diligence a wrong number is a hard failure, not graceful degradation.** A reviewer told "I can't find this" loses a minute. A reviewer given a confident, wrong EBITDA figure can misprice a deal. So the engine is built to refuse, and refusal is measured as carefully as accuracy.
+
+---
+
+## What it looks like
+
+> **Q: What is the Section 280G excise tax exposure and which executives trigger it?**
+>
+> **Total potential Section 280G excise tax exposure: $2.4 million**
+> **Executives triggering excess parachute payments:** Marsh (CEO), Wu, and Chen.
+>
+> Marsh, Wu and Chen are expected to exceed the Section 280G safe harbour threshold, exposing the Company to a 20% excise tax and the loss of the corresponding corporate tax deduction `[employment_and_retention_agreements.txt | p.2 | Section 280G]`. The Company has **not** obtained a shareholder cleansing vote…
+
+No single passage states all of this. The exposure figure, the affected executives and the cleansing-vote status sit in different sections, and the question has to be decomposed before any of them can be retrieved.
 
 ---
 
 ## Table of Contents
-- [Architecture](#multi-agent-architecture)
-- [Core Engineering Challenges Solved](#engineering-ma-due-diligence-challenges)
-- [Key Features](#key-features--advanced-rag-strategies)
-- [Tech Stack](#technology-stack)
-- [Model Routing & Quota Engineering](#model-routing--quota-engineering)
+- [Architecture](#architecture)
+- [Handling the hard parts of a data room](#handling-the-hard-parts-of-a-data-room)
+- [Retrieval pipeline](#retrieval-pipeline)
+- [Model routing & quota engineering](#model-routing--quota-engineering)
+- [Results](#results)
 - [Quick Start](#quick-start)
-- [Results & Honest Limitations](#results--validation)
+- [Engineering notes](#engineering-notes)
+- [Limitations](#limitations)
 - [Roadmap](#roadmap)
-- [Key Engineering Lessons](#key-engineering-lessons)
 - [Project Structure](#project-structure)
 
 ---
 
-## Multi-Agent Architecture
+## Architecture
 
-Orchestrated with a **LangGraph StateGraph** of **7 specialized graph nodes** (plus one deterministic, zero-LLM helper) collaborating through typed shared state, with checkpointing keyed by `(deal_id, session_id)`. Retrieval strategy selection is deterministic, not LLM-driven, to cut unnecessary latency and cost.
+A **LangGraph StateGraph** of 7 LLM agents plus one deterministic helper, sharing typed state and checkpointed to Postgres by `(deal_id, session_id)`. Retrieval strategy selection is deterministic rather than LLM-driven — it is a lookup, and paying a model call for it would buy latency and an extra failure mode for nothing.
 
 ```mermaid
 graph TD
     A["FastAPI /api/v1/query"] --> B["LangGraph Orchestrator"]
-    B --> C["Agent 1: Query Intelligence<br/>(Intent & Extraction)"]
-    C --> E["Agent 3: Retrieval Executor<br/>(Deterministic Strategy & Qdrant Search)"]
+    B --> C["Agent 1: Query Intelligence<br/>(Intent, filters, sub-questions)"]
+    C --> E["Agent 3: Retrieval Executor<br/>(Hybrid search + RRF + rerank)"]
     E --> F{"Financial Query?"}
-    F -->|Yes| G["Agent 4: Financial Verifier<br/>(Numerical Consistency Checks)"]
-    F -->|No| H["Agent 5: Quality Assessor<br/>(Heuristic & LLM Evaluation)"]
+    F -->|Yes| G["Agent 4: Financial Verifier<br/>(Numerical consistency)"]
+    F -->|No| H["Agent 5: Quality Assessor<br/>(Heuristic, LLM fallback)"]
     G --> H
-    H --> I{"Quality Score?"}
-    I -->|"Pass (Score ≥ 0.3)"| J["Agent 7: Answer Synthesizer<br/>(Structured Markdown Generation)"]
-    I -->|"Fail & Attempt < 2"| K["Agent 6: Query Rewriter<br/>(Query Expansion & Tuning)"]
-    I -->|"Fail & Attempt = 2"| L["Forced Refusal<br/>(Insufficient Context)"]
+    H --> I{"Context good enough?"}
+    I -->|"Pass"| J["Agent 7: Answer Synthesizer<br/>(Cited markdown)"]
+    I -->|"Fail, attempt < 2"| K["Agent 6: Query Rewriter"]
+    I -->|"Fail, attempt = 2"| L["Refusal<br/>(Insufficient context)"]
     K --> E
-    J --> M["Agent 8: Hallucination Validator<br/>(Claim Grounding Checks)"]
-    M --> N{"Validation Status?"}
-    N -->|Passed / Warning| O["End Response"]
-    N -->|Failed & Attempt < 1| J
+    J --> M["Agent 8: Hallucination Validator<br/>(Claim grounding)"]
+    M --> N{"Validated?"}
+    N -->|Passed / Warning| O["Response"]
+    N -->|Failed, attempt < 1| J
     L --> O
 ```
 
-### The Agents
-
 | # | Agent | Role |
 |---|---|---|
-| 1 | **Query Intelligence** | Classifies user intent, flags numerical-precision needs, extracts metadata filters |
-| 2 | **Retrieval Strategy** *(deterministic, no LLM)* | Picks dense/sparse weights and top-k by query type — zero added latency |
-| 3 | **Retrieval Executor** | Queries Qdrant using hybrid search and merges results via Reciprocal Rank Fusion (RRF).|
-| 4 | **Financial Verifier** | Normalizes numbers (units/currency) and cross-checks figures against source tables |
-| 5 | **Quality Assessor** | Scores context quality using a hybrid heuristic-LLM checker. |
-| 6 | **Query Rewriter** | Reformulates the query when retrieval quality is insufficient (max 2 loops) |
-| 7 | **Answer Synthesizer** | Generates structured, cited markdown answers |
-| 8 | **Hallucination Validator** | Validates every claim against retrieved source text and flags unsupported ones |
+| 1 | **Query Intelligence** | Classifies intent, extracts metadata filters, decomposes multi-fact questions into sub-questions |
+| 2 | **Retrieval Strategy** *(no LLM)* | Picks dense/sparse weights and top-k by query type — zero added latency |
+| 3 | **Retrieval Executor** | Hybrid search over Qdrant, Reciprocal Rank Fusion, cross-encoder rerank |
+| 4 | **Financial Verifier** | Normalises units and currency, cross-checks figures against source tables |
+| 5 | **Quality Assessor** | Scores whether the retrieved context can support an answer at all |
+| 6 | **Query Rewriter** | Reformulates and relaxes filters when retrieval comes back thin (max 2 loops) |
+| 7 | **Answer Synthesizer** | Writes the cited answer, or declines |
+| 8 | **Hallucination Validator** | Checks every claim against the retrieved text and flags unsupported ones |
 
 ---
 
-## Engineering M&A Due Diligence Challenges
+## Handling the hard parts of a data room
 
-M&A due diligence involves reasoning over massive, multi-format data rooms (e.g., 1000+ page PDFs, financial spreadsheets, legal contracts), where **a wrong number is a hard failure, not graceful degradation**. The engine addresses this through the following mechanisms:
+**Tables must survive ingestion intact.** A financial answer is only as good as the cell it lands on. Each table is stored as **four linked representations** sharing a `table_id` — a narrative summary for semantic matching, row-by-row key/value pairs for precise lookup, deterministic pandas-computed metrics (YoY, CAGR, margins) with citation chains, and a clean markdown grid. Retrieval hitting *any* one of them pulls all four, so the synthesizer sees the real grid and arithmetic it never had to perform itself.
 
-**1. Memory-Efficient PDF Streaming** — Loading 1000+ page PDFs into memory causes Out-Of-Memory (OOM) failures. The ingestion pipeline uses **PyMuPDF (fitz)** to stream layout blocks and text page-by-page. It keeps the memory footprint flat regardless of document length.
+**Tables that span pages get stitched back together.** Continuation tables are fingerprinted by column count and header similarity, then merged into one section with a matching page range — rather than sliced mid-row by a naive chunker.
 
-**2. Multi-Page Table Stitching** — Financial statements and cap tables routinely span page breaks. Naive chunking slices these tables mid-row, destroying structure. The **MultiPageTableStitcher** extracts tables page-by-page using `pdfplumber`, fingerprints their column structures (column counts and header similarities), and automatically stitches continuation tables across page boundaries into a single markdown table section with matching page-range metadata.
+**Small chunks retrieve well but read badly.** The index holds 512-token chunks for precision, then swaps each hit for its 2048-token parent before synthesis, so the model sees the definition or footnote that gives a number its meaning.
 
-**3. Cell-Level Numeric Fidelity (4-Representation Tables)** — Financial queries require exact numbers. The engine processes tables into **4 concurrent representations** sharing a single `table_id`:
-- **Narrative**: A text description of key items for semantic dense matching.
-- **Row-by-Row**: Key-value pairs for precise cell lookup.
-- **Metrics Summary**: Deterministic pandas-computed financial metrics (YoY growth, CAGR, margins) with explicit citation chains, preventing LLM arithmetic errors.
-- **Markdown**: A clean markdown grid for answer generation.
+**Provenance is first-class.** Superseded document versions are flagged in the citation panel; PII is detected at ingestion and excluded from retrieval unless a caller explicitly overrides it (never the model's decision); risk signals — change of control, MAC clauses, litigation — are extracted deterministically at ingestion and surfaced on a dashboard.
 
-If retrieval finds *any* of these representations, a table-id lookup automatically pulls all 4 sibling chunks from Qdrant. The synthesizer receives the exact markdown grid and verified computed metrics, preventing LLM hallucinations.
-
-**4. Hierarchical Parent-Child Context Expansion** — Retrieving small, high-density chunks is optimal for search relevance, but lacks surrounding context. The engine retrieves 512-token semantic chunks but automatically swaps them for their larger **2048-token parent chunks** (from a dedicated parent collection) before synthesis. This provides the LLM with the full context (such as definitions or footnotes) without fragmenting the retrieval.
-
-**5. Layout-Aware Heading Detection** — Instead of hardcoded formatting rules, headings are identified using per-page statistical font-size distribution (any text block with font size > page median * 1.2 is classified as a heading), maintaining hierarchical lineage across diverse document layouts.
+**Large PDFs stream.** Layout blocks are read page-by-page via PyMuPDF, keeping memory flat regardless of document length.
 
 ---
 
-## Key Features & Advanced RAG Strategies
+## Retrieval pipeline
 
-- **Three-Tier Chunking** — Documents undergo structural parsing, followed by semantic chunking (sentence-boundary aware with 10% overlap) and custom tables/metrics preservation to avoid fragmentation.
-- **Hybrid Dense + Sparse Search** — Merges vector search (**BAAI/bge-m3**, 1024-dim) with sparse lexical search (**FastEmbed BM25**) in a unified Qdrant database.
-- **Reciprocal Rank Fusion (RRF)** — Custom rank-based fusion implementation that de-duplicates overlap and merges dense and sparse rankings, explicitly ignoring raw scores to prevent scale mismatch.
-- **Cross-Encoder Reranking** — Utilizes `BAAI/bge-reranker-v2-m3` for cross-attention query-passage scoring, applying a sigmoid-activation map to normalize scores within `[0,1]`.
-- **Document Versioning** — Automatically flags superseded document versions and traces information lineage.
-- **PII & Risk Detection** — Flags PII at ingestion (excluded from retrieval by default) and surfaces risk signals (change-of-control, MAC clauses, litigation, etc.) on a dashboard
-- **Token-Budget Governance** — Features a Postgres-backed (`BudgetTracker`) daily quota + RPM rate limiting per model, with a graceful in-memory fallback if Postgres is unavailable to keep API consumption under tight guardrails.
+Dense vectors (**BAAI/bge-m3**, 1024-dim) and sparse BM25 are searched in one Qdrant collection and merged with **Reciprocal Rank Fusion** — rank-based, deliberately ignoring raw scores, because dense cosine similarity and BM25 term weights are not on a comparable scale. Survivors are re-scored by a **`bge-reranker-v2-m3` cross-encoder** with sigmoid normalisation, so thresholds mean something in `[0,1]`.
 
----
+**Sub-question decomposition** is what makes multi-hop work. Query expansion rephrases the same question; it cannot retrieve a fact the question never asks for. Asked for an implied EV/EBITDA multiple, the engine decomposes into transaction value, share count and EBITDA, retrieves each in **its own pass reranked against itself**, then merges round-robin so every facet is represented. A passage containing only a share price scores near zero against the parent question and high against "what is the per-share merger consideration?".
 
-## Technology Stack
+Measured on retrieval alone, so model choice cannot influence the result:
 
-| Component | Technology | Detail |
+| | baseline | with decomposition |
 |---|---|---|
-| **Orchestration** | LangGraph | StateGraph + PostgresSaver (falls back to in-memory checkpointing) |
-| **Vector Database** | Qdrant | Hybrid (dense + sparse) search, Self-Hosted, with local-disk fallback |
-| **LLMs (Cloud)** | Gemini (via LiteLLM) | Capability-tiered ladders + multi-key rotation (see below) |
-| **LLM (Local)** | Ollama / Qwen2.5-14B | Final fallback when all cloud quota is spent |
-| **Embeddings** | BAAI/bge-m3 | 1024-dimensional dense vectors + FastEmbed BM25 sparse |
-| **Reranker** | BAAI/bge-reranker-v2-m3 | Cross-encoder (Sigmoid Normalized) |
-| **API Layer** | FastAPI | Structured JSON logging, async lifespan management |
-| **Frontend** | Streamlit | 8 custom dashboard components (citations, risk, version history, agent trace) |
-| **Database** | PostgreSQL | Budget tracking, LangGraph checkpoints |
+| All 35 answerable questions | 63.4% | **73.8% (+10.4pp)** |
+| multi-hop (n=10) | 73.8% | **94.7% (+20.8)** |
+| comparative (n=5) | 38.0% | **69.0% (+31.0)** |
+
+**7 improved, 0 regressed.** Question types that are not decomposed are untouched — the gain lands exactly where evidence is genuinely spread across documents.
 
 ---
 
-## Model Routing & Quota Engineering
+## Model routing & quota engineering
 
-The Gemini free tier is lopsided in a way that dictates the entire routing design:
+The Gemini free tier is lopsided in a way that dictates the whole design: every reasoning-grade model is capped at **20 requests/day**, while the Lite tier allows **500**.
 
 | Model | RPM | RPD | Role |
 |---|---|---|---|
@@ -124,292 +119,146 @@ The Gemini free tier is lopsided in a way that dictates the entire routing desig
 | `gemini-3.6-flash` | 5 | 20 | Synthesis |
 | `gemini-3.5-flash` | 5 | 20 | Synthesis |
 | `gemini-3-flash-preview` | 5 | 20 | Synthesis |
-| `gemini-2.5-flash` | 5 | 20 | Synthesis — *grandfathered keys only* |
+| `gemini-2.5-flash` | 5 | 20 | Synthesis — grandfathered keys only |
 | `gemini-3.5-flash-lite` | 15 | **500** | Agents — volume tier |
 | `gemini-3.1-flash-lite` | 15 | **500** | Agents — volume tier |
-| `gemini-2.5-flash-lite` | 10 | 20 | Agents — *grandfathered keys only* |
+| `gemini-2.5-flash-lite` | 10 | 20 | Agents — grandfathered keys only |
 
-Every model here was checked twice: against the AI Studio console for its quota, and with a live `generateContent` call **per key** for whether that credential can reach it. The second check found the interesting case — **availability is a property of the (key, model) pair, not of the model.** `gemini-2.5-flash` and `gemini-2.5-flash-lite` are closed to new sign-ups: they answer on two of five configured keys and return 404 *"no longer available to new users"* on the rest, because Google grandfathers older keys.
+A query spends ~4 agent calls and 1 synthesis call. Putting agent traffic on a reasoning model would drain it in five queries and leave nothing for synthesis — the one call whose quality reaches the user. Hence **two ladders**: the agent ladder ordered by *daily capacity* with reasoning models excluded (enforced by a test), and the synthesis ladder ordered by *capability*, spilling to Lite only once the good models are spent, and finally to local Ollama.
 
-The router handles that at the right granularity. A 429 retires the pair for a day; a 503 retires the model for every key briefly; an auth error retires the key entirely; and a per-key revocation retires exactly one slot, permanently, leaving the model usable on the keys that still have it. Restoring these two on that basis added **19 reasoning-grade syntheses and 19 agent calls per day on each grandfathered key**.
+**Keys multiply capacity, so rotation drains one key on a model before stepping down a rung** — answer quality degrades last, not first. That required a non-blocking `try_acquire()`: the natural `acquire()` sleeps until the rate window opens, which would block on a saturated key while another sat idle.
 
-`gemini-2-flash`, `gemini-2-flash-lite`, `gemini-2.5-pro` and `gemini-3.1-pro` show 0/0/0 in the console: no free-tier access on any key.
+**Failures are classified by what they actually mean**, because each implies a different repair:
 
-**Only the Lite tier can sustain traffic.** Every reasoning-grade model is capped at 20 requests/day. A query spends ~4 agent calls (classification, rewriting, quality assessment, validation) and 1 synthesis call — so putting agent traffic on a reasoning model would drain it in five queries, and it would then be unavailable to synthesis, which is the only place reasoning quality reaches the user.
+| Signal | Meaning | Response |
+|---|---|---|
+| 429 | this key is spent on this model | rotate to another key |
+| 503 / timeout | the model is unresponsive for everyone | skip the model, escalating backoff, no quota debited |
+| 404 "no longer available" | this key may never use this model | retire that one slot, permanently |
+| auth error | the credential is bad | retire the key across all models |
 
-Per API key that works out to **969 agent calls/day (~242 queries)** and **95 syntheses on reasoning-grade models** across five rungs — though the last rung of each ladder exists only on grandfathered keys, so a newer key gets 950 and 76.
+That taxonomy is not academic. `gemini-2.5-flash` answers on two of five configured keys and 404s on the rest — Google grandfathers older keys when a model closes to new sign-ups, so **availability is a property of the (key, model) pair, not of the model.** Retiring the model would have discarded real capacity; retiring the key would have discarded more.
 
-Hence two ladders, both defined in [`src/llm/model_registry.py`](src/llm/model_registry.py):
+Per key: **969 agent calls/day (~242 queries)** and **95 reasoning-grade syntheses** across five rungs. Quotas live in one table — [`src/llm/model_registry.py`](src/llm/model_registry.py) — with invariant tests, because two earlier quota bugs were arithmetic errors over constants duplicated across three files.
 
-- **Agent ladder** — ordered by *daily capacity*, Lite models only. Reasoning models are deliberately excluded (enforced by a test).
-- **Synthesis ladder** — ordered by *capability*, spilling to Lite only once the reasoning models are spent.
+---
 
-**Multi-key rotation.** Quotas are enforced per API key, so keys multiply capacity:
+## Results
 
-```bash
-GEMINI_API_KEYS=key_one,key_two,key_three   # or GEMINI_API_KEY_1/2/…, or GEMINI_API_KEY
-```
+Validated against a synthetic data room of **9 documents (~66K tokens)** with a hand-built golden set of **41 questions: 35 answerable** (10 of them multi-hop) plus **6 unanswerable controls** whose answers are absent by construction. The controls are what make the answer rate falsifiable — without them, "always finds the answer" and "never refuses" produce identical numbers.
 
-Selection drains one key on a given model before trying the next key on the **same** model, and only steps down a rung once every key is spent — so **answer quality degrades last, not first**. Across two keys that yields ~152 reasoning-grade syntheses before any downgrade, then ~950 Lite calls, then local Ollama.
+| Metric | Result |
+|---|---|
+| Completed without an unhandled exception | 41/41 |
+| Answerable questions answered | 35/35 |
+| Mean fact recall | **86.3%** |
+| Answers containing every expected fact | 26/35 |
+| Citation-source match | 33/35 |
+| Answers flagged unsupported by the validator | 0/35 |
+| Controls where the engine did **not** fabricate | 6/6 |
+| Latency per query | 13–36s |
 
-This required a non-blocking `RateLimiter.try_acquire()`: the existing `acquire()` *sleeps* until the window opens, which is correct with one destination but would block on a saturated key while another sat idle — wasting exactly the capacity the extra keys were added for.
+Per type: legal 100%, financial 87.9%, multi-hop 82.5%, summary 80.6%, comparative 74.0%. Full per-query output, including every answer verbatim, in [`RESULTS.md`](RESULTS.md).
 
-Two quota bugs were found and fixed by consolidating limits into one table: separate rate limiters summing to 20 RPM against a shared 15 RPM model quota, and per-bucket daily allowances summing to 960/day against a 500 RPD cap. Both were arithmetic errors over numbers that lived in three different files. The fix in each case is an invariant test, not a corrected constant.
+**One caveat matters enough to state up front.** Recall on this set moves with *which synthesis model served the run*, and that depends on daily quota and provider health rather than on anything in this repository. Six runs of identical questions against an identical index scored 86.6%, 73.9%, 71.0%, 85.9%, 62.1% and 86.3% — the 62.1% run coincided with a Gemini incident that truncated a third of its answers. `RESULTS.md` therefore records the synthesis model mix and the upstream-failure count with every report, so no figure can be read without the conditions that produced it. Retrieval changes are measured on retrieval alone for the same reason.
+
+The refusal path is a feature, not a fallback: on all 6 controls the engine declined to invent the missing figure — usually by answering the part it *could* support and naming the gap explicitly, which is better due-diligence behaviour than a blanket refusal.
 
 ---
 
 ## Quick Start
 
 ### 1. Prerequisites
-Ensure you have Docker and Python 3.12+ installed.
+Docker and Python 3.12+.
 
-### 2. Setup Env & Packages
+### 2. Setup
+
 ```bash
-# Clone the repository and configure environment variables
 cp .env.example .env
 # Edit .env — add GEMINI_API_KEYS (one or more, comma-separated) and the DB password
 
-# Install requirements
 pip install -r requirements.txt
 
-# Install PyTorch for your GPU. --force-reinstall --no-deps is required:
-# a plain `pip install torch --index-url ...` reports "Requirement already
-# satisfied" against an existing CPU build and silently leaves it in place.
+# PyTorch for your GPU. --force-reinstall --no-deps is required: a plain
+# `pip install torch --index-url ...` reports "Requirement already satisfied"
+# against an existing CPU build and silently leaves it in place.
 pip install --force-reinstall --no-deps torch --index-url https://download.pytorch.org/whl/cu128
 ```
 
-**Check that the GPU is actually being used** — this is worth thirty seconds, because the failure is silent and costs about 5x on every query:
+Verify the GPU is actually in use — this failure is silent and costs about 5x on every query:
 
 ```bash
 python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
 ```
 
-`2.11.0+cu128 True` is correct. Anything ending `+cpu`, or `False`, means the embedding and reranker models are running on CPU: everything still works and answers are identical, but retrieval goes from under a second to roughly 6–18 seconds per pass. Use `cu128` or later for RTX 50-series (Blackwell, sm_120); `cu118`/`cu124` for older cards. With no GPU, install plain `torch` and expect the slower path.
+`2.11.0+cu128 True` is correct. Anything ending `+cpu`, or `False`, means the embedding and reranker models are running on CPU: answers are identical, but retrieval goes from under a second to 6–18s per pass. Use `cu128`+ for RTX 50-series (Blackwell), `cu118`/`cu124` for older cards.
 
-### 3. Local Ollama (fallback model)
-Start the local Ollama server and pull the validation model:
-```bash
-# Start Ollama service (if not already running as a daemon)
-ollama serve
-
-# Fetch the local validation model
-ollama pull qwen2.5:14b
-```
-
-### 4. Choose Deployment Path
-
-#### Option A (fastest): One command
+### 3. Run it
 
 ```bash
 python run_demo.py
 ```
 
-Starts Docker Desktop if it is not running, brings up Postgres and Qdrant, waits for each to be genuinely healthy, starts the API, ingests the sample data room if the index is empty, warms the local models, and opens the UI at `http://localhost:8501`. It checks each step rather than assuming it — every failure it reports has actually happened during development. `python run_demo.py --stop` shuts the containers down.
+Starts Docker Desktop if needed, brings up Postgres and Qdrant, waits for each to be genuinely healthy, starts the API, ingests the sample data room if the index is empty, warms the local models, and opens the UI at `http://localhost:8501`. `--stop` shuts the containers down.
 
-The models are loaded during startup rather than on first use, so the first question runs at the same speed as every one after it. That costs about 30 seconds of startup and removes roughly 9 seconds from whichever question gets asked first — which, in a live demo, is the one being watched.
+Models load during startup rather than on first use, so the first question runs at the same speed as every one after it.
 
-#### Option B: Fully Containerized Stack (Recommended for Production/Evaluation)
-Run the entire system (databases, API backend, and Streamlit frontend UI) inside Docker:
+<details>
+<summary>Other ways to run</summary>
+
+**Fully containerized:** `docker compose up -d` — API on `:8000`, UI on `:8501`.
+
+**Development:** `docker compose up postgres qdrant -d`, then `python run_api.py` and `streamlit run app/streamlit_app.py`.
+
+`run_api.py` rather than `uvicorn api.main:app`, because on Windows the latter loses durable checkpointing: uvicorn hands asyncio an explicit `ProactorEventLoop` factory, psycopg refuses to run on it, and the orchestrator silently degrades to in-memory checkpoints. Setting the event loop policy does not help — a factory overrides it. On Linux the default loop is already selector-based and either command is fine.
+
+**Local fallback model** (optional): `ollama serve && ollama pull qwen2.5:14b`.
+</details>
+
+### 4. Tests
+
 ```bash
-# Spin up all services
-docker compose up -d
-
-# Access the Streamlit dashboard: http://localhost:8501
-# Access the FastAPI docs: http://localhost:8000/docs
-```
-
-#### Option C: Local Development Stack (Recommended for Development/Fast Reload)
-Run only the databases in Docker and run the application services locally on your host:
-```bash
-# Spin up only PostgreSQL and Qdrant database services
-docker compose up postgres qdrant -d
-
-# Start the FastAPI backend server (in a new terminal window)
-python run_api.py
-
-# Start the Streamlit frontend dashboard (in a separate terminal window)
-streamlit run app/streamlit_app.py
-```
-
-`run_api.py` rather than `uvicorn api.main:app` because **on Windows the latter loses durable checkpointing**. uvicorn hands asyncio an explicit `ProactorEventLoop` factory, psycopg refuses to run on that loop, and `AsyncPostgresSaver` fails at startup — the orchestrator then degrades to in-memory checkpoints, so a restart loses session state. Setting the event loop policy does not help, because a loop *factory* overrides the policy; `run_api.py` builds a `SelectorEventLoop` itself and hands uvicorn a server to run on it. On Linux the default loop is already selector-based, so the container path is unaffected and `uvicorn api.main:app` remains correct there.
-
-### 5. Running Tests & E2E Validation
-```bash
-# Execute pytest suite (179 tests covering async safety, agents, quotas, RRF,
-# sub-question decomposition, SQL parameter binding, provider-failure handling,
-# and the Streamlit UI via Streamlit's own AppTest harness)
-pytest
-
-# Execute the live E2E validation against the 41-question golden set
-# (requires the API running and at least one Gemini key configured)
-python tests/run_end_to_end_validation.py
+pytest                                      # 179 tests
+python tests/run_end_to_end_validation.py   # live 41-question golden set
 ```
 
 ---
 
-## Results & Validation
+## Engineering notes
 
-Validated against a synthetic data room of **9 documents (~66K tokens)** — financial statements, merger agreement, board deck, quality of earnings report, customer contracts, employment and retention schedule, IP portfolio and litigation schedule, credit agreement, and a regulatory/privacy memo — using a hand-built golden Q&A set.
+A few decisions driven by measurement rather than intuition. The full record — including the ones that turned out to be wrong — is in [`DECISIONS_LOG.md`](DECISIONS_LOG.md).
 
-The set is **41 questions: 35 answerable** across financial, legal, comparative, summary and multi-hop, plus **6 unanswerable control questions** whose answers are absent from the corpus by construction. Ten of the answerable questions are multi-hop, requiring facts combined across two or more documents. The controls exist so the answer rate is falsifiable — without them, "never refuses" and "always finds the answer" look identical.
+**Quality thresholds have to be calibrated against the distribution they gate.** The context-quality gate averaged reranker scores and required `min(top_5) >= 0.2`. But a cross-encoder is a per-pair classifier and its output is sharply bimodal — relevant chunks score 0.24–0.99 on this corpus, noise sits near 0.006. Averaging meant **retrieving more candidates made context look worse**, penalising the thing it existed to reward; two questions with genuinely good context scored 0.638 and 0.645 and were refused. Rebuilt to score the *usable* evidence, with the relevance floor derived from a labelled sweep rather than chosen by hand.
 
-| Metric | Result |
-|---|---|
-| Completed without an unhandled exception | 41/41 |
-| Answerable questions answered | 35/35 |
-| Mean fact recall | **86.3%** on the latest clean run (62–87% across runs — see below) |
-| Answers with every expected fact present | 26/35 |
-| Citation-source match | 33/35 |
-| Answers flagged as unsupported by the validator | 0/35 |
-| Control questions where the engine did **not** fabricate | 6/6 |
-| Mean latency per query | 13–36s measured live on GPU |
+**An LLM's guess must not become a hard filter.** Agent 1 infers a `document_category`, and it was applied as a hard Qdrant condition — so a wrong guess removed the answer from the search space entirely. Relaxing it on retry helped but was not sufficient: relaxation triggers on *low* context quality, and a wrong category can produce a context that scores **well** and is merely missing one required fact. Incomplete is not the same as weak, and nothing downstream could tell them apart. The filter now comes off before the search whenever the query has been decomposed.
 
-Recall is reported with its dependency stated, because that dependency turned out to be the largest single factor. Six runs of the identical 41 questions against an identical index scored 86.6%, 73.9%, 71.0%, 85.9%, 62.1% and 86.3%, and the ordering is explained not by code changes but by **which synthesis model served the run, and how healthy that model was that day**: the 85.9% run had 38 of 41 answers written by `gemini-3.6-flash` on fresh daily quota, while the 71.0% run had drained to `gemini-3.5-flash` for most of its answers. Quoting the best figure alone would be the more flattering choice and the less honest one. Full per-query breakdown, including every answer verbatim, in [`RESULTS.md`](RESULTS.md).
+**A binary refusal metric measures the wrong thing.** Control questions initially scored 1/3 on "refusal precision", apparently hallucinating. Reading the answers showed the opposite — the engine had reported the data that *did* exist and named the missing figure. A refused/answered flag scores that as a failure. What matters is whether it **fabricated**; re-scored on that basis, 6/6.
 
-Per-type recall on the full-quota run: legal 98.2%, multi-hop 85.2%, summary 83.3%, financial 83.8%, comparative 73.0%.
+**Three bugs existed only on a clean environment.** A `qdrant-client` version range that resolved six minor versions ahead of the pinned server, so every gRPC write failed while REST, health checks and search kept working — the harness ran 41 questions against an empty index and reported 0% recall. An ISO date string bound to a `DATE` column, which had never failed because the long-lived database still held that column as text. And durable checkpointing that had never worked on Windows at all. Each was total, silent, and invisible to a green test suite.
 
-**Re-run after the decomposition fix, on a clean provider day: 86.3%.** Same synthesis model mix as the run above (38 of 41 answers on `gemini-3.6-flash`) and zero answers lost upstream, so the two are directly comparable.
+**A model can be unhealthy without being broken.** When `gemini-3.7-flash` began timing out, the timeout matched none of the failure classifiers and fell through to the generic retry path — three attempts at 120s, exhausting the client's budget before a healthy model was ever tried. Timeouts are now treated as unavailability, with an escalating per-model backoff so a persistently sick model costs one attempt rather than one per query.
 
-| | before the fix | after |
-|---|---|---|
-| Mean fact recall | 85.9% | **86.3%** |
-| Answerable questions answered | 35/35 | **35/35** |
-| Answers with every expected fact | 24/35 | **26/35** |
-| Citation-source match | 33/35 | 33/35 |
-| Controls held | 6/6 | **6/6** |
+**Guards can be worse than the bug they fix.** A check that rejected uncited answers — added after an unsourced answer shipped at confidence 1.00 — also rejected *correct refusals*, which have nothing to cite. Three good models declined accurately, all three were scored as failures, and the ladder burned three scarce reasoning slots to land on the weakest model. It now distinguishes an answer that declines from one that asserts.
 
-Per question: **6 improved, 3 regressed, 26 unchanged.** Per type: legal 100%, financial 87.9%, multi-hop 82.5%, summary 80.6%, comparative 74.0%.
+---
 
-Read honestly, end-to-end recall is **unchanged** — +0.4pp is well inside run-to-run variance on 35 questions, and three questions moved down while six moved up. The retrieval measurement below is the one that shows the fix working (+5.4pp coverage, zero regressions). Both facts are worth stating together: decomposition reliably puts more of the needed evidence in front of the model, and on this corpus the model was already finding enough for most questions. The gain concentrates exactly where it should — comparative and multi-hop retrieval — rather than lifting an average that was already high.
+## Limitations
 
-**An earlier attempt at this same re-run scored 62.1%, and that number was an artifact worth keeping in the record.** It was measured during a Gemini incident: `gemini-3.6-flash` returned 503 *"currently experiencing high demand"* on roughly a third of synthesis calls. The model mix was identical, so the usual explanation did not apply. What did: five answerable questions never got an answer at all (12.1pp of the drop on its own), and the ones that did came back **10-22% of their normal length with 0-1 citations instead of 4-13** — `comp_02` went from 3,624 characters and 7 citations to 349 and none. Retrieval on the same index measured *better* throughout. One bad afternoon at the provider moved the headline metric further than any change in this repository has.
-
-**Three fixes came out of that incident**, all of which make the engine fail more honestly under provider stress: explicit per-request timeouts (LiteLLM's 600s default is not a timeout), 503 classified as *model unavailable* rather than *quota exhausted* — so the ladder tries a different model instead of retrying a dead one across five keys, without burning the day's quota — and a guard that treats an uncited or scratchpad-leaking response as a failed generation. That last one matters most: the incident run shipped an answer with **zero citations at `validation=passed` and confidence 1.00**, in a tool whose entire premise is that every claim is traceable. On the clean re-run that guard fired zero times.
-
-`RESULTS.md` now records the synthesis model mix, the decomposition count and the upstream-failure count in every report, so no future number can be read without the conditions that produced it.
-
-**Three defects found by measurement rather than inspection.** Each was invisible to code review — the pipeline ran, returned plausible output, and logged no error:
-
-1. **The quality gate was calibrated against a score distribution nobody had measured.** It averaged cross-encoder scores across the whole retrieved set and required `min(top_5) >= 0.2`. Cross-encoder outputs are bimodal (relevant 0.24–0.99, noise ~0.006), so retrieving more candidates made context look *worse*, and two questions with genuinely good context scored 0.638/0.645 and were refused anyway. Re-derived the dimensions and thresholds from a labelled sweep over the golden set.
-2. **An LLM's guessed `document_category` was applied as a hard filter.** When the guess was wrong, the answer was outside the search space and the rewrite loop could not recover it. Now relaxed on retry.
-3. **The hallucination validator saw less evidence than the writer.** It judged each chunk truncated to 500 characters while the synthesizer used the full chunk plus parent context, so it flagged correctly-sourced figures as unsupported — including several answers with 100% fact recall. Giving it the same context the writer had eliminated the false flags entirely.
-
-**The refusal path is a deliberate safety feature, not something tuned away.** On all 6 control questions the engine declined to invent the missing figure — and notably by *partial* answer rather than blanket refusal: asked to compare churn against competitors, it reported the retention and competitor data that exist and explicitly stated that churn is not in the data room.
-
-**Sub-question decomposition.** Multi-hop and comparative queries are split by Agent 1 into atomic sub-questions, each retrieved in its own pass and reranked against *itself*. This matters because the reranker scores every candidate against the whole question: a passage holding only a share price scores poorly against "what is the implied EV/EBITDA multiple", so it never survives to the context. Query expansion cannot fix that — rephrasing the question five ways still never asks for the price.
-
-Three details make it work rather than merely exist:
-
-- **Sub-questions do not inherit the parent's `document_category` filter.** They exist to look somewhere else; applying the parent's guess to them re-creates the problem. Measured: the EV/EBITDA query decomposed correctly into price, share count and EBITDA, but every pass inherited one filter and all three returned chunks from the same document.
-- **It is additive, not a redistribution.** Splitting a fixed `final_top_k` across passes cost the parent query most of its slots, and a comparative question whose answer sat in one table the parent had already found went from 20% to 0% coverage. The parent keeps its full budget; sub-questions add a small allocation on top.
-- **The classifier must not veto the decomposer.** Sub-questions were originally kept only when `query_type` was `multi_hop` or `comparative`. Asked for the implied EV/EBITDA multiple, Agent 1 decomposed the question correctly into price, share count and EBITDA — and classified it `financial`, so the veto discarded all three and the engine answered about the offer price instead. Emitting sub-questions *is* the model's judgment that the answer spans several facts; classification is a separate judgment made for routing. Requiring two independent guesses to agree made the feature fail silently whenever they disagreed. Now the prompt decides and `MAX_SUB_QUESTIONS` bounds the cost. Same question after the fix: 4 retrieval passes, 0 rewrite loops, confidence 1.00, and the multiple actually computed — **7.03x on Adjusted EBITDA of $99.0M versus 7.15x reported**.
-
-Decomposition is measured on **retrieval alone** — no synthesis, so model choice cannot influence the result. Does the retrieved context contain the facts the answer needs? The measurement was repeated as the feature was fixed, and the progression is the useful part:
-
-| measurement | scope | baseline → decomposed |
-|---|---|---|
-| first cut | 15 decomposable questions | 64.2% → 84.7% (+20.4pp) |
-| after removing the classifier veto | all 35 answerable | 69.6% → 75.0% (+5.4pp) |
-| **after the category-filter fix** | all 35 answerable | **63.4% → 73.8% (+10.4pp)** |
-
-The first row covers only the question types the veto allowed through, which is why it looks larger — it is measuring a subset selected for being decomposable. The last row is the current figure. Baselines differ between runs because Agent 1's own filter guesses vary; only the within-row comparison is meaningful.
-
-On the current measurement: **7 improved, 0 regressed, 28 unchanged**, with Agent 1 choosing to decompose 19 of the 35. Per type, **multi-hop 73.8% → 94.7% (+20.8)** and **comparative 38.0% → 69.0% (+31.0)**; financial, legal and summary are untouched. That is the expected shape — decomposition should help questions spanning documents and do nothing to the ones that do not.
-
-**The category filter has to come off before the search, not after it.** The EV/EBITDA question answered differently run to run — sometimes 7.50x, sometimes "cannot be determined". The required `$696 million` aggregate merger consideration reached the context in only **3 of 8 runs**.
-
-Two plausible explanations were measured and discarded. Sub-question depth: the `$696M` chunk ranks 1st, 5th, 4th or 1st depending on how Agent 1 phrases the value sub-question, and only the top 2 per pass survive — but sweeping depth 2→6 across the golden set moved coverage *not at all*, because the sweep froze one decomposition per question and froze a favourable one here. Agent 1's temperature: already 0.0; the variance is model nondeterminism.
-
-The actual cause is deterministic and needs no LLM to reproduce. `$696 million` is stated in the regulatory memo and the merger agreement; Agent 1 classifies the question `financial` or `legal`; either filter removes the chunk that states it:
-
-| `document_category` filter | `$696M` in context |
-|---|---|
-| none | ✓ |
-| `financial` | ✗ |
-| `legal` | ✗ |
-| `regulatory` | ✓ |
-
-Progressive filter relaxation does not rescue this, and the reason is the interesting part: relaxation fires on *low context quality*, and this context scores well. It is full of plausible, high-scoring financial chunks — it is **incomplete, not weak**, and nothing downstream can distinguish those. A gate that reacts to bad scores cannot catch a good score with a hole in it.
-
-Fixed by dropping `document_category` from the parent pass too, once a query has been decomposed — decomposing is the model stating the answer spans several facts, and those facts sit in different categories. Undecomposed queries keep the filter, where it still buys precision. Retrieval A/B went from +5.4pp to **+10.4pp**, multi-hop coverage **81.7% → 94.7%**, and live the required figures now reach the answer in **4/4** runs against 3/8.
-
-The residual is worth stating: the *computed* 7.5x still appears in 2 of 4 live runs, and both misses were on `gemini-3.5-flash-lite` while both hits were on `gemini-3.6-flash`. Retrieval is now reliable; the arithmetic is model-dependent. The answer still reports the inputs it could not combine.
-
-**Half the fallback ladder was unreachable, and diagnosing it took two corrections.** Tracing a synthesis failure surfaced `404 models/gemini-3-flash is not found for API version v1alpha`. Probing every laddered model: `gemini-3-flash`, `gemini-2.5-flash` and `gemini-2.5-flash-lite` all 404. Three of six cloud rungs appeared dead, so whenever the working rungs were spent or failing — exactly when a ladder earns its keep — the router descended into models that could only fail, burning an attempt and a timeout each.
-
-Both of my first two readings of that evidence were wrong, and the way they were wrong is the point:
-
-- **`gemini-3-flash` was a wrong name, not a missing model.** The console calls it "Gemini 3 Flash"; the servable id is `gemini-3-flash-preview`. Reading a 404 as "this model does not exist" rather than "I asked for the wrong string" cost a working rung. It is back under its real id.
-- **`gemini-2.5-flash` and `gemini-2.5-flash-lite` are not missing either — they are grandfathered.** Probing per key rather than per model showed them answering on two of five configured keys and returning `404 "no longer available to new users"` on the rest. **Availability is a property of the (key, model) pair**, which the registry had no way to express. The router now retires a single slot on that error — not the key, not the model — and both are back on the ladders, worth +19 reasoning syntheses and +19 agent calls per day on each grandfathered key.
-- **`gemini-3.7-flash` existed and was not being used at all.** Nothing fails when a newer model ships; the pipeline quietly keeps running on the older one. It now leads the synthesis ladder, and a test asserts that it does.
-
-Every existing registry test checked internal consistency — laddered models have declared quotas, allowances fit under caps, ladders are ordered correctly. All passed throughout. Availability, freshness and per-key entitlement are network facts; consistency tests cannot see them.
-
-**Why the end-to-end number is measured separately from that.** Answer recall across runs is dominated by which synthesis model served the run, and that drifts within a day as the top rung's 20-request daily quota drains. Six runs of the same 41 questions scored 86.6%, 73.9%, 71.0%, 85.9%, 62.1% and 86.3% as the mix shifted between `gemini-3.6-flash` and `gemini-3.5-flash` (and, on the 62.1% run, as the provider itself degraded) — and question types that are **never** decomposed moved in lockstep (legal 100% → 73% → 98%, summary 72% → 50% → 83%). The fourth run tested the explanation rather than just restating it: run on fresh quota, 38 of its 41 answers were written by `gemini-3.6-flash`, and recall returned to the top of the range. Cross-run end-to-end comparison at this sample size therefore cannot attribute a change to a retrieval improvement, which is why the decomposition result above is measured on retrieval alone.
-
-End-to-end, decomposition does show up where it should: `mh_05` — "what is the implied EV/EBITDA multiple on adjusted rather than reported EBITDA", the question that previously returned *"cannot be calculated"* — now answers at 100% fact recall, and multi-hop as a category scored 82.5% on the latest clean run.
-
-**Three times the measurement was wrong rather than the system.** Each was caught by inspecting answers the metric had marked as failures: a binary refused/answered flag scored a correct partial answer as a hallucination; the golden set docked recall for writing "thirty-six months" instead of "36 months"; and markdown bold markers broke substring matching, so `contains **no information** regarding` was scored as a fabrication. Fact matching and refusal detection now normalise emphasis and accept equivalent surface forms. Re-scoring the same answers with the corrected matcher changed recall by roughly two points and moved control precision from 5/6 to 6/6 — a reminder that on a small set the harness is as likely to be wrong as the pipeline.
-
-**On latency.** A query is 13–36s end to end, measured live across financial, legal, multi-hop, comparative and control questions. The split is worth knowing because only one half is under this project's control:
-
-| | GPU (RTX 5070 Ti) | CPU-only PyTorch |
-|---|---|---|
-| Retrieval — embed, hybrid search, rerank | **0.8–3.8s** for up to 4 passes | 6–18s per pass |
-| Everything else — 5–6 sequential LLM calls | ~20–28s | ~20–28s |
-
-A timeout is treated as unavailability, which matters more than it sounds. `gemini-3.7-flash` began timing out after a quota reset, and because a timeout matched none of the failure classifiers it went through the generic retry path — three attempts at 120s each, so the client's 300s budget expired and the query returned **nothing**. A model that just burned its whole deadline is not more likely to answer on an identical retry; the ladder now bails after the first one. Same query: 300s and no answer → 140s → 19s once the cooldown took the unhealthy model out of rotation.
-
-Retrieval is no longer the bottleneck; provider latency is. Synthesis runs on `gemini-3.6-flash`, capped at 5 RPM, so the rate limiter also paces harder than it would on a 15 RPM Lite model — a deliberate trade of wall-clock for better reasoning on the one call whose quality reaches the user. `VERIFICATION_BACKEND=local` moves the two verification agents to Qwen2.5-14B: quota-free, slower, needs a 12GB-VRAM host. Both paths are live and the cloud path falls back to local automatically when quota runs out.
-
-**The GPU point is not a tuning note, it is a bug report.** This project ran its models on CPU for its entire life because `pip install torch --index-url .../cu128` reports *"Requirement already satisfied"* when any torch is installed — the CPU and CUDA wheels differ only by a local version tag, which pip does not treat as an upgrade. The code selected the device correctly (`"cuda" if torch.cuda.is_available() else "cpu"`), the logs said `CPU`, and nobody read them. A 12GB GPU sat idle next to a 40-passage cross-encoder rerank. The fix was one `--force-reinstall --no-deps`; the lesson is that a silent 5x is harder to notice than a crash.
-
-**Scope, stated plainly:** this is a synthetic data room of 9 documents (~66K tokens), not a real one. It is large enough that retrieval must discriminate across documents — the multi-hop questions each require combining two or more — but a production data room is orders of magnitude larger, and these numbers should not be read as evidence of behaviour at that scale.
+- **The corpus is synthetic and small.** 9 documents is enough that retrieval must discriminate between them, but a real data room is orders of magnitude larger. At this size the synthesizer already finds enough context for most questions, which is why decomposition shows a clear retrieval gain and a flat end-to-end one.
+- **Arithmetic across documents is model-dependent.** Retrieval reliably supplies the inputs for an implied multiple; whether the model combines them correctly varies with which rung answered. The answer reports the inputs either way.
+- **Citation section headings are imprecise.** They come from the chunker, which sometimes labels a mid-sentence fragment as a heading. The viewer filters the worst of it; the real fix is upstream.
+- **TPM is declared but not enforced.** RPM and RPD are.
+- **Single-worker API.** The deal registry is reconstructed from Qdrant rather than persisted, so it survives restarts but loses upload timestamps.
 
 ---
 
 ## Roadmap
 
-- [x] Decompose comparative and multi-hop queries into sub-questions instead of relying on query expansion — comparative retrieval coverage +31.0pp, multi-hop +20.8pp
-- [x] Passage-level citations by parsing the synthesizer's inline `[file | p.N | Section]` markers (Decision 16)
-- [ ] Per-heading granularity in the chunker. The citation panel currently filters prose the chunker mislabelled as a heading; that is triage in the viewer, and the durable fix is upstream
-- [ ] Persist the deal registry. It is reconstructed from Qdrant on demand, so it survives a restart, but document upload dates are lost and a Postgres table would be the honest home for it
-- [ ] Enforce TPM (tokens/minute) alongside RPM/RPD — needs per-call token accounting the pipeline does not yet do
-- [ ] Cache embeddings for repeated query expansions to cut redundant model calls
-- [ ] Exercise the per-key model retirement path (Decision 42) under real quota pressure — it is unit-tested but has not yet fired in a live run
-- [ ] Expand the synthetic corpus. At 9 documents the synthesizer already finds enough context for most questions, which is why decomposition shows a clear retrieval gain and a flat end-to-end one
-
----
-
-## Key Engineering Lessons
-
-**VRAM budgeting (12GB constraint):** running an embedding model, a cross-encoder reranker, and a 14B local LLM concurrently risks CUDA OOM. Solved with separate `ThreadPoolExecutor` pools for embedding vs. reranking so one doesn't starve the other.
-
-**Local LLM JSON truncation:** Ollama's default 2048-token context window was silently truncating JSON outputs during long evaluations. Fixed by forcing `num_ctx=8192` for all Ollama calls.
-
-**Metadata loss during chunking:** the Financial Verifier was silently skipping execution because chunking dropped structural markers (`is_table`, `content_type`). Fixed by propagating chunk metadata explicitly through to Qdrant payloads.
-
-**TOCTOU race in budget tracking:** an earlier `check → increment` pattern allowed two concurrent requests to both pass the budget check and overshoot the daily limit. Replaced with a single atomic conditional `UPDATE` statement.
-
-**Quality thresholds must be calibrated against the score distribution they gate.** The quality gate averaged reranker scores across the whole retrieved set and required `min(top_5) >= 0.2`. But a cross-encoder is a per-pair relevance classifier, and its outputs are sharply bimodal — on this corpus, relevant chunks score 0.24–0.99 while noise sits near 0.006. Two consequences followed: averaging over the top-k meant **retrieving more candidates made the context look worse**, penalising recall; and requiring the fifth-best chunk to be excellent was a bar peaked distributions rarely clear. Two golden questions scored 0.638 and 0.645 — genuinely good context — and were refused anyway. Fixed by scoring the *usable* evidence (max score for relevance, mean of chunks above a measured floor for precision, count relative to per-type expectation for completeness), with the floor and thresholds derived from a labelled sweep rather than chosen by hand.
-
-**An LLM's guess must not become a hard filter.** Agent 1 inferred a `document_category` and it was applied as a hard Qdrant `must` condition. When the guess was wrong the answer was removed from the search space entirely, and the rewrite loop could never recover it because rewriting changes query text, not filters. Measured: a question about per-share merger consideration was classified `financial`, which filtered out the merger agreement — the one document containing the answer. It also compounded two error sources, since the category itself was assigned by a heuristic classifier at ingestion. Fixed with progressive filter relaxation: the category filter is kept on the first attempt for precision and dropped on retry, when the system is explicitly trading precision for recall. Deal isolation and PII/version filters are never relaxed — those are correctness constraints, not relevance hints.
-
-That fix turned out to be necessary but not sufficient, and the gap is the sharper lesson. Relaxation fires on *low context quality*. A wrong category can also produce a context that scores **well** and is simply missing one required fact — plausible, high-scoring chunks with a hole in them. Nothing downstream distinguishes incomplete from weak, so the retry never triggers and the engine confidently reports it cannot compute the answer. The filter now comes off before the search rather than after it, whenever the query has been decomposed.
-
-**A binary refusal metric mis-scores the behaviour you actually want.** Adding unanswerable control questions to the golden set initially showed 1/3 "refusal precision" — apparently hallucinating. The answers told a different story: the engine had said *"The provided documents do not contain the revenue figures for Q1 FY2024"* with a citation, and for a churn question had reported the retention and competitor data that were present while explicitly flagging churn as absent. That partial answer is better due-diligence behaviour than a blanket refusal, but a refused/answered flag scores it as a failure. The metric was measuring the wrong thing; what matters is whether the engine **fabricated the missing figure**. Re-scored on that basis: 3/3.
-
-**"Nothing matched" is a valid outcome, not an exception.** RRF raised `ValueError` when both retrievers returned empty, turning a legitimate no-results query into a 500. It now returns an empty list so the Quality Assessor sees zero chunks and takes the refusal path the pipeline is built around.
-
-**Three bugs that only existed on a clean environment.** Rebuilding the stack from scratch — new containers, empty volumes — surfaced failures that a long-lived development machine had been hiding, and all three shared a shape: total, silent, and invisible to the tests.
-
-- **A dependency range that allowed an incompatible pair.** `requirements.txt` permitted `qdrant-client>=1.9.0,<2.0.0` while `docker-compose.yml` pinned the server to `v1.12.1`; pip resolved 1.18.0. Qdrant's contract is at most one minor version of skew. Over gRPC the newer client's vector encoding was unreadable by the old server, so *every* ingest failed — while REST, health checks, collection creation and search all worked. The harness dutifully ran 41 questions against an empty index and reported 0% recall, which looks exactly like a catastrophic regression in the engine. The client detects this and raises a `UserWarning`; a JSON log handler swallows it. Now: versions pinned to each other, `assert_server_compatible()` **raises** at startup before anything writes, and the harness aborts if fewer documents ingest than the corpus contains.
-- **Schema drift hid a broken SQL binding.** The budget tracker passed `date.today().isoformat()` into `reset_date = $1::date`. asyncpg encodes by inferred type and rejects a string, and the server-side cast happens too late to help. It had never failed because the long-lived database still stored that column as text from an older schema revision — and every tracker test sets `_is_mock = True`, skipping SQL entirely. Green suite, and not a single query could complete against a correctly-created database. It broke every *first* deploy, which is the one nobody has logs for.
-- **Durable checkpointing had never worked on Windows.** Covered above; the point here is that the only evidence was one `WARNING` line, and the system kept running perfectly well without the durability it claimed to have.
-
-The common lesson is that a green test suite plus a healthy `/health` endpoint plus plausible output is not evidence that the system works. All three failures were downstream of state that the development machine happened to have and a fresh one does not.
-
-More decisions and trade-offs are logged in [`DECISIONS_LOG.md`](DECISIONS_LOG.md).
+- [ ] Per-heading granularity in the chunker, so citations carry a real section rather than a filtered guess
+- [ ] Persist the deal registry in Postgres
+- [ ] Enforce TPM alongside RPM/RPD — needs per-call token accounting
+- [ ] Cache embeddings for repeated query expansions
+- [ ] Expand the corpus enough to stress comparative and multi-hop retrieval properly
 
 ---
 
@@ -417,19 +266,18 @@ More decisions and trade-offs are logged in [`DECISIONS_LOG.md`](DECISIONS_LOG.m
 
 ```
 run_demo.py           One-command local launcher (Docker, API, ingest, UI)
-run_api.py            API entrypoint — builds a selector event loop so Postgres
-                      checkpointing works on Windows
+run_api.py            API entrypoint — selector event loop for Postgres checkpointing
 api/                  FastAPI routes, request/response models
 app/                  Streamlit UI (8 components) + dashboard
 src/
   agents/             8 LangGraph agent nodes + retrieval strategy
-  data_processing/     PDF/DOCX/PPTX/Excel processors, chunkers, PII/risk detectors
-  llm/                 LiteLLM wrapper, budget tracker, rate limiter, prompt templates
-  vector_db/           Qdrant client, hybrid search, RRF fusion, reranker
-  workflow/            LangGraph state machine, orchestrator, conditional edges
-  utils/               Logging, token counting, audit log, metrics
-tests/                 179 tests + golden Q&A set + live E2E runner
-config/                Qdrant, LiteLLM, and chunking YAML configs
+  data_processing/    PDF/DOCX/PPTX/Excel processors, chunkers, PII/risk detectors
+  llm/                LiteLLM wrapper, budget tracker, rate limiter, prompt templates
+  vector_db/          Qdrant client, hybrid search, RRF fusion, reranker
+  workflow/           LangGraph state machine, orchestrator, conditional edges
+  utils/              Logging, token counting, audit log, metrics
+tests/                179 tests + golden Q&A set + live E2E runner
+config/               Qdrant, LiteLLM, and chunking YAML configs
 ```
 
 ---
