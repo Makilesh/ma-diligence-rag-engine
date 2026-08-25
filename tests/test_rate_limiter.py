@@ -1157,3 +1157,82 @@ class TestPerKeyModelAvailability:
         t = self._tracker()
         t.mark_slot_unavailable(0, LOCAL_MODEL)
         assert not t._slot_is_unavailable(t._slot(0, LOCAL_MODEL))
+
+
+class TestTimeoutIsTreatedAsUnavailability:
+    """
+    A model that burned its full deadline must not be retried.
+
+    `gemini-3.7-flash` began timing out consistently. A timeout matched none of
+    the classifiers, so it fell through to the generic retry path: three
+    attempts at 120 seconds each. The caller's 300-second budget expired before
+    the ladder ever reached a healthy model, so the query returned nothing at
+    all rather than an answer from the next rung down.
+
+    Retrying a model that just consumed 120 seconds and produced nothing is the
+    single most expensive thing this pipeline can do.
+    """
+
+    @staticmethod
+    def _timeout():
+        class Timeout(Exception):
+            pass
+
+        return Timeout("litellm.Timeout: Connection timed out. Timeout passed=120.0")
+
+    def test_recognises_a_timeout(self):
+        from src.llm.litellm_wrapper import is_timeout_error
+
+        assert is_timeout_error(self._timeout())
+        assert is_timeout_error(TimeoutError("timed out"))
+
+    def test_not_confused_with_other_failures(self):
+        from src.llm.litellm_wrapper import (
+            is_auth_error, is_model_unavailable_for_key,
+            is_quota_error, is_timeout_error,
+        )
+
+        err = self._timeout()
+        assert not is_quota_error(err), "would retire the slot for the whole day"
+        assert not is_auth_error(err), "would retire a working key"
+        assert not is_model_unavailable_for_key(err), "would retire the slot forever"
+
+        class RateLimitError(Exception):
+            pass
+
+        assert not is_timeout_error(RateLimitError("429 RESOURCE_EXHAUSTED"))
+
+    @pytest.mark.asyncio
+    async def test_prose_agent_does_not_retry_a_timeout(self, monkeypatch):
+        import src.llm.litellm_wrapper as wrapper
+
+        calls = {"n": 0}
+
+        class Timeout(Exception):
+            pass
+
+        async def always_timeout(**kwargs):
+            calls["n"] += 1
+            raise Timeout("litellm.Timeout: Connection timed out. Timeout passed=120.0")
+
+        monkeypatch.setattr(wrapper.litellm, "acompletion", always_timeout)
+
+        with pytest.raises(Exception):
+            await wrapper.call_prose_agent(
+                model="gemini/test", system_prompt="s", user_prompt="u", api_key="k"
+            )
+
+        assert calls["n"] == 1, (
+            f"made {calls['n']} attempts; at {wrapper.PROSE_TIMEOUT_SECONDS}s each "
+            f"that is {calls['n'] * wrapper.PROSE_TIMEOUT_SECONDS}s spent before the "
+            f"ladder may try a healthy model"
+        )
+
+    def test_prose_timeout_budget_fits_a_single_request(self):
+        """One timeout must leave room to try another rung inside a 300s budget."""
+        from src.llm.litellm_wrapper import PROSE_TIMEOUT_SECONDS
+
+        assert PROSE_TIMEOUT_SECONDS * 2 < 300, (
+            "a single timeout plus one fallback attempt must fit inside the "
+            "client's request budget"
+        )

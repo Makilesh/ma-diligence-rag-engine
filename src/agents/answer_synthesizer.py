@@ -16,6 +16,7 @@ from src.llm.litellm_wrapper import (
     is_auth_error,
     is_service_unavailable,
     is_model_unavailable_for_key,
+    is_timeout_error,
 )
 from src.llm.budget_tracker import BudgetTracker
 from src.llm.prompt_templates.answer_synthesizer import (
@@ -375,11 +376,14 @@ async def answer_synthesizer_node(state: AgentState) -> dict:
                     extra={"model": model, "key_index": choice.key_index},
                 )
                 continue
-            if is_service_unavailable(e) and choice.key_index >= 0:
+            if (is_service_unavailable(e) or is_timeout_error(e)) and choice.key_index >= 0:
                 # 503 means the model is down for every key, so rotating keys
-                # just repeats the failure. Skip the model briefly instead, and
-                # do not debit quota — this clears in minutes and should not
-                # cost the day's capacity on the best synthesis model.
+                # just repeats the failure. A timeout means the same thing in
+                # practice — the model consumed its whole deadline and produced
+                # nothing, and the next identical attempt costs another one.
+                # Skip the model briefly instead, without debiting quota: both
+                # conditions clear in minutes and should not cost the day's
+                # capacity on the best synthesis model.
                 tracker.skip_model_for_request(model)
                 logger.warning(
                     "Synthesis rung unavailable provider-side, trying another model",

@@ -130,6 +130,25 @@ def is_model_unavailable_for_key(exc: Exception) -> bool:
     )
 
 
+def is_timeout_error(exc: Exception) -> bool:
+    """
+    True when the request exceeded its own deadline.
+
+    Treated exactly like a 503, and for the same reason: a model that just
+    consumed the full timeout without answering is not more likely to answer on
+    the next identical attempt, and every retry costs another full timeout.
+
+    Measured: `gemini-3.7-flash` began timing out consistently, and because a
+    timeout matched none of the other classifiers it fell through to the generic
+    retry path — three attempts at 120 seconds each. The caller's 300-second
+    budget expired before the ladder was ever allowed to try a healthy model, so
+    the query returned nothing at all rather than a slightly worse answer.
+    """
+    name = type(exc).__name__.lower()
+    text = str(exc).lower()
+    return "timeout" in name or "timed out" in text or "timeout passed" in text
+
+
 def is_auth_error(exc: Exception) -> bool:
     """
     True when the provider rejected the credential itself.
@@ -371,7 +390,7 @@ async def call_prose_agent(
             # Measured: gemini-3.7-flash returning 503 cost three attempts and
             # ~48 seconds of backoff before the ladder was allowed to move to
             # gemini-3.6-flash, which answered on the first try.
-            if is_service_unavailable(e):
+            if is_service_unavailable(e) or is_timeout_error(e):
                 raise
 
         if attempt < MAX_RETRIES:
@@ -481,8 +500,9 @@ async def call_verification_agent(
                     extra={"model": choice.model, "key_index": choice.key_index},
                 )
                 continue
-            if is_service_unavailable(e) and choice.key_index >= 0:
-                # The model is down for everyone, so rotating keys is pointless.
+            if (is_service_unavailable(e) or is_timeout_error(e)) and choice.key_index >= 0:
+                # The model is down or unresponsive for everyone, so rotating
+                # keys is pointless.
                 # Skip the whole model for this request without debiting quota —
                 # this clears in minutes and should not cost the day's capacity.
                 tracker.skip_model_for_request(choice.model)
