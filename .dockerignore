@@ -50,3 +50,8 @@ scratchpad/
 
 # Deal documents are mounted at runtime via the ./data volume, not copied in
 data/
+
+# Frontend — deployed separately to Vercel, and never imported by the API. Its
+# node_modules alone is several hundred MB of build context the backend image
+# would copy and never open.
+web/

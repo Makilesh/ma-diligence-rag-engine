@@ -1,0 +1,90 @@
+# Backend image for Hugging Face Spaces (Docker SDK, free CPU tier).
+#
+# The free tier gives 2 vCPU / 16GB RAM / 50GB disk, which is the only free host
+# that fits this workload at all — bge-m3 alone is 2.27GB resident, so the 512MB
+# tiers at Render, Fly and Koyeb are not near-misses, they are an order of
+# magnitude short.
+#
+# Three things differ from the local Dockerfile, each forced by the platform:
+#   1. Port 7860. Spaces routes to that port and nothing else.
+#   2. User 1000. Spaces runs the container as a non-root user, so anything the
+#      process writes — most importantly the several-GB model cache — must be
+#      owned by that user or the first download fails with EACCES.
+#   3. CPU-only torch. `pip install sentence-transformers` pulls the CUDA build
+#      by default: ~2.5GB of NVIDIA wheels that cannot be used on a CPU host and
+#      push the image past what a free build will finish.
+
+FROM python:3.11-slim
+
+# Spaces runs as uid 1000. Creating the user here (rather than relying on the
+# platform's) keeps `docker run` locally identical to what Spaces does.
+RUN useradd -m -u 1000 user
+
+# HF_HOME is where huggingface_hub caches model weights. It must live under the
+# user's own directory: the default (/root/.cache) is unwritable as uid 1000,
+# and the failure surfaces as a download error at first query rather than at
+# build time, long after it would have been cheap to notice.
+ENV HF_HOME=/home/user/.cache/huggingface \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    API_HOST=0.0.0.0 \
+    API_PORT=7860
+
+# PyMuPDF and pdfplumber need a compiler; curl is used by the healthcheck.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# CPU-only torch, installed first and pinned to the CPU index so the later
+# `sentence-transformers` install sees the requirement already satisfied and
+# does not pull the CUDA build over the top of it.
+RUN pip install --no-cache-dir \
+        torch --index-url https://download.pytorch.org/whl/cpu
+
+COPY --chown=user requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY --chown=user . .
+
+USER user
+
+# Bake the models into the image rather than downloading them on first boot.
+# The free tier's disk is ephemeral, so a runtime download is paid again after
+# every sleep-wake cycle — roughly two minutes in front of whoever opened the
+# link. Baking moves that cost to build time, once.
+#
+# RERANKER_MODEL must be set for this step, because it is the model this layer
+# caches: building with the default and running with an override would download
+# the real reranker on first query, which is the exact cost this avoids.
+ARG EMBEDDING_MODEL=BAAI/bge-m3
+ARG RERANKER_MODEL=cross-encoder/ms-marco-MiniLM-L-6-v2
+RUN python -c "\
+from sentence_transformers import SentenceTransformer, CrossEncoder; \
+SentenceTransformer('${EMBEDDING_MODEL}'); \
+CrossEncoder('${RERANKER_MODEL}'); \
+print('models cached')"
+
+# FastEmbed's BM25 model is small but is fetched on first use like the others.
+RUN python -c "\
+from fastembed import SparseTextEmbedding; \
+SparseTextEmbedding(model_name='Qdrant/bm25'); \
+print('bm25 cached')"
+
+# Measured on 2 vCPU: bge-reranker-v2-m3 needs 111s to score 40 passages and a
+# decomposed query reranks four times. The MiniLM cross-encoder does the same
+# work in 3.2s. See src/vector_db/reranker.py for the full measurement.
+ENV EMBEDDING_MODEL=${EMBEDDING_MODEL} \
+    RERANKER_MODEL=${RERANKER_MODEL} \
+    RERANKER_MAX_LENGTH=512 \
+    WARM_MODELS=1
+
+EXPOSE 7860
+
+HEALTHCHECK --interval=60s --timeout=10s --start-period=180s --retries=3 \
+    CMD curl -fsS http://localhost:7860/health || exit 1
+
+CMD ["python", "run_api.py"]

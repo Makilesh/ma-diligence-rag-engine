@@ -1,0 +1,53 @@
+# Keeps the Hugging Face Space awake.
+#
+# A free Space sleeps after 48 hours without traffic, and waking it costs the
+# next visitor 1-2 minutes while the models load. For a portfolio link that
+# first visitor is usually the one who matters, so the Space is pinged well
+# inside the window.
+#
+# KNOWN LIMITATION, and the reason this file says so out loud: GitHub disables
+# scheduled workflows in a repository with no activity for 60 days. When that
+# happens the ping stops silently and the Space starts sleeping again. Re-enable
+# it from the Actions tab, or push any commit to reset the clock.
+
+name: Keep Space awake
+
+on:
+  schedule:
+    # Every 6 hours. Well inside the 48h sleep window, so several consecutive
+    # failures still leave the Space awake.
+    - cron: "0 */6 * * *"
+  # Manual trigger, for confirming the URL is right without waiting for the cron.
+  workflow_dispatch:
+
+# The default GITHUB_TOKEN permissions are not needed — this job only makes an
+# outbound request.
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Ping the Space health endpoint
+        env:
+          # Repository variable, not a secret: a Space URL is public anyway.
+          # Set it under Settings → Secrets and variables → Actions → Variables.
+          SPACE_URL: ${{ vars.SPACE_URL }}
+        run: |
+          if [ -z "$SPACE_URL" ]; then
+            echo "::error::SPACE_URL repository variable is not set."
+            exit 1
+          fi
+
+          # A sleeping Space wakes on the first request but takes minutes to
+          # load models, so the request must outlast a cold start rather than
+          # time out and report failure on a Space that is in fact waking.
+          # --retry-all-errors covers the 503s served while it boots.
+          curl --fail --show-error --silent \
+               --max-time 300 \
+               --retry 5 --retry-delay 30 --retry-all-errors \
+               "${SPACE_URL%/}/health"
+
+          echo ""
+          echo "Space is awake."
