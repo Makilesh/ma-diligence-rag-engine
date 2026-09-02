@@ -2,6 +2,18 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "web",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["web/node_modules/next/dist/bin/next", "dev", "web", "-p", "3000"],
+      "port": 3000
+    },
+    {
+      "name": "api",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["run_api.py"],
+      "port": 8000
+    },
+    {
       "name": "streamlit",
       "runtimeExecutable": ".venv/Scripts/python.exe",
       "runtimeArgs": ["-m", "streamlit", "run", "app/streamlit_app.py", "--server.port", "8501"],

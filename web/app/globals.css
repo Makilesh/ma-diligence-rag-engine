@@ -356,28 +356,6 @@ body {
   animation: pulse-ring 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-@keyframes caret-blink {
-  0%,
-  45% {
-    opacity: 1;
-  }
-  50%,
-  100% {
-    opacity: 0;
-  }
-}
-
-.stream-caret::after {
-  content: "";
-  display: inline-block;
-  width: 0.5ch;
-  height: 1.05em;
-  margin-left: 0.12em;
-  vertical-align: -0.15em;
-  background: var(--color-gold-500);
-  animation: caret-blink 1.05s step-end infinite;
-}
-
 /* Respect the OS setting. The shimmer and typewriter are affordances, not
    information — everything they convey is also stated in text. */
 @media (prefers-reduced-motion: reduce) {
