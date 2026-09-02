@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CornerDownLeft, Layers, Sparkles } from "lucide-react";
 
@@ -231,7 +231,13 @@ export default function Home() {
     setTimeout(() => setHighlighted(null), 1600);
   }, []);
 
-  const parsedCitations = result ? parseAnswer(result.answer, result.citations).citations : [];
+  // Memoised: `parseAnswer` walks the whole answer body, and this component
+  // re-renders on every tick of the elapsed-time interval.
+  const parsedCitations = useMemo(
+    () => (result ? parseAnswer(result.answer, result.citations).citations : []),
+    [result],
+  );
+
   const isLanding = phase === "idle" && !result;
   const activeDeal = deals.find((d) => d.deal_id === activeDealId) ?? null;
 
