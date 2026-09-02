@@ -33,6 +33,7 @@ def get_qdrant_client() -> AsyncQdrantClient:
     Configuration via environment variables:
         QDRANT_URL: Qdrant server URL (default: http://localhost:6333)
         QDRANT_GRPC_PORT: gRPC port for faster operations (default: 6334)
+        QDRANT_API_KEY: API key. Required by Qdrant Cloud; unset when self-hosted.
 
     Returns:
         Shared AsyncQdrantClient instance.
@@ -57,16 +58,34 @@ def get_qdrant_client() -> AsyncQdrantClient:
         except OSError:
             pass
 
-        if server_reachable:
+        api_key = os.getenv("QDRANT_API_KEY") or None
+
+        # A managed cluster is not reachable by raw socket probe in the same
+        # sense as a local one, but an API key is only ever set for a managed
+        # cluster, so its presence is the reliable signal to skip the fallback.
+        if server_reachable or api_key:
             grpc_port = int(os.getenv("QDRANT_GRPC_PORT", "6334"))
+
+            # Managed clusters terminate TLS on the REST port and do not expose
+            # plain gRPC on 6334. Preferring gRPC there produces a client that
+            # constructs fine and fails on first use, so the transport follows
+            # the deployment: gRPC when self-hosted, REST when managed.
+            prefer_grpc = api_key is None
+
             logger.info(
                 "Initializing AsyncQdrantClient singleton (Server Mode)",
-                extra={"qdrant_url": qdrant_url, "grpc_port": grpc_port},
+                extra={
+                    "qdrant_url": qdrant_url,
+                    "grpc_port": grpc_port,
+                    "prefer_grpc": prefer_grpc,
+                    "authenticated": api_key is not None,
+                },
             )
             _qdrant_client = AsyncQdrantClient(
                 url=qdrant_url,
                 grpc_port=grpc_port,
-                prefer_grpc=True,  # gRPC is faster for batch operations
+                prefer_grpc=prefer_grpc,  # gRPC is faster for batch operations
+                api_key=api_key,
                 timeout=30,
             )
         else:

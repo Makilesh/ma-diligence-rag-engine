@@ -13,6 +13,7 @@ and broken in 3.12.
 """
 
 import asyncio
+import os
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
@@ -32,6 +33,31 @@ _embed_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="embed")
 _rerank_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="rerank")
 
 # ==============================================================================
+# Model selection
+# ==============================================================================
+# The defaults are the models every measurement in RESULTS.md was produced with.
+# They are overridable because the cross-encoder does not fit a CPU-only host:
+# measured on 2 vCPU (the free-tier deployment target), bge-reranker-v2-m3 takes
+# 111s to score 40 passages, and a decomposed query reranks four times — roughly
+# 7.5 minutes per question, against 0.12s for the whole dense embedding step.
+#
+# Quantization is not enough to close that: int8 buys 2-4x where ~30x is needed.
+# Only a smaller cross-encoder does, so the model itself is the knob.
+# `cross-encoder/ms-marco-MiniLM-L-6-v2` (22M params) measured 3.2s for the same
+# 40 passages — 34x — at the cost of being English-only.
+#
+# The embedding model is deliberately overridable too, but changing it is a much
+# bigger commitment than changing the reranker: reranking is query-time only,
+# while a new embedding model invalidates every vector already in Qdrant and
+# requires a full re-index.
+EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3")
+RERANKER_MODEL_NAME = os.getenv("RERANKER_MODEL", "BAAI/bge-reranker-v2-m3")
+
+# Sequence length the cross-encoder pads pairs to. Halving it to 512 is worth
+# 1.6x on its own and costs nothing when chunks are 512 tokens to begin with.
+RERANKER_MAX_LENGTH = int(os.getenv("RERANKER_MAX_LENGTH", "1024"))
+
+# ==============================================================================
 # Model singletons — lazily loaded on first use
 # ==============================================================================
 _embedding_model: SentenceTransformer | None = None
@@ -40,34 +66,46 @@ _reranker_model: CrossEncoder | None = None
 
 def _get_embedding_model() -> SentenceTransformer:
     """
-    Lazily loads the BAAI/bge-m3 embedding model on first use.
+    Lazily loads the configured embedding model on first use.
     Always resident in VRAM (every query uses it).
 
+    The model is EMBEDDING_MODEL_NAME, which defaults to BAAI/bge-m3. Any
+    override must produce 1024-dimensional vectors to match VECTOR_SIZE, and
+    changing it invalidates everything already indexed.
+
     Returns:
-        SentenceTransformer model for BAAI/bge-m3 on CUDA.
+        SentenceTransformer model on CUDA when available, else CPU.
     """
     global _embedding_model
     if _embedding_model is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        logger.info(f"Loading BAAI/bge-m3 embedding model to {device.upper()}")
+        logger.info(f"Loading {EMBEDDING_MODEL_NAME} embedding model to {device.upper()}")
         _embedding_model = SentenceTransformer(
-            "BAAI/bge-m3",
+            EMBEDDING_MODEL_NAME,
             device=device,
         )
-        logger.info(f"BAAI/bge-m3 embedding model loaded successfully on {device.upper()}")
+        logger.info(
+            f"{EMBEDDING_MODEL_NAME} embedding model loaded successfully on {device.upper()}"
+        )
     return _embedding_model
 
 
 def _get_reranker_model() -> CrossEncoder:
     """
-    Lazily loads the BAAI/bge-reranker-v2-m3 cross-encoder on first use.
+    Lazily loads the configured cross-encoder on first use.
     Always resident in VRAM (every query uses it).
 
-    CRITICAL: bge-reranker-v2-m3 outputs RAW LOGITS (unbounded) by default.
+    The model is RERANKER_MODEL_NAME, which defaults to BAAI/bge-reranker-v2-m3.
+    Unlike the embedding model this is safe to change at any time — reranking is
+    query-time only and touches nothing already stored.
+
+    CRITICAL: cross-encoders output RAW LOGITS (unbounded) by default.
     Without sigmoid normalization, scores can be negative or >1, which silently
     breaks every reranker_threshold (0.25-0.8) and the Quality Assessor's
     "mean reranker score of top-5" heuristic.
-    activation_fct=torch.nn.Sigmoid() normalizes output to [0, 1].
+    activation_fct=torch.nn.Sigmoid() normalizes output to [0, 1]. This applies
+    to any substituted model, not just the default — swapping the model without
+    it would leave every threshold comparing against a different scale, silently.
 
     Returns:
         CrossEncoder model with sigmoid activation for [0,1] normalized scores.
@@ -75,14 +113,19 @@ def _get_reranker_model() -> CrossEncoder:
     global _reranker_model
     if _reranker_model is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        logger.info(f"Loading BAAI/bge-reranker-v2-m3 to {device.upper()}")
+        logger.info(
+            f"Loading {RERANKER_MODEL_NAME} to {device.upper()}",
+            extra={"max_length": RERANKER_MAX_LENGTH},
+        )
         _reranker_model = CrossEncoder(
-            "BAAI/bge-reranker-v2-m3",
-            max_length=1024,
+            RERANKER_MODEL_NAME,
+            max_length=RERANKER_MAX_LENGTH,
             device=device,
             default_activation_function=torch.nn.Sigmoid(),  # ← MANDATORY for [0,1] scores
         )
-        logger.info(f"BAAI/bge-reranker-v2-m3 loaded successfully on {device.upper()} (sigmoid activated)")
+        logger.info(
+            f"{RERANKER_MODEL_NAME} loaded successfully on {device.upper()} (sigmoid activated)"
+        )
     return _reranker_model
 
 
