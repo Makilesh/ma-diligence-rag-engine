@@ -2,8 +2,10 @@
 Deal management routes.
 """
 
+import asyncio
+import os
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException
 
@@ -46,12 +48,21 @@ _RISK_SEVERITY: dict[str, str] = {
 async def create_deal(request: DealCreateRequest):
     """Creates a new deal."""
     deal_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc)
+    expires_at = (
+        (now + timedelta(seconds=SANDBOX_TTL_SECONDS)).isoformat()
+        if request.is_sandbox
+        else ""
+    )
     _deals[deal_id] = {
         "deal_id": deal_id,
         "deal_name": request.deal_name,
         "description": request.description,
         "document_count": 0,
         "status": "active",
+        "is_sandbox": request.is_sandbox,
+        "created_at": now.isoformat(),
+        "expires_at": expires_at,
     }
 
     logger.info(
@@ -420,3 +431,226 @@ async def list_deal_risk_signals(deal_id: str):
     severity_rank = {"high": 0, "medium": 1, "low": 2}
     signals.sort(key=lambda s: severity_rank.get(s.severity, 3))
     return signals
+
+
+# ==============================================================================
+# Ephemeral sandbox deals
+# ==============================================================================
+# A public demo has to let visitors upload their own documents without becoming
+# a permanent store of other people's files. Sandbox deals are deleted on two
+# independent triggers, because neither is sufficient alone:
+#
+#   1. The tab closes. The browser fires `navigator.sendBeacon` at the purge
+#      endpoint below, which deletes immediately. This covers the ordinary case
+#      and is the only one fast enough to feel like "closed it, it's gone".
+#
+#   2. The TTL sweeper. A beacon is best-effort by specification — a crashed
+#      tab, a backgrounded mobile browser killed by the OS, or a dropped network
+#      all lose it silently. The sweeper is what makes deletion a guarantee
+#      rather than a hope, so it is the load-bearing one.
+#
+# Deletion is by `deal_id` payload filter, which is an indexed KEYWORD field, so
+# it is a single cheap operation rather than a scroll-and-delete.
+
+# Sandbox lifetime. Long enough that a visitor reading a long answer does not
+# have their upload swept mid-session, short enough that an abandoned upload does
+# not sit in a free-tier cluster overnight.
+SANDBOX_TTL_SECONDS: int = int(os.getenv("SANDBOX_TTL_SECONDS", str(2 * 60 * 60)))
+
+# How often the sweeper wakes. Independent of the TTL: checking every few minutes
+# bounds how long an expired deal outlives its deadline without making the sweep
+# itself a load source.
+SANDBOX_SWEEP_INTERVAL_SECONDS: int = int(
+    os.getenv("SANDBOX_SWEEP_INTERVAL_SECONDS", "300")
+)
+
+_sweeper_task: asyncio.Task | None = None
+
+
+async def _delete_deal_vectors(deal_id: str) -> None:
+    """
+    Removes every point belonging to a deal from both Qdrant collections.
+
+    Args:
+        deal_id: Deal whose vectors should be deleted.
+
+    Raises:
+        Exception: Propagated from the Qdrant client so callers can decide
+            whether a failed purge is fatal (explicit delete) or worth retrying
+            on the next pass (sweeper).
+    """
+    from qdrant_client.models import FilterSelector, FieldCondition, Filter, MatchValue
+
+    from src.vector_db.qdrant_client import get_qdrant_client
+    from src.vector_db.constants import COLLECTION_NAME, PARENT_COLLECTION_NAME
+
+    client = get_qdrant_client()
+    selector = FilterSelector(
+        filter=Filter(
+            must=[FieldCondition(key="deal_id", match=MatchValue(value=deal_id))]
+        )
+    )
+
+    for collection in (COLLECTION_NAME, PARENT_COLLECTION_NAME):
+        try:
+            await client.delete(collection_name=collection, points_selector=selector)
+        except Exception as e:
+            # The parent collection is not written by the current ingest path, so
+            # it is frequently absent. Missing it must not abort the delete of
+            # the main collection, which is the one that actually holds content.
+            if collection == PARENT_COLLECTION_NAME:
+                logger.debug(
+                    "Parent collection purge skipped",
+                    extra={"deal_id": deal_id, "error": str(e)},
+                )
+                continue
+            raise
+
+
+async def purge_deal(deal_id: str) -> dict:
+    """
+    Deletes a deal's vectors and forgets its in-memory records.
+
+    Args:
+        deal_id: Deal to purge.
+
+    Returns:
+        Summary dict with the deal_id and how many document records were dropped.
+    """
+    await _delete_deal_vectors(deal_id)
+
+    documents_dropped = len(_documents.pop(deal_id, []))
+    _deals.pop(deal_id, None)
+
+    logger.info(
+        "Deal purged",
+        extra={"deal_id": deal_id, "documents_dropped": documents_dropped},
+    )
+    return {"deal_id": deal_id, "documents_dropped": documents_dropped, "status": "purged"}
+
+
+@router.delete("/deals/{deal_id}")
+async def delete_deal(deal_id: str):
+    """
+    Deletes a deal and everything indexed under it.
+
+    Args:
+        deal_id: Deal to delete.
+
+    Returns:
+        Purge summary.
+    """
+    try:
+        return await purge_deal(deal_id)
+    except Exception as e:
+        logger.error("Deal purge failed", extra={"deal_id": deal_id, "error": str(e)})
+        raise HTTPException(status_code=500, detail=f"Purge failed: {str(e)}")
+
+
+@router.post("/deals/{deal_id}/purge")
+async def purge_deal_endpoint(deal_id: str):
+    """
+    POST-shaped alias of DELETE, for `navigator.sendBeacon`.
+
+    This exists purely because the Beacon API can only issue POST — and a beacon
+    is the only request that reliably survives the tab that fired it. Routing the
+    unload path through `fetch(..., {method: "DELETE"})` instead loses the
+    request whenever the browser tears the page down first, which is most of the
+    time and is exactly the case the endpoint is for.
+
+    Always reports success: the caller is a beacon whose response nothing will
+    ever read, and a failure here is recovered by the TTL sweeper anyway.
+
+    Args:
+        deal_id: Deal to purge.
+
+    Returns:
+        Purge summary, or a status of "deferred" if the delete failed.
+    """
+    try:
+        return await purge_deal(deal_id)
+    except Exception as e:
+        logger.warning(
+            "Beacon purge failed — deferring to the TTL sweeper",
+            extra={"deal_id": deal_id, "error": str(e)},
+        )
+        return {"deal_id": deal_id, "status": "deferred"}
+
+
+async def _sweep_expired_sandboxes() -> int:
+    """
+    Purges every sandbox deal past its TTL.
+
+    Returns:
+        Number of deals purged on this pass.
+    """
+    now = datetime.now(timezone.utc)
+
+    # Materialise the candidate list before awaiting anything: `purge_deal`
+    # mutates `_deals`, and mutating a dict while iterating it raises.
+    expired = [
+        deal_id
+        for deal_id, deal in list(_deals.items())
+        if deal.get("is_sandbox")
+        and deal.get("expires_at")
+        and datetime.fromisoformat(deal["expires_at"]) <= now
+    ]
+
+    purged = 0
+    for deal_id in expired:
+        try:
+            await purge_deal(deal_id)
+            purged += 1
+        except Exception as e:
+            # Leave the record in place so the next pass retries it.
+            logger.warning(
+                "Sandbox sweep failed for deal",
+                extra={"deal_id": deal_id, "error": str(e)},
+            )
+
+    if purged:
+        logger.info("Sandbox sweep complete", extra={"deals_purged": purged})
+    return purged
+
+
+async def _sweeper_loop() -> None:
+    """Runs `_sweep_expired_sandboxes` forever, on the configured interval."""
+    while True:
+        try:
+            await asyncio.sleep(SANDBOX_SWEEP_INTERVAL_SECONDS)
+            await _sweep_expired_sandboxes()
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            # A sweep that raises must not kill the loop — that would silently
+            # disable the guarantee the sweeper exists to provide.
+            logger.error("Sandbox sweeper iteration failed", extra={"error": str(e)})
+
+
+async def start_sandbox_sweeper() -> None:
+    """Starts the background sweeper. Idempotent."""
+    global _sweeper_task
+    if _sweeper_task is not None and not _sweeper_task.done():
+        return
+    _sweeper_task = asyncio.create_task(_sweeper_loop())
+    logger.info(
+        "Sandbox sweeper started",
+        extra={
+            "ttl_seconds": SANDBOX_TTL_SECONDS,
+            "interval_seconds": SANDBOX_SWEEP_INTERVAL_SECONDS,
+        },
+    )
+
+
+async def stop_sandbox_sweeper() -> None:
+    """Cancels the background sweeper and waits for it to unwind."""
+    global _sweeper_task
+    if _sweeper_task is None:
+        return
+    _sweeper_task.cancel()
+    try:
+        await _sweeper_task
+    except asyncio.CancelledError:
+        pass
+    _sweeper_task = None
+    logger.info("Sandbox sweeper stopped")
