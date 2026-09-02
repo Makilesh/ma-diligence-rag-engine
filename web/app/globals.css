@@ -1,0 +1,429 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   Design tokens
+
+   Carried forward from the Streamlit build's palette (app/styles.py): a deep
+   ink canvas with one warm gold accent. The constraint that shaped it still
+   holds — colour carries meaning here (validated / warning / failed / refused),
+   so it is spent on state rather than decoration, and the accent is reserved
+   for actions, focus, and provenance.
+
+   The page commits to dark. This is a tool for reading dense financial and
+   legal text in long sessions, and the palette is tuned for that rather than
+   split across two half-tuned themes.
+   ========================================================================== */
+
+@theme {
+  --color-ink-950: #06080c;
+  --color-ink-900: #0b0e14;
+  --color-ink-850: #101420;
+  --color-ink-800: #151a27;
+  --color-ink-750: #1a2030;
+  --color-ink-700: #212838;
+  --color-ink-600: #2b3346;
+
+  --color-line: #212739;
+  --color-line-strong: #303950;
+
+  --color-ash-50: #e8ebf2;
+  --color-ash-300: #98a1b5;
+  --color-ash-500: #68718a;
+  --color-ash-600: #4d5568;
+
+  --color-gold-300: #f6dcae;
+  --color-gold-400: #f2cb86;
+  --color-gold-500: #e0b36a;
+  --color-gold-600: #c29750;
+  --color-gold-700: #8a6e3f;
+
+  --color-ok: #4fbf87;
+  --color-warn: #e5ac5e;
+  --color-bad: #e8695f;
+  --color-info: #6fa8dc;
+  --color-violet: #8b7fe8;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas,
+    monospace;
+
+  --radius-card: 14px;
+  --radius-pill: 999px;
+}
+
+:root {
+  color-scheme: dark;
+  --glow: rgba(224, 179, 106, 0.16);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px -18px rgba(0, 0, 0, 0.7);
+}
+
+* {
+  border-color: var(--color-line);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-ink-950);
+  color: var(--color-ash-50);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  min-height: 100vh;
+}
+
+/* --------------------------------------------------------------------------
+   Ambient canvas
+
+   A near-black page reads flat and cheap on a large monitor. Two fixed layers
+   fix that without becoming decoration: a wide, very low-opacity gold bloom
+   behind the masthead, and a fine grain that breaks up the banding a large
+   gradient shows on 8-bit panels.
+   -------------------------------------------------------------------------- */
+.canvas-glow {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(1100px 520px at 15% -10%, var(--glow), transparent 68%),
+    radial-gradient(900px 420px at 88% 4%, rgba(139, 127, 232, 0.09), transparent 70%);
+}
+
+.canvas-grain {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.032;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 220 220' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* A hairline grid, visible only near the top of the page. Reads as graph paper
+   under the masthead and fades out before it can compete with content. */
+.canvas-grid {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: linear-gradient(to bottom, black, transparent 42%);
+  -webkit-mask-image: linear-gradient(to bottom, black, transparent 42%);
+}
+
+/* --------------------------------------------------------------------------
+   Surfaces
+   -------------------------------------------------------------------------- */
+.panel {
+  background: linear-gradient(
+    180deg,
+    var(--color-ink-850),
+    var(--color-ink-900)
+  );
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.panel-flush {
+  background: color-mix(in srgb, var(--color-ink-850) 62%, transparent);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  backdrop-filter: blur(14px);
+}
+
+/* --------------------------------------------------------------------------
+   Answer typography
+
+   The answer is the product. It gets a wider measure, looser leading and
+   tabular figures — a due-diligence answer is mostly numbers, and proportional
+   digits make columns of them impossible to scan.
+   -------------------------------------------------------------------------- */
+.answer-body {
+  font-size: 1.005rem;
+  line-height: 1.78;
+  color: var(--color-ash-50);
+  font-variant-numeric: tabular-nums;
+}
+
+.answer-body > *:first-child {
+  margin-top: 0;
+}
+
+.answer-body p {
+  margin: 0 0 1.05rem;
+}
+
+.answer-body h1,
+.answer-body h2,
+.answer-body h3,
+.answer-body h4 {
+  font-size: 0.83rem;
+  font-weight: 660;
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+  color: var(--color-gold-400);
+  margin: 1.9rem 0 0.75rem;
+}
+
+.answer-body ul,
+.answer-body ol {
+  margin: 0 0 1.05rem;
+  padding-left: 1.3rem;
+}
+
+.answer-body ul {
+  list-style: none;
+  padding-left: 1.15rem;
+}
+
+.answer-body ul > li {
+  position: relative;
+}
+
+.answer-body ul > li::before {
+  content: "";
+  position: absolute;
+  left: -0.95rem;
+  top: 0.68em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-gold-600);
+}
+
+.answer-body ol {
+  list-style: decimal;
+}
+
+.answer-body li {
+  margin-bottom: 0.5rem;
+  line-height: 1.72;
+}
+
+.answer-body strong {
+  color: #fff;
+  font-weight: 640;
+}
+
+.answer-body blockquote {
+  margin: 0 0 1.05rem;
+  padding: 0.1rem 0 0.1rem 1rem;
+  border-left: 2px solid var(--color-gold-700);
+  color: var(--color-ash-300);
+}
+
+.answer-body code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  background: var(--color-ink-800);
+  border: 1px solid var(--color-line);
+  border-radius: 5px;
+  padding: 0.1rem 0.36rem;
+  color: var(--color-gold-300);
+}
+
+/* Tables are the most information-dense thing an answer contains, so they get
+   a real treatment rather than inheriting prose defaults. */
+.answer-body .table-scroll {
+  overflow-x: auto;
+  margin: 0 0 1.15rem;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+}
+
+.answer-body table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.answer-body thead {
+  background: var(--color-ink-800);
+}
+
+.answer-body th {
+  text-align: left;
+  font-size: 0.68rem;
+  font-weight: 660;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-ash-300);
+  padding: 0.6rem 0.85rem;
+  white-space: nowrap;
+}
+
+.answer-body td {
+  padding: 0.55rem 0.85rem;
+  border-top: 1px solid var(--color-line);
+}
+
+.answer-body tbody tr:hover {
+  background: rgba(255, 255, 255, 0.018);
+}
+
+/* --------------------------------------------------------------------------
+   Citation pills
+
+   Rendered as superscript numbers inline. Sized so a run of them in one
+   sentence does not push the line height around.
+   -------------------------------------------------------------------------- */
+.cite-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.28rem;
+  margin: 0 0.09rem;
+  border-radius: 5px;
+  font-size: 0.66rem;
+  font-weight: 660;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  vertical-align: 0.42em;
+  background: color-mix(in srgb, var(--color-gold-500) 17%, transparent);
+  color: var(--color-gold-300);
+  border: 1px solid color-mix(in srgb, var(--color-gold-500) 34%, transparent);
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease, transform 0.14s ease;
+  text-decoration: none;
+}
+
+.cite-pill:hover {
+  background: var(--color-gold-500);
+  color: #241b08;
+  transform: translateY(-1px);
+}
+
+.cite-pill-stale {
+  background: color-mix(in srgb, var(--color-bad) 16%, transparent);
+  color: var(--color-bad);
+  border-color: color-mix(in srgb, var(--color-bad) 38%, transparent);
+}
+
+.cite-pill-stale:hover {
+  background: var(--color-bad);
+  color: #2b0d0b;
+}
+
+/* --------------------------------------------------------------------------
+   Motion
+   -------------------------------------------------------------------------- */
+@keyframes shimmer {
+  0% {
+    background-position: -220% 0;
+  }
+  100% {
+    background-position: 220% 0;
+  }
+}
+
+/* Applied to a stage row while its agent is still running. */
+.is-running {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--color-gold-500) 9%, transparent) 46%,
+    transparent 92%
+  );
+  background-size: 220% 100%;
+  animation: shimmer 1.9s ease-in-out infinite;
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-gold-500) 45%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+.pulse-ring {
+  animation: pulse-ring 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes caret-blink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.stream-caret::after {
+  content: "";
+  display: inline-block;
+  width: 0.5ch;
+  height: 1.05em;
+  margin-left: 0.12em;
+  vertical-align: -0.15em;
+  background: var(--color-gold-500);
+  animation: caret-blink 1.05s step-end infinite;
+}
+
+/* Respect the OS setting. The shimmer and typewriter are affordances, not
+   information — everything they convey is also stated in text. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Chrome
+   -------------------------------------------------------------------------- */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-ink-700);
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--color-ink-950);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gold-700);
+}
+
+/* Streamlit's default focus ring was invisible on this canvas, which made the
+   old app unusable by keyboard. Do not let that regress. */
+:focus-visible {
+  outline: 2px solid var(--color-gold-500);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-gold-500) 30%, transparent);
+  color: #fff;
+}
