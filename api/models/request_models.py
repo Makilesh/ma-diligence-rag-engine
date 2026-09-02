@@ -28,3 +28,10 @@ class DealCreateRequest(BaseModel):
     """Request model for creating a new deal."""
     deal_name: str = Field(..., description="Human-readable deal name")
     description: str = Field("", description="Deal description")
+    is_sandbox: bool = Field(
+        False,
+        description=(
+            "Mark the deal as ephemeral. Sandbox deals are purged when the "
+            "visitor's tab closes, and swept on a TTL if that never arrives."
+        ),
+    )

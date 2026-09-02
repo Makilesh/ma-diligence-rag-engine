@@ -54,6 +54,11 @@ class DealResponse(BaseModel):
     description: str = ""
     document_count: int = 0
     status: str = "active"
+    is_sandbox: bool = False
+    expires_at: str = Field(
+        "",
+        description="ISO-8601 TTL deadline for sandbox deals; empty for permanent ones",
+    )
 
 
 class DocumentRecord(BaseModel):
