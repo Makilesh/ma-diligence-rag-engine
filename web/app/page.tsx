@@ -115,6 +115,12 @@ export default function Home() {
       },
       [refreshDeals],
     ),
+    useCallback(() => {
+      // Clear the selection before refetching so `refreshDeals` falls back to
+      // the pre-indexed demo deal rather than keeping the purged id.
+      setActiveDealId(null);
+      void refreshDeals();
+    }, [refreshDeals]),
   );
 
   useEffect(() => {

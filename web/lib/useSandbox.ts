@@ -27,7 +27,10 @@ const STORAGE_KEY = "redline.sandbox.deal";
  * browsers background and kill tabs without ever firing it. `pagehide` fires in
  * both cases.
  */
-export function useSandbox(onDealCreated: (deal: Deal) => void) {
+export function useSandbox(
+  onDealCreated: (deal: Deal) => void,
+  onDealDiscarded: () => void,
+) {
   const [sandboxDeal, setSandboxDeal] = useState<Deal | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,7 +100,11 @@ export function useSandbox(onDealCreated: (deal: Deal) => void) {
     sessionStorage.removeItem(STORAGE_KEY);
     setSandboxDeal(null);
     dealRef.current = null;
-  }, []);
+    // The caller has to re-read the deal list: the purged deal is still in it,
+    // and if it was the selected one, every subsequent query would be scoped to
+    // a deal that no longer exists and would refuse for lack of context.
+    onDealDiscarded();
+  }, [onDealDiscarded]);
 
   return { sandboxDeal, uploading, error, upload, discard };
 }
