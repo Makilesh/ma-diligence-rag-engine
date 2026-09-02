@@ -11,6 +11,7 @@ import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from src.vector_db.qdrant_client import (
     get_qdrant_client,
@@ -75,12 +76,17 @@ async def lifespan(app: FastAPI):
 
         await warm_models()
 
+    from api.routes.deals import start_sandbox_sweeper, stop_sandbox_sweeper
+
+    await start_sandbox_sweeper()
+
     logger.info("Application startup complete")
 
     yield  # Application runs here
 
     # Shutdown
     logger.info("Shutting down application")
+    await stop_sandbox_sweeper()
     await close_checkpointer()
     await close_qdrant_client()
     await BudgetTracker.close()
@@ -92,6 +98,29 @@ app = FastAPI(
     description="Production-grade Hybrid Agentic RAG for M&A Due Diligence",
     version="1.0.0",
     lifespan=lifespan,
+)
+
+# The Next.js frontend is served from a different origin than this API in every
+# deployment (localhost:3000 vs :8000 in development, Vercel vs the container
+# host in production), so browsers preflight every request. CORS_ORIGINS is a
+# comma-separated allowlist; the default covers a local `npm run dev`.
+#
+# Deliberately not `allow_credentials=True`: this API has no cookie session, and
+# the combination of credentials with a permissive origin list is the mistake
+# that turns CORS from a control into a formality.
+_cors_origins = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
+    ).split(",")
+    if origin.strip()
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins,
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
 )
 
 
