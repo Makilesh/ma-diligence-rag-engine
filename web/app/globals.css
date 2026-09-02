@@ -89,6 +89,9 @@ body {
   inset: 0;
   pointer-events: none;
   z-index: 0;
+  /* These three layers never change. Promoting them to their own compositor
+     layer keeps scrolling content from dragging them through a repaint. */
+  transform: translateZ(0);
   background:
     radial-gradient(1100px 520px at 15% -10%, var(--glow), transparent 68%),
     radial-gradient(900px 420px at 88% 4%, rgba(139, 127, 232, 0.09), transparent 70%);
@@ -99,8 +102,13 @@ body {
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.032;
-  mix-blend-mode: overlay;
+  opacity: 0.022;
+  transform: translateZ(0);
+  /* No `mix-blend-mode` here, deliberately. Blending a full-viewport fixed
+     layer forces the entire stacking context to recomposite on every scroll
+     frame, which showed up as visible repaint lag under the two backdrop-blur
+     bars. On a near-black canvas the overlay blend was contributing almost
+     nothing anyway, so plain opacity buys the same texture for free. */
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 220 220' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
@@ -111,6 +119,7 @@ body {
   inset: 0;
   pointer-events: none;
   z-index: 0;
+  transform: translateZ(0);
   background-image:
     linear-gradient(to right, rgba(255, 255, 255, 0.028) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
@@ -131,13 +140,6 @@ body {
   border: 1px solid var(--color-line);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
-}
-
-.panel-flush {
-  background: color-mix(in srgb, var(--color-ink-850) 62%, transparent);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-card);
-  backdrop-filter: blur(14px);
 }
 
 /* --------------------------------------------------------------------------
