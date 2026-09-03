@@ -162,6 +162,27 @@ async def ingest_files(client: httpx.AsyncClient, files_info: list[dict]) -> dic
             
     return doc_mappings
 
+async def indexed_filenames(client: httpx.AsyncClient) -> set[str]:
+    """
+    Returns the filenames currently indexed for the evaluation deal.
+
+    Args:
+        client: Shared HTTP client.
+
+    Returns:
+        Set of indexed filenames; empty if the endpoint is unavailable.
+    """
+    try:
+        resp = await client.get(
+            f"{API_URL}/api/v1/deals/{DEAL_ID}/documents", timeout=30.0
+        )
+        if resp.status_code != 200:
+            return set()
+        return {d["filename"] for d in resp.json()}
+    except httpx.HTTPError:
+        return set()
+
+
 async def run_queries(client: httpx.AsyncClient, golden_qa_pairs: list[dict]) -> list[dict]:
     results = []
     
@@ -330,8 +351,32 @@ async def main():
         ]
         print(f"Corpus: {len(files_info)} documents in {deal_dir}")
 
-        doc_mappings = await ingest_files(client, files_info)
-        print(f"\nIngestion completed. {len(doc_mappings)} documents indexed.")
+        # Ingest only what is missing.
+        #
+        # Ingesting unconditionally does not refresh the index, it doubles it.
+        # The ingest endpoint retires a previous version only when handed an
+        # explicit `supersedes_doc_id`, which this harness never sends, so a
+        # second run adds nine more documents with fresh doc_ids, every copy
+        # flagged current. Rank fusion cannot collapse them either — chunk ids
+        # embed the doc_id, so the duplicates are distinct chunks all the way
+        # down. The report's claim of "a freshly wiped index" held only for
+        # whoever happened to wipe it by hand first.
+        already_indexed = await indexed_filenames(client)
+        pending = [f for f in files_info if f["path"].name not in already_indexed]
+
+        if not pending:
+            print(
+                f"All {len(files_info)} corpus documents are already indexed. "
+                f"Skipping ingestion."
+            )
+        else:
+            if already_indexed:
+                print(
+                    f"{len(already_indexed)} document(s) already indexed; "
+                    f"ingesting the {len(pending)} missing."
+                )
+            doc_mappings = await ingest_files(client, pending)
+            print(f"\nIngestion completed. {len(doc_mappings)} document(s) added.")
 
         # Abort rather than measure nothing. A Qdrant client/server version skew
         # made every upsert fail while the API stayed healthy; the harness
@@ -339,12 +384,18 @@ async def main():
         # empty index, producing a full results file of 0% recall that looked
         # like a catastrophic regression in the engine. An evaluation whose
         # corpus failed to load has no result to report — including a bad one.
-        if len(doc_mappings) < len(files_info):
+        #
+        # Asserted against the index rather than the ingest return value, so the
+        # guard covers the skip path too: a stale registry claiming documents
+        # Qdrant does not actually hold would otherwise sail past unnoticed.
+        final_index = await indexed_filenames(client)
+        missing = {f["path"].name for f in files_info} - final_index
+        if missing:
             print(
-                f"\nABORTING: only {len(doc_mappings)}/{len(files_info)} documents "
-                f"ingested. Every query would be scored against an incomplete "
-                f"index, so the run would measure the ingestion failure rather "
-                f"than the engine. Fix ingestion and re-run."
+                f"\nABORTING: {len(missing)}/{len(files_info)} corpus documents are "
+                f"not in the index ({sorted(missing)}). Every query would be scored "
+                f"against an incomplete index, so the run would measure the "
+                f"ingestion failure rather than the engine. Fix ingestion and re-run."
             )
             return
 

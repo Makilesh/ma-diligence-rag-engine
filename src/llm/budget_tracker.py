@@ -543,8 +543,52 @@ class BudgetTracker:
 
         Returns:
             ModelChoice with the model and the API key to bill it to.
+
+        Raises:
+            RuntimeError: If SYNTHESIS_MODEL_PIN names a model with no capacity
+                left. Pinned runs fail rather than substitute — see below.
         """
-        return await self._select_from_ladder(SYNTHESIS_LADDER, "synthesis")
+        pin = os.getenv("SYNTHESIS_MODEL_PIN", "").strip()
+        if not pin:
+            return await self._select_from_ladder(SYNTHESIS_LADDER, "synthesis")
+
+        # Pinned: measurement mode, not a production path.
+        #
+        # Recall on the golden set is dominated by which model answered. Measured
+        # inside a single run, on one index with identical retrieval, mean recall
+        # was 100% on gemini-3.6-flash, 93% on gemini-3-flash-preview, 66% on
+        # gemini-3.5-flash and 50% on gemini-2.5-flash — a 50-point spread driven
+        # entirely by which rung had daily quota left at that moment.
+        #
+        # That makes the ladder fatal to any A/B comparison. Evaluating two
+        # retrieval configurations on different days compares their synthesis
+        # quota states far more than it compares their retrieval, and the ladder
+        # guarantees the two runs differ because the first one spends the quota
+        # the second would have used.
+        #
+        # So the pin restricts the ladder to exactly one model and, critically,
+        # does NOT fall back. Falling back is what the unpinned ladder is for and
+        # is right in production; here it would silently reintroduce the variable
+        # the pin exists to remove, and the substitution is invisible in the
+        # results — the run would simply report a number nobody could interpret.
+        # A loud failure is recoverable; a quietly confounded measurement is not.
+        if pin not in SYNTHESIS_LADDER:
+            logger.warning(
+                "SYNTHESIS_MODEL_PIN names a model absent from SYNTHESIS_LADDER",
+                extra={"pin": pin, "ladder": SYNTHESIS_LADDER},
+            )
+
+        choice = await self._select_from_ladder([pin], "synthesis(pinned)")
+
+        if choice.model != pin:
+            raise RuntimeError(
+                f"SYNTHESIS_MODEL_PIN={pin} has no capacity left on any configured "
+                f"key, and a pinned run must not substitute another model. Wait for "
+                f"the daily quota to reset, add another key, or unset the pin to "
+                f"restore normal ladder behaviour."
+            )
+
+        return choice
 
     async def get_model_for_agent(self) -> ModelChoice:
         """
