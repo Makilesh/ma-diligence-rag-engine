@@ -57,6 +57,12 @@ logger = setup_logger(__name__)
 SERVICE_COOLDOWN_SECONDS = 90.0
 MAX_SERVICE_COOLDOWN_SECONDS = 1800.0
 
+# How long a pinned synthesis run will wait for its model to come back before
+# giving up. Sized against the cooldown ladder: a model that has failed enough
+# times to sit at the 720s maximum gets two chances to recover within this
+# window before the run is abandoned.
+PIN_MAX_WAIT_SECONDS = float(os.getenv("SYNTHESIS_PIN_MAX_WAIT_SECONDS", "1800"))
+
 
 def _utc_today() -> date:
     """
@@ -578,17 +584,78 @@ class BudgetTracker:
                 extra={"pin": pin, "ladder": SYNTHESIS_LADDER},
             )
 
-        choice = await self._select_from_ladder([pin], "synthesis(pinned)")
+        # Two reasons the pin can be unavailable, and they need opposite
+        # responses. A 503 puts the model in an escalating, process-wide
+        # cooldown (90s doubling to 720s) — measured against this provider, the
+        # reasoning rungs 503 several times an hour, so a pinned 41-question run
+        # would almost certainly meet one. That is transient and worth waiting
+        # out. Daily quota exhaustion is not: it clears at the UTC reset, and no
+        # amount of waiting inside one run will help.
+        #
+        # Failing on the first cooldown would make the pin unusable for exactly
+        # the long measurement runs it exists to serve.
+        import time
 
-        if choice.model != pin:
-            raise RuntimeError(
-                f"SYNTHESIS_MODEL_PIN={pin} has no capacity left on any configured "
-                f"key, and a pinned run must not substitute another model. Wait for "
-                f"the daily quota to reset, add another key, or unset the pin to "
-                f"restore normal ladder behaviour."
+        deadline = time.monotonic() + PIN_MAX_WAIT_SECONDS
+
+        while True:
+            choice = await self._select_from_ladder([pin], "synthesis(pinned)")
+            if choice.model == pin:
+                return choice
+
+            if not await self._model_has_daily_budget(pin):
+                raise RuntimeError(
+                    f"SYNTHESIS_MODEL_PIN={pin} has no daily quota left on any "
+                    f"configured key, and a pinned run must not substitute another "
+                    f"model. Wait for the UTC quota reset, add another key, or unset "
+                    f"the pin to restore normal ladder behaviour."
+                )
+
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise RuntimeError(
+                    f"SYNTHESIS_MODEL_PIN={pin} still had daily quota but stayed "
+                    f"provider-side unavailable for {PIN_MAX_WAIT_SECONDS}s. The "
+                    f"model is having a bad spell; re-run the measurement later "
+                    f"rather than comparing against a substituted model."
+                )
+
+            # Sleep until the cooldown lapses rather than polling: the deadline
+            # is known exactly, so there is nothing to discover by waking early.
+            cooldowns = getattr(self, "_model_cooldowns", {}) or {}
+            wait = cooldowns.get(pin, 0) - time.monotonic()
+            wait = max(1.0, min(wait, remaining))
+
+            logger.info(
+                "Pinned synthesis model is cooling down; waiting rather than "
+                "substituting",
+                extra={"model": pin, "wait_seconds": round(wait, 1)},
             )
+            await asyncio.sleep(wait)
 
-        return choice
+    async def _model_has_daily_budget(self, model: str) -> bool:
+        """
+        True if any configured key still has daily allowance for this model.
+
+        Distinguishes "temporarily unavailable" from "spent for the day", which
+        is the difference between a pinned run that should wait and one that
+        should stop.
+
+        Args:
+            model: Upstream model identifier.
+
+        Returns:
+            True if at least one live key has budget left on this model.
+        """
+        for key_index, api_key in enumerate(self._api_keys):
+            if not api_key:  # retired by mark_key_unusable
+                continue
+            slot = self._slot(key_index, model)
+            if self._slot_is_unavailable(slot):
+                continue
+            if await self._budget_available(slot):
+                return True
+        return False
 
     async def get_model_for_agent(self) -> ModelChoice:
         """

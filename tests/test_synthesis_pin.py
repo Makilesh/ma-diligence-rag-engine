@@ -78,7 +78,9 @@ class TestPinned:
         assert result.model == pin
 
     @pytest.mark.asyncio
-    async def test_raises_rather_than_substituting(self, tracker, monkeypatch):
+    async def test_raises_rather_than_substituting_when_quota_is_spent(
+        self, tracker, monkeypatch
+    ):
         """
         The load-bearing test.
 
@@ -93,8 +95,63 @@ class TestPinned:
 
         with patch.object(
             tracker, "_select_from_ladder", new=AsyncMock(return_value=fallback)
+        ), patch.object(
+            tracker, "_model_has_daily_budget", new=AsyncMock(return_value=False)
         ):
-            with pytest.raises(RuntimeError, match="no capacity left"):
+            with pytest.raises(RuntimeError, match="no daily quota left"):
+                await tracker.get_model_for_synthesis()
+
+    @pytest.mark.asyncio
+    async def test_waits_out_a_transient_cooldown(self, tracker, monkeypatch):
+        """
+        A 503 must not end a pinned run.
+
+        The reasoning rungs 503 several times an hour on this provider, and the
+        cooldown escalates to 720s. Failing on the first one would make the pin
+        unusable for exactly the long measurement runs it exists to serve — so
+        while daily quota remains, the pin waits and retries.
+        """
+        pin = "gemini/gemini-3.6-flash"
+        monkeypatch.setenv("SYNTHESIS_MODEL_PIN", pin)
+
+        cooled = ModelChoice(model="ollama/qwen2.5:14b", api_key=None, key_index=-1)
+        recovered = ModelChoice(model=pin, api_key="k", key_index=0)
+
+        slept: list[float] = []
+
+        async def fake_sleep(seconds):
+            slept.append(seconds)
+
+        with patch.object(
+            tracker,
+            "_select_from_ladder",
+            new=AsyncMock(side_effect=[cooled, recovered]),
+        ), patch.object(
+            tracker, "_model_has_daily_budget", new=AsyncMock(return_value=True)
+        ), patch("src.llm.budget_tracker.asyncio.sleep", new=fake_sleep):
+            result = await tracker.get_model_for_synthesis()
+
+        assert result.model == pin, "must return the pinned model, never a substitute"
+        assert slept, "must wait for the cooldown rather than failing immediately"
+
+    @pytest.mark.asyncio
+    async def test_gives_up_after_the_wait_budget(self, tracker, monkeypatch):
+        """
+        Waiting is bounded. A model that stays down is reported, not waited on
+        forever, so a stuck run cannot masquerade as a slow one.
+        """
+        pin = "gemini/gemini-3.6-flash"
+        monkeypatch.setenv("SYNTHESIS_MODEL_PIN", pin)
+        monkeypatch.setattr("src.llm.budget_tracker.PIN_MAX_WAIT_SECONDS", 0.0)
+
+        cooled = ModelChoice(model="ollama/qwen2.5:14b", api_key=None, key_index=-1)
+
+        with patch.object(
+            tracker, "_select_from_ladder", new=AsyncMock(return_value=cooled)
+        ), patch.object(
+            tracker, "_model_has_daily_budget", new=AsyncMock(return_value=True)
+        ):
+            with pytest.raises(RuntimeError, match="provider-side unavailable"):
                 await tracker.get_model_for_synthesis()
 
     @pytest.mark.asyncio
