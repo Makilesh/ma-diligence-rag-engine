@@ -492,6 +492,19 @@ def write_results_md(results: list[dict]) -> None:
             and RERANKER_MAX_LENGTH == 1024
         )
         profile_label = "local (default)" if is_default_profile else "deployed (CPU)"
+
+        # A pinned run holds the synthesis model fixed. Recorded because it is
+        # the difference between "these two runs are comparable" and "these two
+        # runs measured different models", and the mix line alone does not say
+        # whether that mix was chosen or merely what quota allowed.
+        synthesis_pin = os.getenv("SYNTHESIS_MODEL_PIN", "").strip()
+        pin_line = (
+            f"- **Synthesis model pinned to**: `{synthesis_pin}` "
+            f"(ladder disabled; comparable across runs)\n"
+            if synthesis_pin
+            else "- **Synthesis model**: selected by ladder \u2014 not pinned, "
+            "so this run is only comparable to another with the same mix\n"
+        )
         decomposed = sum(
             1 for r in results
             if any((t.get("sub_questions") or [])
@@ -535,7 +548,7 @@ provider health — neither of which is a property of the engine.
 - **Retrieval profile**: {profile_label}
 - **Embedding model**: `{EMBEDDING_MODEL_NAME}`
 - **Reranker**: `{RERANKER_MODEL_NAME}` (max_length {RERANKER_MAX_LENGTH})
-- **Synthesis model mix**: {mix}
+{pin_line}- **Synthesis model mix**: {mix}
 - **Queries decomposed into sub-questions**: {decomposed}/{total_queries}
 - **Answers lost to upstream synthesis failure**: {synthesis_failures}/{total_queries}
 

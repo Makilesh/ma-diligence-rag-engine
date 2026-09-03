@@ -13,7 +13,6 @@ fell back would still produce a results file, and nothing in that file would
 reveal that the comparison it was made for had been invalidated.
 """
 
-import os
 from unittest.mock import AsyncMock, patch
 
 import pytest
