@@ -7,6 +7,22 @@ import time
 from pathlib import Path
 import httpx
 
+# The harness echoes each answer to stdout, and answers carry the synthesizer's
+# citation emoji. On Windows the console defaults to cp1252, which cannot encode
+# them: the print raises UnicodeEncodeError, the exception is caught as a query
+# failure, and the question is recorded with status "exception" and no query_id.
+#
+# The damage is not the lost line of output — it is that a question the engine
+# answered correctly is scored as a crash, silently lowering the reported totals
+# for a reason that has nothing to do with the engine. One question was lost this
+# way before this was found, on a run that otherwise completed.
+#
+# errors="replace" rather than a narrower fix: this is diagnostic output, and no
+# console encoding is worth failing a measurement over.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
