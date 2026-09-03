@@ -405,6 +405,26 @@ def write_results_md(results: list[dict]) -> None:
             1 for r in results
             if "did not return a usable response" in (r.get("answer") or "")
         )
+
+        # Retrieval profile. Recorded for the same reason as the synthesis mix:
+        # it is a run condition, not a property of the engine, and two runs are
+        # not comparable without it. The deployed profile substitutes a much
+        # smaller cross-encoder to fit a CPU-only host, so a report that does not
+        # name its reranker cannot be told apart from one that used the default —
+        # which is precisely the confusion that would let a deployed number be
+        # read as the local one.
+        from src.vector_db.reranker import (
+            EMBEDDING_MODEL_NAME,
+            RERANKER_MAX_LENGTH,
+            RERANKER_MODEL_NAME,
+        )
+
+        is_default_profile = (
+            EMBEDDING_MODEL_NAME == "BAAI/bge-m3"
+            and RERANKER_MODEL_NAME == "BAAI/bge-reranker-v2-m3"
+            and RERANKER_MAX_LENGTH == 1024
+        )
+        profile_label = "local (default)" if is_default_profile else "deployed (CPU)"
         decomposed = sum(
             1 for r in results
             if any((t.get("sub_questions") or [])
@@ -445,6 +465,9 @@ Read these before comparing this run to another one. Recall on this set moves
 with the synthesis model, and the synthesis model moves with daily quota and
 provider health — neither of which is a property of the engine.
 
+- **Retrieval profile**: {profile_label}
+- **Embedding model**: `{EMBEDDING_MODEL_NAME}`
+- **Reranker**: `{RERANKER_MODEL_NAME}` (max_length {RERANKER_MAX_LENGTH})
 - **Synthesis model mix**: {mix}
 - **Queries decomposed into sub-questions**: {decomposed}/{total_queries}
 - **Answers lost to upstream synthesis failure**: {synthesis_failures}/{total_queries}
