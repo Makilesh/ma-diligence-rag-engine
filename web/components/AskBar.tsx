@@ -35,6 +35,14 @@ export const EXAMPLES: { type: string; query: string }[] = [
   },
 ];
 
+/**
+ * Whether to offer the PII toggle at all. Off unless the build opts in: on the
+ * public demo the server forces include_pii to false for every non-admin
+ * caller, so a toggle there would promise something it cannot deliver. Inlined
+ * at build time like every NEXT_PUBLIC_ variable.
+ */
+const PII_TOGGLE_ENABLED = process.env.NEXT_PUBLIC_ENABLE_PII_TOGGLE === "1";
+
 interface AskBarProps {
   onSubmit: (query: string, includePii: boolean) => void;
   onCancel: () => void;
@@ -72,7 +80,7 @@ export default function AskBar({
   const submit = () => {
     const trimmed = value.trim();
     if (!trimmed || running || disabled) return;
-    onSubmit(trimmed, includePii);
+    onSubmit(trimmed, PII_TOGGLE_ENABLED && includePii);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -119,20 +127,25 @@ export default function AskBar({
         />
 
         <div className="flex items-center justify-between gap-3 px-3.5 pb-3 pt-2">
-          <button
-            type="button"
-            onClick={() => setIncludePii((v) => !v)}
-            aria-pressed={includePii}
-            title="Include PII-flagged content (HR records, salary data). Excluded by default; every authorized use is written to the audit log."
-            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[0.72rem] font-medium transition-colors ${
-              includePii
-                ? "border-warn/35 bg-warn/10 text-warn"
-                : "border-line bg-ink-800 text-ash-500 hover:text-ash-300"
-            }`}
-          >
-            <EyeOff size={12} />
-            {includePii ? "PII included" : "PII excluded"}
-          </button>
+          {PII_TOGGLE_ENABLED ? (
+            <button
+              type="button"
+              onClick={() => setIncludePii((v) => !v)}
+              aria-pressed={includePii}
+              title="Include PII-flagged content (HR records, salary data). Excluded by default; every authorized use is written to the audit log."
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[0.72rem] font-medium transition-colors ${
+                includePii
+                  ? "border-warn/35 bg-warn/10 text-warn"
+                  : "border-line bg-ink-800 text-ash-500 hover:text-ash-300"
+              }`}
+            >
+              <EyeOff size={12} />
+              {includePii ? "PII included" : "PII excluded"}
+            </button>
+          ) : (
+            // Keeps the send controls pinned right when the toggle is absent.
+            <span />
+          )}
 
           <div className="flex items-center gap-2.5">
             <span className="hidden text-[0.7rem] text-ash-600 sm:inline">
