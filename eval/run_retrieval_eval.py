@@ -526,7 +526,12 @@ def baseline_metrics(report: dict) -> dict:
 def _device() -> str:
     import torch
 
-    return f"cuda ({torch.cuda.get_device_name(0)})" if torch.cuda.is_available() else "cpu"
+    try:
+        if torch.cuda.is_available() and torch.cuda.device_count() > 0:
+            return f"cuda ({torch.cuda.get_device_name(0)})"
+    except RuntimeError:  # CUDA build with no visible device
+        pass
+    return "cpu"
 
 
 async def run(args: argparse.Namespace) -> dict:
@@ -710,7 +715,7 @@ def main(argv: list[str] | None = None) -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
     stamp = report["generated_at"][:10]
     json_path = output_dir / f"retrieval_{stamp}.json"
-    json_path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    json_path.write_text(json.dumps(report, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
     markdown = render_markdown(report)
     (output_dir / "latest.md").write_text(markdown + "\n", encoding="utf-8")
     print(markdown)

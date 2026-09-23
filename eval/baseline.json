@@ -1,0 +1,26 @@
+{
+  "_about": "Gated retrieval metrics for `python -m eval.run_retrieval_eval --baseline eval/baseline.json`. Fractions in [0, 1]; a drop larger than `tolerance` on any of them fails the run. Regenerate with --update-baseline after an intentional retrieval change.",
+  "generated_at": "2026-09-23T10:39:48+00:00",
+  "device": "cuda (NVIDIA GeForce RTX 5070 Ti Laptop GPU)",
+  "golden_set_sha256": "a192d34a93c330963ff0fbec68c33264b08205c194844905fe0b82c398f05005",
+  "sub_questions_sha256": "9c13db3a6ee2af973800597956fdf3c81c3d2f481050c1051d1c2bb3a49fff27",
+  "tolerance": 0.02,
+  "metrics": {
+    "production": {
+      "fact_coverage@5": 0.8175,
+      "fact_coverage@10": 0.8175,
+      "fact_coverage@context": 0.8524,
+      "recall@10": 0.6196,
+      "mrr@10": 0.781,
+      "ndcg@10": 0.6568
+    },
+    "production_decomp": {
+      "fact_coverage@5": 0.8413,
+      "fact_coverage@10": 0.8413,
+      "fact_coverage@context": 0.8714,
+      "recall@10": 0.6451,
+      "mrr@10": 0.7667,
+      "ndcg@10": 0.6776
+    }
+  }
+}
