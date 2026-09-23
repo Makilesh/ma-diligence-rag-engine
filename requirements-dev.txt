@@ -1,0 +1,21 @@
+# requirements-dev.txt — test and lint tooling, on top of the runtime set.
+#
+# PyTorch is still installed separately (see the note in requirements.txt). For a
+# CPU-only machine or CI:
+#
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r requirements-dev.txt
+#
+# Ranges bracket the versions the suite was last run with locally
+# (pytest 9.1.1, pytest-asyncio 1.4.0, httpx 0.28.1, ruff 0.16.8).
+
+-r requirements.txt
+
+pytest>=8.3,<10.0
+# 1.x: strict mode, tests opt in with @pytest.mark.asyncio.
+pytest-asyncio>=1.0,<2.0
+# fastapi.testclient.TestClient is built on httpx; FastAPI does not install it.
+httpx>=0.27,<1.0
+# Pinned to a minor: ruff adds and re-scopes rules between minors, which would
+# turn a green CI red without any code change.
+ruff>=0.16,<0.17

@@ -1,0 +1,151 @@
+AURORA TECHNOLOGIES INC.
+CONSOLIDATED FINANCIAL STATEMENTS
+For the Fiscal Years Ended December 31, 2023 and December 31, 2022
+(Audited by Deloitte & Touche LLP)
+
+================================================================================
+CONSOLIDATED INCOME STATEMENT
+(in millions of USD)
+================================================================================
+
+                                          FY2023          FY2022
+                                          ------          ------
+Revenue                                   $452.8          $387.1
+  Software Licenses                       $198.4          $172.3
+  SaaS Subscriptions                      $189.6          $148.2
+  Professional Services                    $64.8           $66.6
+
+Cost of Revenue                           $181.1          $158.3
+
+Gross Profit                              $271.7          $228.8
+  Gross Margin                             60.0%           59.1%
+
+Operating Expenses:
+  Research & Development                   $72.4           $63.2
+  Sales & Marketing                        $90.6           $81.4
+  General & Administrative                 $36.2           $32.8
+  Restructuring Charges                     $4.5            $0.0
+                                          ------          ------
+Total Operating Expenses                  $203.7          $177.4
+
+Operating Income (EBIT)                    $68.0           $51.4
+  Operating Margin                         15.0%           13.3%
+
+Interest Expense                           ($8.2)          ($7.4)
+Other Income/(Expense)                      $2.1            $1.8
+                                          ------          ------
+Income Before Taxes                        $61.9           $45.8
+
+Income Tax Expense                         $15.5           $11.5
+  Effective Tax Rate                       25.0%           25.1%
+                                          ------          ------
+Net Income                                 $46.4           $34.3
+  Net Margin                               10.2%            8.9%
+
+Earnings Per Share (Diluted)               $3.87           $2.86
+Weighted Average Shares (Diluted)          12.0M           12.0M
+
+================================================================================
+CONSOLIDATED BALANCE SHEET
+(in millions of USD, as of December 31)
+================================================================================
+
+ASSETS                                    FY2023          FY2022
+                                          ------          ------
+Current Assets:
+  Cash and Cash Equivalents                $89.4           $72.1
+  Accounts Receivable, net                 $67.8           $58.2
+  Prepaid Expenses                         $12.3           $10.5
+  Other Current Assets                      $8.7            $7.4
+                                          ------          ------
+Total Current Assets                      $178.2          $148.2
+
+Non-Current Assets:
+  Property, Plant & Equipment, net         $45.6           $42.1
+  Goodwill                                $234.5          $234.5
+  Intangible Assets, net                   $67.8           $78.2
+  Deferred Tax Assets                      $15.4           $12.8
+  Other Non-Current Assets                 $18.9           $16.4
+                                          ------          ------
+Total Non-Current Assets                  $382.2          $384.0
+                                          ------          ------
+TOTAL ASSETS                              $560.4          $532.2
+
+LIABILITIES AND STOCKHOLDERS' EQUITY      FY2023          FY2022
+                                          ------          ------
+Current Liabilities:
+  Accounts Payable                         $28.4           $24.6
+  Accrued Liabilities                      $34.7           $29.8
+  Deferred Revenue                         $78.2           $65.4
+  Current Portion of Long-Term Debt        $12.0           $12.0
+                                          ------          ------
+Total Current Liabilities                 $153.3          $131.8
+
+Non-Current Liabilities:
+  Long-Term Debt                           $98.0          $110.0
+  Deferred Revenue (Non-Current)           $22.4           $18.6
+  Other Non-Current Liabilities            $14.3           $12.8
+                                          ------          ------
+Total Non-Current Liabilities             $134.7          $141.4
+                                          ------          ------
+TOTAL LIABILITIES                         $288.0          $273.2
+
+Stockholders' Equity:
+  Common Stock                              $1.2            $1.2
+  Additional Paid-In Capital              $124.8          $118.4
+  Retained Earnings                       $148.4          $141.4
+  Accumulated OCI                          ($2.0)          ($2.0)
+                                          ------          ------
+TOTAL STOCKHOLDERS' EQUITY                $272.4          $259.0
+                                          ------          ------
+TOTAL LIABILITIES AND EQUITY              $560.4          $532.2
+
+================================================================================
+KEY FINANCIAL METRICS AND NOTES
+================================================================================
+
+EBITDA Reconciliation:
+  Operating Income (EBIT)                  $68.0           $51.4
+  Depreciation & Amortization              $24.8           $22.6
+                                          ------          ------
+  EBITDA                                   $92.8           $74.0
+  EBITDA Margin                            20.5%           19.1%
+
+Adjusted EBITDA (excluding restructuring):
+  EBITDA                                   $92.8           $74.0
+  Add back: Restructuring Charges           $4.5            $0.0
+                                          ------          ------
+  Adjusted EBITDA                          $97.3           $74.0
+  Adjusted EBITDA Margin                   21.5%           19.1%
+
+Free Cash Flow:
+  Cash from Operations                     $78.4           $62.1
+  Capital Expenditures                    ($14.2)         ($12.8)
+                                          ------          ------
+  Free Cash Flow                           $64.2           $49.3
+
+Net Debt:
+  Total Debt (Current + Non-Current)      $110.0          $122.0
+  Less: Cash and Cash Equivalents         ($89.4)         ($72.1)
+                                          ------          ------
+  Net Debt                                 $20.6           $49.9
+  Net Debt/EBITDA                           0.2x            0.7x
+
+Revenue Growth: 17.0% YoY
+SaaS ARR Growth: 27.9% YoY (SaaS ARR as of Dec 31, 2023: $210.5M)
+Net Revenue Retention Rate: 118%
+Total Customers: 2,847 (up from 2,412 in FY2022)
+Enterprise Customers (>$100K ACV): 284 (up from 231 in FY2022)
+
+Note 7 — Debt:
+The Company maintains a $150M senior secured revolving credit facility with
+JPMorgan Chase, of which $110M was drawn as of December 31, 2023. The facility
+matures on June 30, 2026, and bears interest at SOFR + 225bps. The facility
+contains financial covenants requiring: (i) Net Debt/EBITDA ≤ 3.5x, and
+(ii) Interest Coverage Ratio ≥ 3.0x. As of December 31, 2023, the Company
+was in compliance with all covenants.
+
+Note 12 — Subsequent Events:
+On February 15, 2024, the Company's Board of Directors approved the exploration
+of strategic alternatives, including a potential sale of the Company. The Company
+has retained Goldman Sachs as financial advisor.

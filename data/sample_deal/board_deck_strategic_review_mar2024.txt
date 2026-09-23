@@ -1,0 +1,149 @@
+AURORA TECHNOLOGIES INC.
+BOARD OF DIRECTORS — SPECIAL MEETING
+MARCH 10, 2024
+
+PRIVILEGED AND CONFIDENTIAL
+
+================================================================================
+SLIDE 1: STRATEGIC ALTERNATIVES REVIEW
+================================================================================
+
+Agenda:
+1. Market Context and Strategic Rationale
+2. Preliminary Indications of Interest
+3. Valuation Analysis
+4. Recommended Path Forward
+5. Timeline and Next Steps
+
+Presenter: Sarah Chen, CFO
+Advisors Present: Goldman Sachs (Financial Advisor), Skadden Arps (Legal Counsel)
+
+================================================================================
+SLIDE 2: MARKET CONTEXT
+================================================================================
+
+Industry Trends:
+- Enterprise software M&A activity up 34% YoY in 2023
+- Median EV/Revenue multiple for SaaS companies: 8.2x (down from 12.4x in 2021)
+- Median EV/EBITDA multiple for profitable SaaS: 22.5x
+- Private equity dry powder at record $2.6 trillion
+
+Aurora's Position:
+- #3 market share in enterprise data analytics (est. 8.2% market share)
+- Market leader: Palantir (18.4%), #2: Snowflake (12.1%)
+- Strong customer retention: 118% Net Revenue Retention
+- Accelerating SaaS transition: SaaS mix grew from 38.3% to 41.9% of revenue
+
+Competitive Risks:
+- AI-native competitors gaining traction (Databricks, DataRobot)
+- Customer concentration: Top 10 customers represent 28% of revenue
+- Key person dependency: CTO Dr. James Wu holds 12 critical patents
+
+================================================================================
+SLIDE 3: PRELIMINARY INDICATIONS OF INTEREST
+================================================================================
+
+Three parties submitted non-binding indications:
+
+Party A — Vertex Capital Partners (Private Equity)
+  - Offer: $55 - $60 per share (cash)
+  - Financing: Committed debt financing from JPMorgan and Goldman Sachs
+  - Timeline: 60-day exclusivity, 90-day to signing
+  - Due Diligence: Standard, no unusual conditions
+  - Certainty: HIGH — experienced buyer, financing secured
+
+Party B — Meridian Software Corp (Strategic)
+  - Offer: $50 - $54 per share (60% cash / 40% stock)
+  - Synergies: Estimated $45M annual cost synergies by Year 3
+  - Timeline: 90-day exclusivity, 120-day to signing
+  - Due Diligence: Extensive technology DD required
+  - Antitrust: MODERATE RISK — overlapping customer base (~15%)
+  - Certainty: MEDIUM — antitrust review could delay/block
+
+Party C — Atlas Data Holdings (Private Equity Consortium)
+  - Offer: $48 - $52 per share (cash)
+  - Financing: Partially committed, ~30% equity shortfall
+  - Timeline: 90-day exclusivity, 150-day to signing
+  - Due Diligence: Extensive, including management presentations
+  - Certainty: LOW — financing gap, complex consortium structure
+
+================================================================================
+SLIDE 4: VALUATION ANALYSIS (Goldman Sachs)
+================================================================================
+
+Methodology                          Low         Mid         High
+-----------                          ---         ---         ----
+Comparable Companies (EV/Revenue)    $42.00      $48.00      $55.00
+Comparable Companies (EV/EBITDA)     $44.00      $51.00      $59.00
+Precedent Transactions               $46.00      $53.00      $62.00
+DCF (WACC 10.5%, TGR 3.0%)          $47.00      $54.00      $63.00
+LBO (20% IRR target)                $50.00      $56.00      $61.00
+
+52-Week High (Jan 8, 2024):         $44.12
+52-Week Low (Aug 15, 2023):         $31.87
+Current Price (Mar 8, 2024):        $41.20
+
+Goldman Sachs Reference Range:       $50.00 — $60.00
+
+================================================================================
+SLIDE 5: MANAGEMENT RECOMMENDATION
+================================================================================
+
+The Management Team and Goldman Sachs recommend:
+
+1. PROCEED with Vertex Capital Partners as the preferred bidder
+   - Highest offer range ($55-$60)
+   - All-cash consideration — no stock price risk for shareholders
+   - High certainty of close — committed financing
+   - Shortest timeline to signing
+
+2. MAINTAIN engagement with Meridian Software as a backup bidder
+   - Could drive price improvement through competition
+   - Synergy value could justify higher price if antitrust resolved
+
+3. DECLINE Atlas Data Holdings
+   - Lowest offer range
+   - Uncommitted financing creates execution risk
+   - Complex consortium structure
+
+================================================================================
+SLIDE 6: TIMELINE AND NEXT STEPS
+================================================================================
+
+Week 1-2 (Mar 11-22):  Grant Vertex exclusivity, open data room
+Week 3-6 (Mar 23-Apr 19): Buyer due diligence
+Week 7-8 (Apr 20-May 3): Negotiate definitive agreement
+Week 9 (May 4-10):     Board approval and signing
+Week 10-18 (May-Jul):  Regulatory approvals (HSR filing)
+Week 19-20 (Aug-Sep):  Shareholder vote and closing
+
+Target Closing Date: September 15, 2024
+
+Key Risk Factors:
+- DataFlow patent litigation outcome could impact valuation
+- Customer consent requirements for Northstar and Pacific Data contracts
+- Key employee retention through transition (CTO retention package: $4.5M)
+- HSR antitrust review (expected standard clearance, no second request)
+
+================================================================================
+BOARD RESOLUTION
+================================================================================
+
+RESOLVED, that the Board of Directors hereby authorizes the Company to:
+(1) Grant Vertex Capital Partners a 60-day exclusivity period;
+(2) Open the virtual data room for Vertex's due diligence team;
+(3) Retain Skadden Arps to prepare the definitive merger agreement;
+(4) Authorize management to negotiate within a price floor of $55.00 per share.
+
+Vote: 7-0 (unanimous)
+
+SPEAKER NOTES:
+- CFO Sarah Chen noted that the $4.5M restructuring charge in FY2023 was
+  related to the closure of the Austin development center (32 employees)
+  and should be added back for Adjusted EBITDA calculation.
+- Board member David Park raised concerns about customer concentration risk
+  and requested management prepare a sensitivity analysis assuming loss of
+  the top 3 customers.
+- General Counsel Maria Rodriguez confirmed that the DataFlow litigation
+  reserve of $5.0M is reflected in the FY2023 balance sheet under
+  Accrued Liabilities.

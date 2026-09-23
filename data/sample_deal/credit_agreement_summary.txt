@@ -1,0 +1,142 @@
+AURORA TECHNOLOGIES INC.
+SUMMARY OF INDEBTEDNESS AND CREDIT FACILITIES
+Disclosure Schedule 3.7 to the Agreement and Plan of Merger
+As of March 15, 2024
+
+CONFIDENTIAL
+
+================================================================================
+SECTION 1: OUTSTANDING INDEBTEDNESS
+================================================================================
+
+(in millions of USD, as of December 31, 2023)
+
+  Revolving Credit Facility (drawn)                          $85.0
+  Capital Lease Obligations                                   $6.4
+  Other Debt                                                  $0.0
+                                                            ------
+  Total Debt                                                 $91.4
+
+  Less: Cash and Cash Equivalents                            ($70.8)
+                                                            ------
+  Net Debt                                                    $20.6
+
+  Net Debt / Reported EBITDA (FY2023)                          0.2x
+  Net Debt / Reported EBITDA (FY2022)                          0.7x
+
+The Company deleveraged materially during FY2023, driven by $52.1 million of
+operating cash flow and a $25.0 million voluntary paydown of the revolver in
+Q4 FY2023.
+
+================================================================================
+SECTION 2: REVOLVING CREDIT FACILITY
+================================================================================
+
+Agreement:          Amended and Restated Credit Agreement dated June 30, 2021
+Administrative
+  Agent:            JPMorgan Chase Bank, N.A.
+Syndicate:          JPMorgan Chase Bank, N.A. (Lead Arranger), Silicon Valley
+                    Bank, Wells Fargo Bank, N.A.
+Facility Type:      Senior secured revolving credit facility
+Commitment:         $150 million
+Drawn:              $85 million as of December 31, 2023
+Available:          $65 million
+Maturity:           June 30, 2026
+Interest Rate:      Term SOFR plus an applicable margin of 225 basis points
+                    at current leverage
+Commitment Fee:     35 basis points on the undrawn portion
+Security:           First priority lien on substantially all assets, including
+                    a pledge of intellectual property
+
+Applicable margin grid (basis points over Term SOFR):
+
+  Net Leverage < 1.0x                                          175
+  Net Leverage >= 1.0x and < 2.0x                              200
+  Net Leverage >= 2.0x and < 3.0x                              225
+  Net Leverage >= 3.0x                                         275
+
+The Company is currently billed at 225 basis points. Management has not
+requested a re-grid following the FY2023 deleveraging; counsel notes the Company
+may be entitled to 175 basis points on delivery of the FY2023 compliance
+certificate, representing approximately $425,000 of annual interest saving.
+
+================================================================================
+SECTION 3: FINANCIAL COVENANTS
+================================================================================
+
+Tested quarterly on a trailing twelve month basis:
+
+  Maximum Total Net Leverage Ratio                            3.50x
+    Actual at December 31, 2023                               0.22x
+    Headroom                                                  3.28x
+
+  Minimum Fixed Charge Coverage Ratio                         1.25x
+    Actual at December 31, 2023                               6.84x
+    Headroom                                                  5.59x
+
+  Minimum Liquidity                                     $25 million
+    Actual at December 31, 2023                        $135.8 million
+
+The Company was in compliance with all financial covenants at each quarterly
+test date during FY2022 and FY2023. No waiver or amendment has been requested
+or granted.
+
+================================================================================
+SECTION 4: CHANGE OF CONTROL AND THE TRANSACTION
+================================================================================
+
+Section 8.1(k) of the Credit Agreement defines an Event of Default to include
+any transaction in which any person or group acquires beneficial ownership of
+more than 35% of the voting equity of the Company.
+
+The Vertex Capital Partners merger constitutes a change of control within this
+definition. On the occurrence of such an Event of Default:
+
+  - All commitments terminate automatically;
+  - All outstanding principal, accrued interest and fees become immediately due
+    and payable without further notice or demand.
+
+Consequence for the transaction: the full $85 million drawn balance must be
+repaid at closing. There is no prepayment penalty, but accrued interest and a
+breakage indemnity for any SOFR period terminated mid-period will be payable.
+Estimated breakage cost: less than $50,000.
+
+The Company has NOT sought a consent or waiver from the lending syndicate.
+Buyer's financing plan assumes the facility is repaid and replaced. The merger
+agreement requires delivery of a customary payoff letter and lien releases at
+closing as a condition to Buyer's obligation to close.
+
+================================================================================
+SECTION 5: NEGATIVE COVENANTS OF NOTE
+================================================================================
+
+While the facility remains outstanding, the Company may not, without lender
+consent:
+
+  - Incur additional indebtedness in excess of $15 million;
+  - Make restricted payments (including dividends) in excess of $10 million per
+    fiscal year;
+  - Dispose of assets outside the ordinary course with proceeds exceeding
+    $20 million in any fiscal year;
+  - Permit any subsidiary to guarantee other indebtedness.
+
+None of these covenants restrict the Company's ability to enter into the merger
+agreement itself; they restrict operations pending closing. The interim
+operating covenants in Article V of the merger agreement are drafted to be
+consistent with these restrictions.
+
+================================================================================
+SECTION 6: CAPITAL LEASES AND OTHER OBLIGATIONS
+================================================================================
+
+Capital lease obligations of $6.4 million relate to data centre equipment under
+three master lease schedules maturing between 2025 and 2027. Two of the three
+schedules contain change of control provisions requiring lessor consent; the
+lessor in each case is the same counterparty and has indicated in writing that
+consent will be granted upon customary notice.
+
+Operating lease commitments (not included in debt) total $34.7 million over the
+remaining terms, principally the San Jose headquarters lease expiring in 2029.
+The Austin facility lease was terminated in Q3 FY2023 as part of the
+restructuring; the associated exit cost is included in the $4.5 million
+restructuring charge.

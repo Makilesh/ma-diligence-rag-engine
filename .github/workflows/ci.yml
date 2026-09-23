@@ -1,0 +1,108 @@
+# Lint, type-check and test on every push and pull request.
+#
+# The Python job runs the offline suite: everything that needs no Docker
+# services (Postgres, Qdrant), no GPU, no Gemini keys, no Ollama and no
+# multi-GB model weights. Tests that need any of those are marked in pytest.ini
+# (`live`, `models`) and deselected here; run them locally.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python (ruff + pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PYTHONUNBUFFERED: "1"
+      # No keys in CI: every LLM path in the offline suite is mocked, and an
+      # accidental real call should fail rather than spend quota.
+      GEMINI_API_KEYS: ""
+      GEMINI_API_KEY: ""
+      # Never load the embedding/reranker weights at API startup in tests.
+      WARM_MODELS: "0"
+      # The Streamlit UI tests run with the API deliberately down; point them at
+      # a port that refuses immediately instead of relying on localhost:8000.
+      API_URL: "http://127.0.0.1:9"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      TOKENIZERS_PARALLELISM: "false"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"  # matches Dockerfile / Dockerfile.hf
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      # Small Hugging Face artefacts (e.g. the bge-m3 tokenizer used by the
+      # chunkers) are cached between runs. Full model weights are never
+      # downloaded here: tests that need them are marked `models` and deselected.
+      - name: Cache Hugging Face hub
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-${{ runner.os }}-v1
+
+      # CPU torch first, from the CPU index, so sentence-transformers sees the
+      # requirement satisfied and does not pull ~2.5GB of CUDA wheels.
+      - name: Install CPU torch
+        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Ruff
+        run: ruff check . --output-format=github
+
+      - name: Pytest (offline suite)
+        run: pytest -m "not live and not models" -ra
+
+  web:
+    name: Web (typecheck + lint + build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      # Inlined at build time; any URL will do for a build check.
+      NEXT_PUBLIC_API_URL: "http://localhost:8000"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+  # Retrieval-eval job goes here: a manual run of the golden QA set against a
+  # live index. Add `workflow_dispatch:` under `on:` and gate the job with
+  # `if: github.event_name == 'workflow_dispatch'`. Deliberately not part of
+  # push/PR CI — it needs Qdrant, model weights and Gemini quota.

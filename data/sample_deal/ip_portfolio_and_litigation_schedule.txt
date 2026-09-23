@@ -1,0 +1,148 @@
+AURORA TECHNOLOGIES INC.
+INTELLECTUAL PROPERTY PORTFOLIO AND LITIGATION SCHEDULE
+Disclosure Schedule 3.9 to the Agreement and Plan of Merger
+Prepared by Marcus Delgado, General Counsel
+As of March 15, 2024
+
+CONFIDENTIAL - ATTORNEY WORK PRODUCT
+
+================================================================================
+SECTION 1: PATENT PORTFOLIO
+================================================================================
+
+Issued U.S. Patents                                          47
+Pending U.S. Applications                                    23
+Issued Foreign Patents (EP, JP, CA)                          14
+Pending Foreign Applications                                  9
+
+Patents by technology area:
+
+  Real-time data reconciliation                              12
+  Distributed query optimization                             11
+  Schema inference and mapping                                9
+  Access control and audit                                    8
+  Data visualization                                          7
+                                                            ---
+  Total issued U.S. patents                                  47
+
+Dr. James Wu is named as sole or first inventor on 12 issued patents, all within
+the real-time data reconciliation area.
+
+Annual maintenance and prosecution cost: approximately $840,000.
+
+================================================================================
+SECTION 2: THE DATAFLOW SYSTEMS LITIGATION
+================================================================================
+
+Caption:        DataFlow Systems Inc. v. Aurora Technologies Inc.
+Case Number:    2023-CV-04821
+Court:          U.S. District Court, Northern District of California
+Filed:          September 14, 2023
+Claim:          Patent infringement
+
+DataFlow Systems Inc. alleges that Aurora's real-time data reconciliation engine
+infringes U.S. Patent Nos. 9,847,221 and 10,112,905, both directed to methods
+for incremental reconciliation of distributed record sets.
+
+The four Aurora patents most closely related to the accused functionality are
+U.S. Patent Nos. 10,445,882, 10,662,013, 11,004,776 and 11,238,450 — all naming
+Dr. James Wu as first inventor.
+
+Procedural posture as of March 15, 2024:
+  - Aurora's motion to dismiss was denied in part on January 8, 2024.
+  - Claim construction (Markman) hearing is scheduled for August 2024.
+  - No trial date has been set. Counsel estimates trial no earlier than Q3 2025.
+
+Exposure assessment by outside counsel (Wilson Sonsini):
+  - Probable exposure range: $3.5 million to $8.0 million.
+  - Counsel assesses the probability of an injunction as low, on the basis that
+    DataFlow does not practise the asserted patents and would face difficulty
+    demonstrating irreparable harm.
+  - A licensing settlement in the range of $4 million to $6 million is
+    considered the most likely outcome.
+
+Financial statement treatment: the Company has NOT recorded a loss accrual, on
+the basis that no loss is both probable and reasonably estimable within the
+meaning of ASC 450. The range is disclosed but not accrued. Buyer's accounting
+advisers have flagged this as an area of judgement.
+
+Legal fees of $2.8 million were incurred in FY2023 in connection with this
+matter and are treated as a non-recurring add-back in the quality of earnings
+report. That add-back is qualified: the litigation is unresolved and comparable
+fees are likely in FY2024.
+
+================================================================================
+SECTION 3: OTHER LITIGATION AND CLAIMS
+================================================================================
+
+There is no other pending or, to the Company's knowledge, threatened litigation
+against the Company other than the following:
+
+  1. Hartley v. Aurora Technologies Inc. — former employee wrongful termination
+     claim filed in Santa Clara County Superior Court, November 2023. Demand of
+     $450,000. Counsel assesses exposure below $150,000. Mediation scheduled
+     for May 2024.
+
+  2. A commercial dispute with a former reseller in the EMEA region regarding
+     approximately EUR 310,000 of disputed commissions. No proceedings have been
+     commenced. The Company has accrued EUR 180,000.
+
+No governmental investigation, subpoena, or civil investigative demand is
+pending or has been received.
+
+================================================================================
+SECTION 4: OPEN SOURCE SOFTWARE
+================================================================================
+
+The Company's software incorporates open source components. A software
+composition analysis was performed by Black Duck in January 2024.
+
+  Components identified                                     1,847
+  Permissive licences (MIT, Apache 2.0, BSD)                1,792
+  Weak copyleft (LGPL, MPL)                                    51
+  Strong copyleft (GPL, AGPL)                                   4
+
+The four strong copyleft components are:
+
+  1. A GPL-licensed database driver used only in an internal build tool. Not
+     distributed to customers. No copyleft obligation is triggered.
+
+  2. An AGPL-licensed graph rendering library linked into the customer-facing
+     analytics module. THIS IS A MATERIAL FINDING. AGPL obligations may extend
+     to network-delivered software. The Company has engaged counsel and is
+     replacing the component. Estimated remediation cost: $340,000, targeted
+     for completion in Q3 2024.
+
+  3. and 4. Two GPL command-line utilities invoked as separate processes. Counsel
+     advises that process separation avoids derivative work treatment.
+
+The merger agreement representation at Section 3.9(f) regarding open source
+compliance is qualified by disclosure of the AGPL component described above.
+
+================================================================================
+SECTION 5: TRADEMARKS AND DOMAINS
+================================================================================
+
+  Registered U.S. trademarks                                    6
+  Registered foreign trademarks                                11
+  Pending applications                                          3
+
+The mark "AURORA" is registered in Class 9 and Class 42 in the United States.
+An opposition was filed in the European Union by an unrelated party operating
+under a similar mark in Class 35; the opposition does not affect the Company's
+core classes and counsel assesses the risk as low.
+
+The Company owns aurora-tech.com and 14 defensive domain registrations. All
+domain registrations are held in the Company's name, not in the name of any
+employee or contractor.
+
+================================================================================
+SECTION 6: IP ASSIGNMENT COVERAGE
+================================================================================
+
+All current employees have executed proprietary information and invention
+assignment agreements. A gap analysis identified 3 former contractors engaged
+between 2019 and 2020 for whom executed assignment agreements could not be
+located. The work performed related to internal tooling, not to any patented
+technology or customer-facing product. Counsel assesses the residual risk as low
+but the representation at Section 3.9(c) is qualified accordingly.
