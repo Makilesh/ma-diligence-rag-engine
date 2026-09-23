@@ -74,11 +74,6 @@ NODE_ABLATIONS = ("production", "production_decomp")
 # (40 dense candidates vs a thresholded rerank) are compared on equal terms.
 RANK_DEPTH = 10
 
-# The synthesizer sees each context chunk's text plus the first 500 characters
-# of its parent (answer_synthesizer._format_context_for_synthesis). Fact
-# coverage of the final context is measured over exactly that view.
-PARENT_CONTEXT_CHARS = 500
-
 DEFAULT_TOLERANCE = 0.02
 
 
@@ -199,10 +194,19 @@ async def _node_run(question: dict, sub_questions: list[str]) -> dict:
 # ==============================================================================
 
 
-def _context_text(chunk: dict) -> str:
-    """The text of one context chunk as the synthesizer sees it."""
-    parent = (chunk.get("parent_text") or "")[:PARENT_CONTEXT_CHARS]
-    return f"{chunk.get('text', '')}\n{parent}" if parent else chunk.get("text", "")
+def synthesis_context(chunks: list[dict]) -> str:
+    """
+    The final context exactly as the synthesis prompt receives it.
+
+    Calls the synthesizer's own formatter rather than re-implementing it, so a
+    change to what the model is shown (parent expansion, per-parent
+    de-duplication, the context character budget) moves this measurement with
+    it. Body text is only escaped for `<document` look-alikes, so facts match
+    unchanged.
+    """
+    from src.agents.answer_synthesizer import _format_context_for_synthesis
+
+    return _format_context_for_synthesis(chunks)
 
 
 def score_run(run: dict, question: dict, qrels: dict[str, int], ks: list[int]) -> dict:
@@ -236,9 +240,11 @@ def score_run(run: dict, question: dict, qrels: dict[str, int], ks: list[int]) -
 
     detail: dict = {"metrics": scores, "latency_ms": round(run["latency_ms"], 1)}
     if "context" in run:
-        coverage, found = m.fact_coverage([_context_text(c) for c in run["context"]], facts)
+        context = synthesis_context(run["context"])
+        coverage, found = m.fact_coverage([context], facts)
         scores["fact_coverage@context"] = coverage
-        detail["context_size"] = len(run["context"])
+        detail["context_chunks"] = len(run["context"])
+        detail["context_chars"] = len(context)
         detail["facts_missing_from_context"] = [
             m.fact_label(f) for i, f in enumerate(facts) if i not in found
         ]
@@ -419,7 +425,7 @@ def render_markdown(report: dict) -> str:
         "",
         "Percentages. fact_cov = share of expected facts present in the top-k chunk "
         "texts (any file); ctx = the final context the synthesizer receives "
-        "(reranked + parent/sibling expansion). recall/MRR/nDCG use substring-derived "
+        "(reranked + parent/sibling expansion, formatted by the synthesizer). recall/MRR/nDCG use substring-derived "
         "chunk labels — see eval/README.md.",
         "",
     ]
