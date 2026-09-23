@@ -34,8 +34,10 @@ from src.agents.retrieval_executor import retrieval_executor_node
 from src.agents.financial_verifier import financial_verifier_node
 from src.agents.quality_assessor import quality_assessor_node
 from src.agents.query_rewriter import query_rewriter_node
-from src.agents.answer_synthesizer import answer_synthesizer_node
+from src.agents.answer_synthesizer import answer_synthesizer_node, synthesize_answer
 from src.agents.hallucination_validator import hallucination_validator_node
+from src.llm.litellm_wrapper import set_trace_context
+from src.verification.claim_checker import revision_feedback
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -77,20 +79,30 @@ async def insufficient_context_node(state: AgentState) -> dict:
 
 async def retry_synthesis_node(state: AgentState) -> dict:
     """
-    Re-runs synthesis after validation failure.
-    Simply delegates back to answer_synthesizer_node with current state.
+    Re-runs synthesis after a failed validation, with the failures fed back.
+
+    Re-running the identical prompt — what this node used to do — mostly
+    reproduces the identical answer, since synthesis runs at temperature 0.1.
+    The contradicted and unsupported claims from the validator are now appended
+    to the prompt with an instruction to remove or correct them.
 
     Args:
-        state: Current AgentState with validation feedback.
+        state: Current AgentState with claim_checks / hallucination_flags.
 
     Returns:
         Updated state from re-synthesis.
     """
+    feedback = revision_feedback(
+        state.get("claim_checks") or [], state.get("hallucination_flags") or []
+    )
     logger.info(
         "Retrying synthesis after validation failure",
-        extra={"attempt": state.get("validation_attempt", 0)},
+        extra={
+            "attempt": state.get("validation_attempt", 0),
+            "feedback_items": len(feedback),
+        },
     )
-    return await answer_synthesizer_node(state)
+    return await synthesize_answer(state, revision_feedback=feedback)
 
 
 def build_graph() -> StateGraph:
@@ -284,6 +296,7 @@ def _build_initial_state(
         "numerical_claims": [],
         "confidence_score": 0.0,
         "hallucination_flags": [],
+        "claim_checks": [],
         "validation_status": "passed",
         "validation_attempt": 0,
         "force_refusal": False,
@@ -330,6 +343,8 @@ async def run_query(
             "thread_id": f"{deal_id}_{session_id}",
         }
     }
+
+    set_trace_context(deal_id=deal_id, session_id=session_id)
 
     logger.info(
         "Starting query pipeline",
@@ -475,14 +490,18 @@ def _summarize_stage(node: str, delta: dict) -> tuple[str, dict]:
 
     if node == "financial_verifier":
         inconsistencies = delta.get("inconsistencies") or []
-        registry = delta.get("numerical_registry") or {}
+        figures = trace.get("figures", len(delta.get("numerical_registry") or {}))
+        cross = trace.get("cross_checked", 0)
         noun = "inconsistency" if len(inconsistencies) == 1 else "inconsistencies"
         summary = (
-            f"{len(registry)} figures normalised - {len(inconsistencies)} {noun} flagged"
+            f"{figures} figures read, {cross} cross-checked across sources - "
+            f"{len(inconsistencies)} {noun} found"
         )
         return summary, {
-            "figures": len(registry),
+            "figures": figures,
+            "cross_checked": cross,
             "inconsistencies": inconsistencies,
+            "method": trace.get("method", "deterministic"),
         }
 
     if node == "quality_assessor":
@@ -510,24 +529,50 @@ def _summarize_stage(node: str, delta: dict) -> tuple[str, dict]:
     if node in ("answer_synthesizer", "retry_synthesis"):
         citations = delta.get("citations") or []
         plural = "s" if len(citations) != 1 else ""
-        return f"Answer drafted with {len(citations)} citation{plural}", {
+        verb = "Answer revised" if trace.get("revision") else "Answer drafted"
+        summary = f"{verb} with {len(citations)} citation{plural}"
+        if trace.get("revision"):
+            items = trace.get("revision_items", 0)
+            summary += f" - {items} flagged claim{'s' if items != 1 else ''} fed back"
+        return summary, {
             "citation_count": len(citations),
             "answer_length": trace.get("answer_length", 0),
             "model": trace.get("model", ""),
+            "revision": bool(trace.get("revision")),
         }
 
     if node == "hallucination_validator":
         status = delta.get("validation_status", "passed")
         flags = delta.get("hallucination_flags") or []
         confidence = delta.get("confidence_score", 0.0)
+        counts = trace.get("status_counts") or {}
+        methods = trace.get("method_counts") or {}
+        checked = trace.get("claims_checked", 0)
         summary = f"Validation {status} - confidence {confidence:.0%}"
-        if flags:
-            plural = "s" if len(flags) > 1 else ""
-            summary += f" - {len(flags)} claim{plural} unsupported"
+        if trace.get("validation_unavailable"):
+            summary += " - verifier unavailable, answer kept"
+        elif checked:
+            summary += f" - {counts.get('supported', 0)}/{checked} claims supported"
+            bad = counts.get("contradicted", 0) + counts.get("unsupported", 0)
+            if bad:
+                summary += f", {bad} flagged"
+            used = ", ".join(f"{k} {v}" for k, v in sorted(methods.items()))
+            if used:
+                summary += f" ({used}"
+                summary += f"; {trace.get('llm_calls', 0)} LLM call"
+                summary += "s)" if trace.get("llm_calls", 0) != 1 else ")"
         return summary, {
             "validation_status": status,
             "confidence_score": confidence,
             "hallucination_flags": flags,
+            "status_counts": counts,
+            "method_counts": methods,
+            "numeric_counts": trace.get("numeric_counts") or {},
+            "claim_checks": trace.get("claim_checks") or [],
+            "nli_model": trace.get("nli_model"),
+            "llm_model": trace.get("llm_model"),
+            "llm_calls": trace.get("llm_calls", 0),
+            "model": trace.get("model", ""),
         }
 
     if node == "insufficient_context":
@@ -563,16 +608,30 @@ async def stream_query(
         session_id: Optional session ID (generated if not provided).
         include_pii: Compliance override from the authenticated caller.
 
+    Answer tokens are streamed too: the run is started with
+    `configurable.stream_tokens=True` and stream mode "custom", which the
+    synthesizer detects and answers by streaming its completion through
+    LangGraph's stream writer (see answer_synthesizer._token_sink). run_query
+    sets neither, so the blocking path is unchanged.
+
     Yields:
-        (event_name, payload) tuples: one "start", many "stage", then exactly one
-        of "result" or "error".
+        (event_name, payload) tuples: one "start", many "stage" interleaved with
+        "token" ({text}) and "answer_reset" ({reason}) while the answer is being
+        written, then exactly one of "result" or "error". Tokens are a draft;
+        the validated answer arrives in "result".
     """
     if session_id is None:
         session_id = str(uuid.uuid4())
 
     start = time.monotonic()
     initial_state = _build_initial_state(query, deal_id, session_id, include_pii)
-    config = {"configurable": {"thread_id": f"{deal_id}_{session_id}"}}
+    config = {
+        "configurable": {
+            "thread_id": f"{deal_id}_{session_id}",
+            "stream_tokens": True,
+        }
+    }
+    set_trace_context(deal_id=deal_id, session_id=session_id)
 
     logger.info(
         "Starting streamed query pipeline",
@@ -600,10 +659,19 @@ async def stream_query(
 
     try:
         async for mode, chunk in app.astream(
-            initial_state, config=config, stream_mode=["updates", "values"]
+            initial_state, config=config, stream_mode=["updates", "values", "custom"]
         ):
             if mode == "values":
                 final_state = chunk
+                continue
+
+            if mode == "custom":
+                # Emitted by the synthesizer: {"type": "token", "text": ...} or
+                # {"type": "answer_reset", "reason": ...}.
+                if isinstance(chunk, dict) and chunk.get("type") == "token":
+                    yield ("token", {"text": chunk.get("text", "")})
+                elif isinstance(chunk, dict) and chunk.get("type") == "answer_reset":
+                    yield ("answer_reset", {"reason": chunk.get("reason", "")})
                 continue
 
             # mode == "updates": {node_name: delta}. One key in practice, but the

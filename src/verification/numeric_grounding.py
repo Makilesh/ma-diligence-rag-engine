@@ -59,6 +59,7 @@ _NUMBER_RE = re.compile(
     (?:
         (?P<scale_attached>MM|mm|[Bb]n|BN|mn|M|B|K|k|m|b)(?![A-Za-z])
       | \s?(?P<scale_word>thousand|million|billion|trillion|mn|bn|tn)s?\b
+      | \s(?P<scale_spaced>MM|M|B|K)\b          # "$452.8 MM" — currency only
     )?
     (?P<cur_suffix>\s?(?:USD|EUR|GBP)\b)?
     (?P<unit>
@@ -187,12 +188,17 @@ def extract_numbers(text: str, claims_only: bool = True) -> list[NumericMention]
     for m in _NUMBER_RE.finditer(scrubbed):
         num = m.group("num")
         cur = (m.group("cur") or "").strip() or (m.group("cur_suffix") or "").strip()
-        scale_token = m.group("scale_attached") or m.group("scale_word")
+        scale_token = (
+            m.group("scale_attached") or m.group("scale_word") or m.group("scale_spaced")
+        )
         unit = (m.group("unit") or "").strip().lower()
 
         # Lower-case single-letter scales are only a scale next to a currency:
-        # "5m" is as likely minutes or metres; "$5m" is five million.
-        if scale_token in ("m", "b", "k") and not cur:
+        # "5m" is as likely minutes or metres; "$5m" is five million. A spaced
+        # letter ("12 M") is likewise only trusted after a currency.
+        if not cur and (
+            scale_token in ("m", "b", "k") or m.group("scale_spaced")
+        ):
             # Re-read without the scale: still a figure, just unscaled.
             scale_token = None
 
@@ -290,10 +296,15 @@ class ContextIndex:
         self.figures: list[ContextFigure] = []
         keyed: list[tuple[float, int]] = []
 
+        from src.verification.evidence import chunk_evidence_text
+
+        seen_bodies: set[str] = set()
         for ci, chunk in enumerate(chunks):
-            text = chunk.get("text", "") or ""
-            parent = chunk.get("parent_text", "") or ""
-            body = text if not parent or parent in text else f"{text}\n{parent}"
+            body = chunk_evidence_text(chunk)
+            # Sibling chunks expand to the same parent; index its figures once.
+            if body in seen_bodies:
+                continue
+            seen_bodies.add(body)
             for mention in extract_numbers(body, claims_only=False):
                 lo = max(0, mention.start - 60)
                 snippet = body[lo: mention.end + 20].replace("\n", " ").strip()
@@ -347,8 +358,18 @@ class ContextIndex:
 
 # ─── Grounding ────────────────────────────────────────────────────────────────
 
-# Wording that presents a figure as a computation or approximation. A figure in
-# such a sentence that cannot be reproduced is flagged for review, not failed.
+# Wording that presents a figure as a computation or approximation. A figure
+# introduced this way that cannot be reproduced is flagged for review, not
+# failed. Only the text just before the figure is searched (_CUE_WINDOW chars).
+_CUE_WINDOW = 45
+
+# Wording that marks a whole claim as a calculation ("Implied EV / EBITDA:
+# 7.50x", "calculated as"). Its figures may draw on inputs stated elsewhere in
+# the answer, so an unreproducible one is a warning wherever it sits.
+_COMPUTED_CLAIM_RE = re.compile(
+    r"\b(?:implied|calculat\w*|comput\w*|derived|pro forma|annuali[sz]ed)\b",
+    re.IGNORECASE,
+)
 _COMPUTATION_CUE_RE = re.compile(
     r"\b(?:increas\w*|decreas\w*|grew|grow\w*|declin\w*|rose|fell|drop\w*|"
     r"change[ds]?|differen\w*|combined|aggregate|sum|impl(?:ied|ies|y)|"
@@ -502,7 +523,8 @@ def ground_texts(texts: list[str], index: ContextIndex) -> list[list[NumericChec
         pending: list[tuple[NumericMention, NumericCheck]] = []
         operands: list[tuple[float, str]] = []
 
-        for mention in extract_numbers(text, claims_only=True):
+        mentions = extract_numbers(text, claims_only=True)
+        for mention in mentions:
             fig = index.lookup(mention)
             if fig is not None:
                 # Operand value in the context's normalisation, so a claim
@@ -548,9 +570,37 @@ def ground_texts(texts: list[str], index: ContextIndex) -> list[list[NumericChec
             if not progressed:
                 break
 
-        for _mention, check in pending:
-            if check.status != "derived" and _COMPUTATION_CUE_RE.search(text):
+        for mention, check in pending:
+            if check.status == "derived":
+                continue
+            # The cue must introduce THIS figure ("an increase of $X",
+            # "approximately 7.5x"), not merely occur somewhere in the sentence —
+            # otherwise "leverage fell to 0.2x and the balance was $142.0M" would
+            # excuse a fabricated $142.0M because of "fell". So the lead-in stops
+            # at the previous figure.
+            previous_end = max(
+                (m.end for m in mentions if m.end <= mention.start), default=0
+            )
+            lead_in = text[max(previous_end, mention.start - _CUE_WINDOW): mention.start]
+            if _COMPUTATION_CUE_RE.search(lead_in) or _COMPUTED_CLAIM_RE.search(text):
                 check.status = "derived_unverified"
+
+        # A figure restating the one just before it in other units —
+        # "$0.02 million ($20,000)", "$97.3M ($97,300,000)" — is the same claim
+        # twice, so it shares that figure's verdict instead of being judged on
+        # its own (where "$20,000" matches nothing verbatim).
+        for i in range(1, len(checks)):
+            prev, cur = checks[i - 1], checks[i]
+            if (
+                cur.status in ("unsupported", "derived_unverified")
+                and prev.status != "unsupported"
+                and _kinds_compatible(cur.kind, prev.kind)
+                and abs(cur.value - prev.value) <= max(mentions[i].half_unit, _REL_TOLERANCE * prev.value)
+            ):
+                cur.status = prev.status
+                cur.formula = f"restates {prev.raw}"
+                cur.evidence_source = prev.evidence_source
+                cur.evidence_snippet = prev.evidence_snippet
 
         results.append(checks)
 

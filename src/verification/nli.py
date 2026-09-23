@@ -267,12 +267,3 @@ def split_premises(text: str, max_words: int = PREMISE_MAX_WORDS) -> list[str]:
                 break
             windows.append(" ".join(units[i: k + 1]))
     return windows
-
-
-def _reset_for_tests() -> None:
-    """Clears the cached model state. Test helper only."""
-    global _model, _model_name, _label_index, _load_failed
-    _model = None
-    _model_name = None
-    _label_index = {}
-    _load_failed = False

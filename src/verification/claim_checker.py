@@ -6,9 +6,9 @@ Pipeline, cheapest first:
 1. Split the answer into atomic claims (src/verification/claims.py).
 2. Ground every figure deterministically (numeric_grounding.py).
 3. Score each claim against its evidence with a local NLI model (nli.py).
-   Evidence is the chunks the claim cites, plus the best-matching windows of
-   the top retrieved chunks, so a correct claim with a sloppy citation is not
-   failed for the citation alone.
+   Evidence is sentence-sized windows from the chunks the claim cites, plus the
+   best lexical matches across all retrieved chunks, so a correct claim with a
+   sloppy citation is not failed for the citation alone.
 4. Only claims neither step could decide go to an LLM judge — batched into ONE
    call, and only when at least one such claim exists. The common case makes
    zero LLM calls; the previous validator made one on every query.
@@ -17,15 +17,20 @@ Per-claim decision (first matching rule wins):
 
     any figure unsupported                         -> unsupported   (numeric)
     NLI entailment >= ENTAIL_THRESHOLD             -> supported     (nli)
-    every figure grounded/derived, no strong
-      NLI contradiction                            -> supported     (numeric)
+    every figure grounded/derived                  -> supported     (numeric)
     NLI contradiction >= CONTRADICTION_THRESHOLD
-      and entailment < 0.1, figures not all
-      grounded                                     -> contradicted  (nli)
+      and entailment < 0.1                         -> LLM judge (suspected
+                                                      contradiction; "unverified"
+                                                      if no judge answers)
     NLI clearly neutral (entailment below
-      CLEAR_NEUTRAL_MAX_ENTAIL, contradiction low) -> unsupported   (nli)
+      CLEAR_NEUTRAL_MAX_ENTAIL, contradiction low,
+      no figures)                                  -> unsupported   (nli)
     otherwise                                      -> LLM judge, or "unverified"
                                                       when no judge is available
+
+So "contradicted" is only ever an LLM judge's verdict, confirmed against the
+documents; the NLI model raises the question (see the calibration note at the
+rule).
 
 Answer-level outcome:
 
@@ -56,6 +61,7 @@ from typing import Awaitable, Callable
 from src.utils.logger import setup_logger
 from src.verification import nli
 from src.verification.claims import Claim, resolve_cited_chunks, split_claims
+from src.verification.evidence import chunk_evidence_text
 from src.verification.numeric_grounding import (
     ContextIndex,
     ground_texts,
@@ -120,9 +126,22 @@ class VerificationReport:
 
 
 def _tokens(text: str) -> set[str]:
-    """Content tokens for lexical evidence ranking (numbers de-comma'd)."""
+    """
+    Content tokens for lexical evidence ranking.
+
+    Numbers are de-comma'd and a plural "s" is dropped, so "waivers" finds
+    "No waiver or amendment has been requested" — the kind of near-verbatim
+    evidence a stricter match missed during calibration.
+    """
     lowered = (text or "").lower().replace(",", "")
-    return {t for t in _TOKEN.findall(lowered) if t not in _STOPWORDS}
+    out = set()
+    for t in _TOKEN.findall(lowered):
+        if t in _STOPWORDS:
+            continue
+        if len(t) > 4 and t.endswith("s") and not t.endswith("ss") and t[0].isalpha():
+            t = t[:-1]
+        out.add(t)
+    return out
 
 
 _LABEL_PREFIX = re.compile(r"^([^:]{2,60}):\s+(.+)$")
@@ -155,18 +174,30 @@ def _nli_hypothesis(claim_text: str) -> str:
     return f"{label} is {rest}"
 
 
-def _chunk_windows(chunk: dict) -> list[str]:
-    """Premise windows for a chunk: its text, plus its parent when distinct."""
-    text = chunk.get("text", "") or ""
-    parent = chunk.get("parent_text", "") or ""
-    body = text if not parent or parent in text else f"{text}\n{parent}"
-    return nli.split_premises(body)
+def _build_windows(chunks: list[dict]) -> dict[int, list[tuple[str, set[str]]]]:
+    """
+    Premise windows (with their tokens) for every chunk.
+
+    Evidence text is the same the synthesizer saw (chunk_evidence_text). Chunks
+    that expand to the same parent section share one computation.
+
+    Returns:
+        {chunk index: [(window text, window tokens)]}.
+    """
+    cache: dict[str, list[tuple[str, set[str]]]] = {}
+    out = {}
+    for ci, chunk in enumerate(chunks):
+        body = chunk_evidence_text(chunk)
+        if body not in cache:
+            cache[body] = [(w, _tokens(w)) for w in nli.split_premises(body)]
+        out[ci] = cache[body]
+    return out
 
 
 def _best_windows(
     claim_tokens: set[str],
     chunk_ids: list[int],
-    windows: dict[int, list[str]],
+    windows: dict[int, list[tuple[str, set[str]]]],
     limit: int,
 ) -> list[tuple[int, str, float]]:
     """
@@ -178,13 +209,18 @@ def _best_windows(
 
     Returns:
         (chunk index, window text, overlap) tuples, best first; zero-overlap
-        windows are dropped.
+        windows are dropped, and a window shared by sibling chunks (same
+        parent section) is returned once.
     """
     scored = []
+    seen: set[str] = set()
     for ci in chunk_ids:
-        for w in windows.get(ci, []):
-            overlap = len(claim_tokens & _tokens(w)) / max(len(claim_tokens), 1)
+        for w, toks in windows.get(ci, []):
+            if w in seen:
+                continue
+            overlap = len(claim_tokens & toks) / max(len(claim_tokens), 1)
             if overlap > 0:
+                seen.add(w)
                 scored.append((ci, w, overlap))
     scored.sort(key=lambda t: t[2], reverse=True)
     return scored[:limit]
@@ -265,7 +301,7 @@ async def verify_answer(
     if scorer is None and use_nli:
         scorer = nli.ascore_pairs
 
-    windows = {ci: _chunk_windows(c) for ci, c in enumerate(chunks)}
+    windows = _build_windows(chunks)
     top_k = list(range(min(len(chunks), FALLBACK_TOP_K)))
 
     # (claim idx, chunk idx, cited, window, lexical overlap)
@@ -279,7 +315,10 @@ async def verify_answer(
         claim_tokens[claim.index] = toks
         cited = resolve_cited_chunks(claim.markers, chunks)
         cited_by_claim[claim.index] = cited
-        others = [ci for ci in top_k if ci not in cited]
+        # Uncited evidence is searched across ALL retrieved chunks: lexical
+        # ranking is cheap, and a correct claim with a wrong or missing
+        # citation should still find its passage.
+        others = [ci for ci in range(len(chunks)) if ci not in cited]
         chosen = _best_windows(toks, cited, windows, CITED_WINDOWS_PER_CLAIM)
         chosen += _best_windows(
             toks, others, windows,
@@ -384,12 +423,21 @@ async def verify_answer(
             if contra >= CONTRADICTION_THRESHOLD:
                 check["nli_contradiction"] = round(contra, 3)
         elif ev and contra >= CONTRADICTION_THRESHOLD and entail < 0.1:
+            # A suspected contradiction, confirmed by the judge before it can
+            # fail the answer. Measured on the 35 RESULTS.md answers against the
+            # sample data room: every one of the NLI model's >= 0.9
+            # contradictions (5 of 5) was wrong — "36 months (Fundamental
+            # Representation)" against "18 months, except that Fundamental
+            # Representations … 36 months", for instance. A false "contradicted"
+            # fails the answer and spends a reasoning-model re-synthesis, so the
+            # small model is trusted to raise the question, not to settle it.
             chunk = chunks[ev["contra_chunk"]]
+            undecided.append(claim.index)
             check.update(
-                status="contradicted",
-                method="nli",
                 score=round(contra, 3),
+                reason="NLI suggests a contradiction; not confirmed",
                 evidence=_snippet(ev["contra_window"], toks),
+                suspected_contradiction=True,
                 **_evidence_fields(chunk),
             )
         elif (
@@ -421,20 +469,32 @@ async def verify_answer(
         if judge is None:
             report.notes.append("validation unavailable: no LLM judge configured for undecided claims")
         else:
+            # Documents in priority order: each claim's best NLI evidence, then
+            # what it cites, then the top retrieved chunks. Siblings expanding
+            # to the same parent section are sent once.
             doc_ids: list[int] = []
+            seen_bodies: set[str] = set()
+
+            def add(ci: int | None) -> None:
+                if ci is None or ci in doc_ids or len(doc_ids) >= MAX_JUDGE_DOCUMENTS:
+                    return
+                body = chunk_evidence_text(chunks[ci])
+                if body in seen_bodies:
+                    return
+                seen_bodies.add(body)
+                doc_ids.append(ci)
+
+            for idx in to_judge:
+                ev = best.get(idx)
+                if ev:
+                    add(ev["entail_chunk"])
+                    add(ev["contra_chunk"])
             for idx in to_judge:
                 for ci in cited_by_claim[idx]:
-                    if ci not in doc_ids:
-                        doc_ids.append(ci)
-                ev = best.get(idx)
-                if ev and ev["entail_chunk"] is not None and ev["entail_chunk"] not in doc_ids:
-                    doc_ids.append(ev["entail_chunk"])
+                    add(ci)
             for ci in top_k:
-                if len(doc_ids) >= MAX_JUDGE_DOCUMENTS:
-                    break
-                if ci not in doc_ids:
-                    doc_ids.append(ci)
-            documents = [chunks[ci] for ci in sorted(doc_ids[:MAX_JUDGE_DOCUMENTS])]
+                add(ci)
+            documents = [chunks[ci] for ci in sorted(doc_ids)]
             payload = [{"id": i + 1, "claim": claims[idx].text} for i, idx in enumerate(to_judge)]
 
             try:

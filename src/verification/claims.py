@@ -33,8 +33,10 @@ from src.verification.numeric_grounding import extract_numbers, strip_citations
 CITATION_MARKER = re.compile(r"\[([^\[\]]*\|[^\[\]]*)\]")
 PAGE_IN_MARKER = re.compile(r"(?:p\.|pg\.|page\s*)(\d+)", re.IGNORECASE)
 
-# Wording that declines rather than asserts. Shared with the synthesizer's
-# usable-answer guard, where an uncited decline is an accepted outcome.
+# Wording that declines rather than asserts. A superset of the synthesizer's
+# usable-answer guard (_DECLINES_TO_ANSWER there), extended with the gap
+# statements answers put in their "missing information" sections. Kept separate
+# so widening what the verifier skips never loosens what synthesis accepts.
 DECLINES_TO_ANSWER = re.compile(
     r"do(?:es)? not contain|not contain(?:ed)?"
     r"|insufficient|not sufficient|unable to (?:find|determine|calculate|compute)"
