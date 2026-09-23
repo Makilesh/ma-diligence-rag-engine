@@ -31,6 +31,24 @@ RepresentationType = Literal["narrative", "row_by_row", "metrics_summary", "mark
 _PLAIN_AMOUNT = re.compile(r"^\(?-?[$€£¥₹]?\s*-?[\d,]*\.?\d+\)?$")
 
 
+def _fmt_number(value: float) -> str:
+    """
+    Formats an amount with thousands separators and no invented rounding.
+
+    `:,.0f` turned 387.1 into "387" in the narrative and row_by_row text, so a
+    figure reported to one decimal could never be quoted — or verified —
+    exactly. Up to four decimals are kept and trailing zeros dropped.
+
+    Args:
+        value: Numeric value.
+
+    Returns:
+        Formatted string, e.g. "452,800,000", "387.1", "-8.2".
+    """
+    text = f"{value:,.4f}".rstrip("0").rstrip(".")
+    return "0" if text in ("-0", "") else text
+
+
 def representation_content_type(representation: str) -> str:
     """
     Maps a table representation to the payload content_type.
@@ -247,7 +265,7 @@ class FinancialTableConverter:
             for col, val in non_null.items():
                 try:
                     numeric_val = float(val) * meta.scale_factor
-                    values_parts.append(f"{col}: {numeric_val:,.0f}")
+                    values_parts.append(f"{col}: {_fmt_number(numeric_val)}")
                 except (ValueError, TypeError):
                     values_parts.append(f"{col}: {val}")
 
@@ -311,7 +329,7 @@ class FinancialTableConverter:
                         "currency": meta.currency,
                         "scale_factor": meta.scale_factor,
                     }
-                    row_text_parts.append(f"{col}={normalized:,.0f}")
+                    row_text_parts.append(f"{col}={_fmt_number(normalized)}")
                 except (ValueError, TypeError):
                     row_entry["values"][str(col)] = {"raw_value": str(raw_val)}
                     row_text_parts.append(f"{col}={raw_val}")
@@ -373,14 +391,14 @@ class FinancialTableConverter:
                         "value": round(cagr * 100, 2),
                         "unit": "%",
                         "citation_chain": (
-                            f"CAGR(Revenue[{years[0]}={first_val:,.0f} → "
-                            f"{years[-1]}={last_val:,.0f}], n={n})"
+                            f"CAGR(Revenue[{years[0]}={_fmt_number(first_val)} → "
+                            f"{years[-1]}={_fmt_number(last_val)}], n={n})"
                         ),
                         "content_type": "computed_metric",
                     }
                     text_parts.append(
                         f"Revenue CAGR: {cagr * 100:.2f}% "
-                        f"({years[0]}: {first_val:,.0f} → {years[-1]}: {last_val:,.0f})"
+                        f"({years[0]}: {_fmt_number(first_val)} → {years[-1]}: {_fmt_number(last_val)})"
                     )
 
                 # YoY Revenue growth
@@ -394,8 +412,8 @@ class FinancialTableConverter:
                             "value": round(yoy * 100, 2),
                             "unit": "%",
                             "citation_chain": (
-                                f"YoY(Revenue[{years[i - 1]}={prev_val:,.0f} → "
-                                f"{years[i]}={curr_val:,.0f}])"
+                                f"YoY(Revenue[{years[i - 1]}={_fmt_number(prev_val)} → "
+                                f"{years[i]}={_fmt_number(curr_val)}])"
                             ),
                             "content_type": "computed_metric",
                         }
@@ -498,8 +516,8 @@ class FinancialTableConverter:
                     "value": round(margin * 100, 2),
                     "unit": "%",
                     "citation_chain": (
-                        f"{metric_name}({numerator_label}[{col}]={num_val:,.0f} / "
-                        f"{denominator_label}[{col}]={den_val:,.0f})"
+                        f"{metric_name}({numerator_label}[{col}]={_fmt_number(num_val)} / "
+                        f"{denominator_label}[{col}]={_fmt_number(den_val)})"
                     ),
                     "content_type": "computed_metric",
                 }
