@@ -244,6 +244,11 @@ def score_run(run: dict, question: dict, qrels: dict[str, int], ks: list[int]) -
         ]
         detail["gate"] = run["gate"]
         detail["sub_questions"] = run["sub_questions"]
+    if "context" not in run:
+        # Candidate-only ablations: the grade vector is enough to audit the
+        # metrics and keeps the committed results file small.
+        detail["top_grades"] = [qrels.get(cid, 0) for cid in ids[:RANK_DEPTH]]
+        return _rounded(detail)
     detail["top"] = [
         {
             "chunk_id": c["chunk_id"],
@@ -255,6 +260,13 @@ def score_run(run: dict, question: dict, qrels: dict[str, int], ks: list[int]) -
         }
         for c in ranking[:RANK_DEPTH]
     ]
+    return _rounded(detail)
+
+
+def _rounded(detail: dict) -> dict:
+    """Rounds per-question metrics to 4 places (aggregates use the rounded values)."""
+    detail["metrics"] = {k: None if v is None else round(v, 4)
+                         for k, v in detail["metrics"].items()}
     return detail
 
 
@@ -280,6 +292,9 @@ def aggregate(questions: list[dict], ablation: str, ks: list[int]) -> dict:
             for name in names
         }
         out["n"] = len(group)
+        if ablation == "production_decomp":
+            out["n_decomposed"] = sum(
+                1 for q in group if q["runs"][ablation].get("sub_questions"))
         return out
 
     by_type: dict[str, dict] = {}
@@ -313,7 +328,7 @@ def aggregate(questions: list[dict], ablation: str, ks: list[int]) -> dict:
 
 def decomposition_delta(questions: list[dict], metric: str = "fact_coverage@context") -> dict:
     """Per-question improved / regressed / unchanged counts, production -> decomp."""
-    improved, regressed, unchanged = [], [], 0
+    improved, regressed, unchanged, decomposed = [], [], 0, 0
     for q in questions:
         runs = q["runs"]
         if q["is_control"] or "production" not in runs or "production_decomp" not in runs:
@@ -322,6 +337,7 @@ def decomposition_delta(questions: list[dict], metric: str = "fact_coverage@cont
         after = runs["production_decomp"]["metrics"].get(metric)
         if before is None or after is None:
             continue
+        decomposed += bool(runs["production_decomp"].get("sub_questions"))
         if after > before + 1e-9:
             improved.append({"id": q["id"], "before": before, "after": after})
         elif after < before - 1e-9:
@@ -329,7 +345,8 @@ def decomposition_delta(questions: list[dict], metric: str = "fact_coverage@cont
         else:
             unchanged += 1
     return {"metric": metric, "improved": improved, "regressed": regressed,
-            "unchanged": unchanged}
+            "unchanged": unchanged, "decomposed": decomposed,
+            "compared": len(improved) + len(regressed) + unchanged}
 
 
 # ==============================================================================
@@ -397,7 +414,8 @@ def render_markdown(report: dict) -> str:
         f"{report['golden_set']['controls']} control questions · corpus: "
         f"{len(report['index']['documents'])} documents, {report['index']['chunks']} chunks "
         f"({report['index']['retrievable_chunks']} retrievable) · device: "
-        f"{report['environment']['device']} · LLM calls: 0",
+        f"{report['environment']['device']} · LLM calls: 0 · fact-coverage ceiling "
+        f"(facts present in any retrievable chunk): {_pct(report['fact_coverage_ceiling'])}%",
         "",
         "Percentages. fact_cov = share of expected facts present in the top-k chunk "
         "texts (any file); ctx = the final context the synthesizer receives "
@@ -420,13 +438,16 @@ def render_markdown(report: dict) -> str:
 
     for ablation in (a for a in NODE_ABLATIONS if a in aggs):
         lines += [f"## {ABLATION_LABELS[ablation]} — by query type", ""]
-        type_cols = [f"fact_coverage@{ks[-1]}", "fact_coverage@context",
-                     f"recall@{ks[-1]}", f"mrr@{RANK_DEPTH}", f"ndcg@{RANK_DEPTH}"]
+        type_cols = [f"fact_coverage@{k}" for k in ks] + [
+            "fact_coverage@context", f"recall@{ks[-1]}", f"mrr@{RANK_DEPTH}",
+            f"ndcg@{RANK_DEPTH}"]
         lines += ["| type | n | " + " | ".join(
             c.replace("fact_coverage", "fact_cov") for c in type_cols) + " |",
             "|---|---|" + "---|" * len(type_cols)]
-        for qtype, row in aggs[ablation]["by_type"].items():
-            lines.append(f"| {qtype} | {row['n']} | "
+        rows = [*aggs[ablation]["by_type"].items(), ("**all**", aggs[ablation]["overall"])]
+        for qtype, row in rows:
+            n = row["n"] if "n_decomposed" not in row else f"{row['n']} ({row['n_decomposed']} dec.)"
+            lines.append(f"| {qtype} | {n} | "
                          + " | ".join(_pct(row.get(c)) for c in type_cols) + " |")
         lines.append("")
 
@@ -436,9 +457,8 @@ def render_markdown(report: dict) -> str:
             f"Decomposition, per question on {delta['metric']}: "
             f"{len(delta['improved'])} improved, {len(delta['regressed'])} regressed, "
             f"{delta['unchanged']} unchanged "
-            f"({report['sub_questions']['decomposed_questions']} of "
-            f"{report['golden_set']['answerable'] + report['golden_set']['controls']} "
-            f"questions have cached sub-questions).",
+            f"({delta['decomposed']} of the {delta['compared']} answerable questions "
+            f"were decomposed by Agent 1).",
             "",
         ]
         if delta["improved"] or delta["regressed"]:
@@ -572,6 +592,10 @@ async def run(args: argparse.Namespace) -> dict:
                 "n_facts": len(facts),
                 "n_relevant_chunks": len(qrels),
                 "n_relevant_chunks_unreachable": unreachable,
+                # Best fact coverage any retrieval could reach: facts that occur
+                # in no retrievable chunk (e.g. a computed 7.5x) cap it below 1.
+                "fact_coverage_ceiling": m.fact_coverage(
+                    [c.get("text", "") for c in retrievable], facts)[0],
                 "runs": {a: score_run(r, question, qrels, args.k) for a, r in runs.items()},
             })
             print(f"[eval] {n}/{len(pairs)} {question['id']}", file=sys.stderr)
@@ -616,6 +640,8 @@ async def run(args: argparse.Namespace) -> dict:
         "questions": report_questions,
     }
     report["aggregates"] = {a: aggregate(report_questions, a, args.k) for a in ablations}
+    report["fact_coverage_ceiling"] = m.mean(
+        q["fact_coverage_ceiling"] for q in report_questions if not q["is_control"])
     if "production" in ablations and "production_decomp" in ablations:
         report["decomposition_delta"] = decomposition_delta(report_questions)
     report["total_seconds"] = round(time.perf_counter() - started, 1)
