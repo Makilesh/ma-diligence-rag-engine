@@ -10,12 +10,18 @@ name: CI
 on:
   push:
   pull_request:
+  # Retrieval eval (the `retrieval-eval` job) — manual, plus weekly so a slow
+  # drift in retrieval quality cannot go unnoticed for long.
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * 1"  # Mondays 04:00 UTC
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # Event name in the group so a push does not cancel an in-flight eval run.
+  group: ci-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
@@ -102,7 +108,61 @@ jobs:
       - name: Build
         run: npm run build
 
-  # Retrieval-eval job goes here: a manual run of the golden QA set against a
-  # live index. Add `workflow_dispatch:` under `on:` and gate the job with
-  # `if: github.event_name == 'workflow_dispatch'`. Deliberately not part of
-  # push/PR CI — it needs Qdrant, model weights and Gemini quota.
+  # Retrieval eval over the golden QA set with the real models (bge-m3,
+  # bge-reranker-v2-m3, BM25) against an in-memory Qdrant built from
+  # data/sample_deal. No Docker services and no Gemini quota: Agent 1's
+  # sub-questions are read from the committed eval/sub_questions.json, so the
+  # run makes zero LLM calls. Fails if a gated metric drops below
+  # eval/baseline.json by more than the tolerance.
+  #
+  # Runs on CPU here while the baseline is recorded on a GPU. Float differences
+  # between the two can reorder near-tied candidates, and on 35 questions one
+  # fact moving in or out of one question's context is ~0.6-0.7pp — hence a 3pp
+  # tolerance in CI against the 2pp default used locally.
+  retrieval-eval:
+    name: Retrieval eval (golden set, CPU)
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    # CPU cross-encoding is the long pole: ~100 rerank passes of up to 25 pairs.
+    timeout-minutes: 180
+    env:
+      PYTHONUNBUFFERED: "1"
+      GEMINI_API_KEYS: ""
+      GEMINI_API_KEY: ""
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      TOKENIZERS_PARALLELISM: "false"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      # bge-m3 and bge-reranker-v2-m3 weights (~4.5GB) — cached so only the
+      # first run downloads them.
+      - name: Cache Hugging Face models
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-eval-${{ runner.os }}-bge-m3-bge-reranker-v2-m3-v1
+
+      - name: Install CPU torch
+        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run retrieval eval against the baseline
+        run: python -m eval.run_retrieval_eval --baseline eval/baseline.json --tolerance 0.03
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retrieval-eval-results
+          path: eval/results/
+          if-no-files-found: ignore

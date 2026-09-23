@@ -216,8 +216,11 @@ async def query_stream_endpoint(
     how many chunks survived reranking, what the quality gate scored — and closes
     with the same QueryResponse `/query` would have returned.
 
-    Event sequence: `start`, then one `stage` per completed agent, then exactly
-    one of `result` or `error`.
+    Event sequence: `start`, then one `stage` per completed agent — interleaved
+    with `token` ({text}) frames while the answer is written and `answer_reset`
+    ({reason}) if that draft must be discarded — then exactly one of `result`
+    or `error`. Token frames are an unverified draft; `result` is the checked
+    answer. They pass through the generic branch below unchanged.
 
     Args:
         request: QueryRequest with query, deal_id, optional session_id.

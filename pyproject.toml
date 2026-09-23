@@ -50,20 +50,9 @@ ignore = [
 # green today. Each entry is scoped to the file that has it, so new code is
 # still checked. Remove an entry when the file is next touched and fixed.
 # F401 unused imports.
-"api/routes/ingest.py" = ["F401", "B904"]
 "src/agents/quality_assessor.py" = ["F401"]
-"src/agents/retrieval_executor.py" = ["F401"]
-"src/data_processing/document_classifier.py" = ["F401"]
-"src/data_processing/document_version_resolver.py" = ["F401"]
-"src/data_processing/legal_clause_segmenter.py" = ["F401"]
-"src/data_processing/multi_page_table_stitcher.py" = ["F401"]
-"src/data_processing/risk_signal_extractor.py" = ["F401"]
 "src/utils/metrics.py" = ["F401"]
 # B904 `raise ... from err` inside except.
 "api/routes/deals.py" = ["B904"]
 "api/routes/query.py" = ["B904"]
-"src/data_processing/excel_normalizer.py" = ["B904"]
 "src/llm/litellm_wrapper.py" = ["B904"]
-# B023 false positive: the `emit` closure is only ever called within the loop
-# iteration that defines it, so late binding cannot bite.
-"src/data_processing/structural_chunker.py" = ["B023"]

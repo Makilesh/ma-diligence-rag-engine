@@ -27,6 +27,7 @@ from src.llm.prompt_templates.answer_synthesizer import (
     SEARCH_FOCUS_TEMPLATE,
 )
 from src.verification.claims import CITATION_MARKER, PAGE_IN_MARKER
+from src.verification.evidence import chunk_evidence_text, parent_key
 from src.verification.numeric_grounding import ground_answer_numbers
 from src.verification.prompt_safety import chunk_attributes, wrap_document
 from src.workflow.state_definitions import AgentState
@@ -37,6 +38,11 @@ logger = setup_logger(__name__)
 # How many ladder rungs to try before giving up on a query. Bounded so a
 # provider-wide outage cannot walk the entire ladder on every request.
 MAX_LADDER_FALLBACKS = 6
+
+# Character budget for the context block (~16k tokens). Parent sections are
+# ~2,048 tokens each, so roughly the top seven parents fit in full; lower-ranked
+# chunks then contribute their own (child) text only.
+MAX_CONTEXT_CHARS = 64_000
 
 
 def _format_context_for_synthesis(chunks: list[dict]) -> str:
@@ -49,19 +55,36 @@ def _format_context_for_synthesis(chunks: list[dict]) -> str:
     content, so it is escaped rather than pasted in raw — see
     src/verification/prompt_safety.py.
 
+    Evidence is the chunk's full parent section when it has one (the child is a
+    substring of it), shown once per parent: sibling chunks expanding to the same
+    parent_chunk_id are not repeated. This replaces a 500-character parent
+    excerpt that discarded most of each ~2,048-token parent. Chunks are taken in
+    retrieval (rank) order until MAX_CONTEXT_CHARS; past that, a chunk falls
+    back to its own text, and one that does not fit even so is dropped.
+
     Args:
-        chunks: List of expanded context chunk dicts.
+        chunks: List of expanded context chunk dicts, best first.
 
     Returns:
         Formatted string for inclusion in the synthesis prompt.
     """
     parts = []
-    for i, chunk in enumerate(chunks, 1):
-        body = chunk.get("text", "") or ""
-        parent_text = chunk.get("parent_text", "") or ""
-        if parent_text:
-            body += f"\n[Parent context]: {parent_text[:500]}"
-        parts.append(wrap_document(i, body, **chunk_attributes(chunk)))
+    shown_parents: set[str] = set()
+    used = 0
+    for chunk in chunks:
+        key = parent_key(chunk)
+        if key is not None and key in shown_parents:
+            continue
+        body = chunk_evidence_text(chunk)
+        if used + len(body) > MAX_CONTEXT_CHARS:
+            body = chunk.get("text", "") or ""
+            key = None  # parent not shown, so siblings may still contribute
+            if used + len(body) > MAX_CONTEXT_CHARS:
+                continue
+        if key is not None:
+            shown_parents.add(key)
+        used += len(body)
+        parts.append(wrap_document(len(parts) + 1, body, **chunk_attributes(chunk)))
     return "\n\n".join(parts)
 
 

@@ -71,6 +71,25 @@ def fail(message: str, remedy: str = "") -> None:
     sys.exit(1)
 
 
+def _admin_headers() -> dict[str, str]:
+    """
+    The admin header for write calls, if an admin key is configured.
+
+    Ingesting into (or purging) the non-sandbox demo deal is an admin operation.
+    Without ADMIN_API_KEY the API only allows it under ENVIRONMENT=development,
+    which is what a local .env sets; with a key set, it must be presented. Read
+    from the environment first, then .env, so this script stays stdlib-only.
+    """
+    key = os.environ.get("ADMIN_API_KEY", "")
+    env_file = PROJECT_ROOT / ".env"
+    if not key and env_file.exists():
+        for line in env_file.read_text(encoding="utf-8", errors="replace").splitlines():
+            name, _, value = line.partition("=")
+            if name.strip() == "ADMIN_API_KEY":
+                key = value.strip().strip('"').strip("'")
+    return {"X-Admin-Key": key} if key else {}
+
+
 def get_json(url: str, timeout: float = 5.0):
     """GETs JSON, returning None on any failure — used for polling."""
     import json
@@ -186,6 +205,27 @@ def start_api() -> subprocess.Popen:
     return process
 
 
+def purge_demo_deal() -> None:
+    """Drops every indexed point for the demo deal so it can be re-ingested."""
+    say(f"Purging {DEAL_ID} for a clean re-index", "3.")
+    request = urllib.request.Request(
+        f"{API_URL}/api/v1/deals/{DEAL_ID}", headers=_admin_headers(), method="DELETE"
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=120):
+            pass
+    except urllib.error.HTTPError as e:
+        if e.code == 403:
+            fail(
+                "The API refused to purge the demo deal.",
+                "Set ADMIN_API_KEY in .env, or ENVIRONMENT=development with no key.",
+            )
+        if e.code != 404:
+            fail(f"Purge failed with HTTP {e.code}. See demo_api.log.")
+    except (urllib.error.URLError, OSError) as e:
+        fail(f"Purge request failed: {e}")
+
+
 def ingest_if_empty() -> None:
     say("Checking the index", "3.")
     deals = get_json(f"{API_URL}/api/v1/deals", timeout=30) or []
@@ -250,7 +290,10 @@ def _ingest_one(path: Path) -> bool:
     request = urllib.request.Request(
         f"{API_URL}/api/v1/ingest",
         data=b"".join(parts),
-        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        headers={
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+            **_admin_headers(),
+        },
         method="POST",
     )
     try:
@@ -294,6 +337,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--stop", action="store_true", help="stop the containers and exit")
     parser.add_argument("--no-ui", action="store_true", help="start the API only")
+    parser.add_argument(
+        "--reindex",
+        action="store_true",
+        help="purge the demo deal and ingest the sample data room from scratch",
+    )
     args = parser.parse_args()
 
     if args.stop:
@@ -303,6 +351,8 @@ def main() -> None:
     print("\n  M&A Due Diligence Intelligence Engine — local demo\n")
     start_containers()
     api = start_api()
+    if args.reindex:
+        purge_demo_deal()
     ingest_if_empty()
     ui = None if args.no_ui else start_ui()
 

@@ -283,6 +283,11 @@ def register_document(
     """
     records = _documents.setdefault(deal_id, [])
 
+    # doc_id is derived from the file's content, so re-uploading identical bytes
+    # yields the same id and ingestion replaces the points in place. The registry
+    # must do the same, or the deal lists the document twice.
+    records[:] = [r for r in records if r["doc_id"] != doc_id]
+
     records.append(
         {
             "doc_id": doc_id,

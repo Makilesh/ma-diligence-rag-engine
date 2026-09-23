@@ -23,6 +23,7 @@ from src.llm.prompt_templates.hallucination_validator import (
     HALLUCINATION_VALIDATOR_USER_TEMPLATE,
 )
 from src.verification.claim_checker import verify_answer
+from src.verification.evidence import chunk_evidence_text
 from src.verification.nli import nli_enabled
 from src.verification.prompt_safety import chunk_attributes, wrap_document
 from src.workflow.state_definitions import AgentState
@@ -33,7 +34,7 @@ logger = setup_logger(__name__)
 # Per-document character budget inside the judge prompt. The judge sees only
 # the documents relevant to the undecided claims, so this bounds cost without
 # hiding the evidence the way the old 500-character truncation did.
-_JUDGE_DOC_CHARS = 6000
+_JUDGE_DOC_CHARS = 9000
 
 
 def build_judge_prompt(query: str, claims: list[dict], documents: list[dict]) -> str:
@@ -51,10 +52,8 @@ def build_judge_prompt(query: str, claims: list[dict], documents: list[dict]) ->
     claim_lines = "\n".join(f"{c['id']}. {c['claim']}" for c in claims)
     doc_parts = []
     for i, chunk in enumerate(documents, 1):
-        body = chunk.get("text", "") or ""
-        parent = chunk.get("parent_text", "") or ""
-        if parent and parent not in body:
-            body = f"{body}\n[Parent context]: {parent}"
+        # Same evidence text the synthesizer was shown (parent section included).
+        body = chunk_evidence_text(chunk)
         doc_parts.append(wrap_document(i, body[:_JUDGE_DOC_CHARS], **chunk_attributes(chunk)))
     return HALLUCINATION_VALIDATOR_USER_TEMPLATE.format(
         query=query,

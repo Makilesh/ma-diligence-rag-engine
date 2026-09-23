@@ -14,7 +14,7 @@ interface UploadPanelProps {
   onDiscard: () => void;
 }
 
-const ACCEPTED = ".pdf,.docx,.xlsx,.xls,.pptx,.txt";
+const ACCEPTED = ".pdf,.docx,.xlsx,.pptx,.txt";
 
 export default function UploadPanel({
   sandboxDeal,
