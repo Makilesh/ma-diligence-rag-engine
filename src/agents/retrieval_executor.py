@@ -12,7 +12,7 @@ from src.vector_db.reranker import embed_texts_async, rerank_async
 from src.vector_db.hybrid_search import hybrid_search, compute_sparse_bm25
 from src.vector_db.rrf_fusion import flatten_deduplicate, reciprocal_rank_fusion
 from src.vector_db.parent_child_retrieval import expand_context
-from src.agents.retrieval_strategy import get_retrieval_config
+from src.agents.retrieval_strategy import clamp_retrieval_config, get_retrieval_config
 from src.workflow.state_definitions import AgentState
 from src.utils.logger import setup_logger
 
@@ -22,6 +22,30 @@ logger = setup_logger(__name__)
 # guarantee is the whole point of decomposing: without it the dominant facet
 # simply crowds the others out again and nothing has been gained.
 MIN_CHUNKS_PER_SUB_QUESTION = 2
+
+# Floor on what reranker_threshold may cut a pass down to. The threshold drops
+# candidates the cross-encoder scores as irrelevant, but an empty context
+# short-circuits to a refusal before the Quality Assessor and the rewrite loop
+# get a say — so the best few candidates always survive for them to judge.
+MIN_CHUNKS_AFTER_THRESHOLD = 3
+
+
+def _apply_reranker_threshold(scored: list[dict], threshold: float) -> list[dict]:
+    """
+    Drops chunks scoring below the reranker threshold, keeping a minimum.
+
+    Args:
+        scored: Chunks sorted by descending reranker_score.
+        threshold: Minimum sigmoid score in [0, 1].
+
+    Returns:
+        Chunks at or above threshold, or the top MIN_CHUNKS_AFTER_THRESHOLD
+        when fewer than that pass.
+    """
+    kept = [c for c in scored if c["reranker_score"] >= threshold]
+    if len(kept) < MIN_CHUNKS_AFTER_THRESHOLD:
+        return scored[:MIN_CHUNKS_AFTER_THRESHOLD]
+    return kept
 
 
 async def _retrieve_for_query(
@@ -43,12 +67,13 @@ async def _retrieve_for_query(
 
     Args:
         query: The query or sub-question to retrieve for.
-        config: Retrieval config (weights, top-k values).
+        config: Retrieval config (weights, top-k values, reranker_threshold).
         deal_id: Deal scope.
         metadata_filters: Filters, already relaxed/augmented by the caller.
 
     Returns:
-        Chunks sorted by descending reranker score, each carrying reranker_score.
+        Chunks sorted by descending reranker score, each carrying reranker_score,
+        with those below reranker_threshold removed (see _apply_reranker_threshold).
     """
     import asyncio
     from src.vector_db.reranker import get_embed_executor
@@ -96,8 +121,6 @@ async def _retrieve_for_query(
 
     scores = await rerank_async(query, passages)
 
-    # Threshold of 0.0 keeps every candidate for relative sorting; absolute
-    # relevance is the Quality Assessor's judgement, not this node's.
     scored = []
     for chunk, score in zip(chunks, scores):
         chunk = dict(chunk)
@@ -105,7 +128,7 @@ async def _retrieve_for_query(
         scored.append(chunk)
 
     scored.sort(key=lambda c: c["reranker_score"], reverse=True)
-    return scored
+    return _apply_reranker_threshold(scored, float(config.get("reranker_threshold", 0.0)))
 
 
 def _merge_by_quota(
@@ -195,6 +218,8 @@ async def retrieval_executor_node(state: AgentState) -> dict:
         config = state["retrieval_config"]
     else:
         config = get_retrieval_config(state["query_type"], state["parsed_intent"])
+    # Clamp on read as well: the config in state may have been rewritten by an LLM.
+    config = {**config, **clamp_retrieval_config(config)}
 
     # Step 2: Build filters
     # include_pii is injected here rather than living in extracted_filters, because
@@ -350,6 +375,7 @@ async def retrieval_executor_node(state: AgentState) -> dict:
         include_parents=config.get("use_parent_expansion", True),
         include_siblings=config.get("use_sibling_expansion", True),
         include_pii=include_pii,
+        deal_id=deal_id,
     )
 
     elapsed_ms = (time.monotonic() - start) * 1000
