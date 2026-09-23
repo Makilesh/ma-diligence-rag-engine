@@ -6,11 +6,10 @@ Executes the retrieval pipeline: embed → hybrid search → RRF fusion → rera
 """
 
 import time
-import numpy as np
 
 from src.vector_db.reranker import embed_texts_async, rerank_async
 from src.vector_db.hybrid_search import hybrid_search, compute_sparse_bm25
-from src.vector_db.rrf_fusion import flatten_deduplicate, reciprocal_rank_fusion
+from src.vector_db.rrf_fusion import reciprocal_rank_fusion
 from src.vector_db.parent_child_retrieval import expand_context
 from src.agents.retrieval_strategy import clamp_retrieval_config, get_retrieval_config
 from src.workflow.state_definitions import AgentState

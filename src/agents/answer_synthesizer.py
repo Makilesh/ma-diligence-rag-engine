@@ -7,22 +7,28 @@ spent and finally to the local model. See src/llm/model_registry.py.
 Temp: 0.1 | Tokens: 3000 | JSON mode: OFF (prose answer)
 """
 
-import json
 import re
 
 from src.llm.litellm_wrapper import (
+    StreamInterrupted,
     call_prose_agent,
     is_quota_error,
     is_auth_error,
     is_service_unavailable,
     is_model_unavailable_for_key,
     is_timeout_error,
+    stream_prose_agent,
 )
 from src.llm.budget_tracker import BudgetTracker
 from src.llm.prompt_templates.answer_synthesizer import (
     ANSWER_SYNTHESIZER_SYSTEM_PROMPT,
     ANSWER_SYNTHESIZER_USER_TEMPLATE,
+    REVISION_FEEDBACK_TEMPLATE,
+    SEARCH_FOCUS_TEMPLATE,
 )
+from src.verification.claims import CITATION_MARKER, PAGE_IN_MARKER
+from src.verification.numeric_grounding import ground_answer_numbers
+from src.verification.prompt_safety import chunk_attributes, wrap_document
 from src.workflow.state_definitions import AgentState
 from src.utils.logger import setup_logger
 
@@ -36,7 +42,12 @@ MAX_LADDER_FALLBACKS = 6
 def _format_context_for_synthesis(chunks: list[dict]) -> str:
     """
     Formats expanded context chunks for the synthesis prompt.
-    Includes metadata for citation generation.
+
+    Each chunk becomes a delimited <document> element whose attributes carry the
+    metadata the model needs for citations (source, page, section, fiscal year,
+    version and computed-metric flags). Chunk text is untrusted third-party
+    content, so it is escaped rather than pasted in raw — see
+    src/verification/prompt_safety.py.
 
     Args:
         chunks: List of expanded context chunk dicts.
@@ -46,31 +57,11 @@ def _format_context_for_synthesis(chunks: list[dict]) -> str:
     """
     parts = []
     for i, chunk in enumerate(chunks, 1):
-        meta = []
-        if chunk.get("source_file"):
-            meta.append(f"Source: {chunk['source_file']}")
-        if chunk.get("page_number"):
-            meta.append(f"Page: {chunk['page_number']}")
-        if chunk.get("section_heading"):
-            meta.append(f"Section: {chunk['section_heading']}")
-        if chunk.get("fiscal_year"):
-            meta.append(f"FY: {chunk['fiscal_year']}")
-        if chunk.get("is_current_version") == 0:
-            meta.append("⚠ NOT CURRENT VERSION")
-        if chunk.get("content_type") == "computed_metric":
-            meta.append("COMPUTED METRIC")
-        if chunk.get("is_redline"):
-            meta.append("REDLINE VERSION")
-
-        meta_str = " | ".join(meta)
-        text = chunk.get("text", "")
-        parent_text = chunk.get("parent_text", "")
-
-        part = f"--- Chunk {i} [{meta_str}] ---\n{text}"
+        body = chunk.get("text", "") or ""
+        parent_text = chunk.get("parent_text", "") or ""
         if parent_text:
-            part += f"\n[Parent context]: {parent_text[:500]}"
-        parts.append(part)
-
+            body += f"\n[Parent context]: {parent_text[:500]}"
+        parts.append(wrap_document(i, body, **chunk_attributes(chunk)))
     return "\n\n".join(parts)
 
 
@@ -79,8 +70,9 @@ def _format_context_for_synthesis(chunks: list[dict]) -> str:
 #   [📄 FileName | FiscalYear | p.PageNum | Section | Version]
 #   [📊 FileName | Sheet "Name" | COMPUTED: description]
 # Matching on the pipe avoids colliding with ordinary markdown links.
-_CITATION_MARKER = re.compile(r"\[([^\[\]]*\|[^\[\]]*)\]")
-_PAGE_IN_MARKER = re.compile(r"(?:p\.|pg\.|page\s*)(\d+)", re.IGNORECASE)
+# Shared with the verifier, which resolves the same markers per claim.
+_CITATION_MARKER = CITATION_MARKER
+_PAGE_IN_MARKER = PAGE_IN_MARKER
 
 
 # Fragments that mean the model emitted its own working notes instead of an
@@ -249,6 +241,123 @@ def _select_cited_chunks(answer: str, chunks: list[dict]) -> list[dict]:
     return unique
 
 
+def _token_sink():
+    """
+    Returns the LangGraph stream writer when this run streams answer tokens.
+
+    stream_query starts the graph with `configurable.stream_tokens=True` and
+    `stream_mode` including "custom"; run_query does neither. Outside a graph
+    run (unit tests calling the node directly) there is no config at all.
+
+    Returns:
+        A writer callable, or None when tokens should not be streamed.
+    """
+    try:
+        from langgraph.config import get_config, get_stream_writer
+
+        config = get_config()
+    except Exception:
+        return None
+    if not (config.get("configurable") or {}).get("stream_tokens"):
+        return None
+    try:
+        return get_stream_writer()
+    except Exception:
+        return None
+
+
+def _financial_context(state: AgentState) -> tuple[str, str]:
+    """
+    Summarises the financial verifier's deterministic output for the prompt.
+
+    Only measured disagreements are passed on, never a model's opinion — an
+    "inconsistency" in this section is something the answer will repeat with a
+    citation, so it has to be a fact about the documents.
+
+    Args:
+        state: Current AgentState.
+
+    Returns:
+        (financial_verification text, inconsistencies text).
+    """
+    registry = state.get("numerical_registry") or {}
+    found = [
+        i for i in (state.get("inconsistencies") or [])
+        if isinstance(i, dict) and i.get("method") == "deterministic"
+    ]
+    if not registry:
+        return "N/A", "None found"
+
+    multi_source = sum(
+        1 for v in registry.values()
+        if isinstance(v, dict) and len({x.get("source") for x in v.get("values", [])}) > 1
+    )
+    summary = (
+        f"{len(registry)} labelled figures read from the documents; "
+        f"{multi_source} metric/period pairs are reported by more than one source; "
+        f"{len(found)} of those disagree."
+    )
+    if not found:
+        return summary, "None found"
+
+    lines = []
+    for item in found:
+        values = "; ".join(
+            f"{v.get('as_printed') or v.get('value')} in {v.get('source')}"
+            for v in item.get("values_found", [])
+        )
+        lines.append(
+            f"- {item.get('metric')} ({item.get('fiscal_year')}): {values} "
+            f"— {item.get('max_deviation_pct', 0):.1f}% apart"
+        )
+    return summary, "\n".join(lines)
+
+
+def _build_user_prompt(
+    state: AgentState,
+    chunks: list[dict],
+    revision_feedback: list[str] | None,
+) -> str:
+    """
+    Assembles the synthesis user prompt.
+
+    The question is the user's ORIGINAL query. After a rewrite, current_query is
+    a search-optimised string ("Aurora FY2023 revenue growth drivers segment
+    breakdown") — good for retrieval, wrong as the question to answer. It is
+    included only as retrieval context when it differs.
+
+    Args:
+        state: Current AgentState.
+        chunks: Context chunks.
+        revision_feedback: Unsupported statements from a failed validation.
+
+    Returns:
+        The formatted user prompt.
+    """
+    question = state.get("original_query") or state.get("current_query", "")
+    current = state.get("current_query", "")
+    search_focus = (
+        SEARCH_FOCUS_TEMPLATE.format(current_query=current)
+        if current and current.strip() != question.strip()
+        else ""
+    )
+    financial_verification, inconsistencies = _financial_context(state)
+    feedback = ""
+    if revision_feedback:
+        feedback = REVISION_FEEDBACK_TEMPLATE.format(
+            feedback="\n".join(f"- {line}" for line in revision_feedback)
+        )
+    return ANSWER_SYNTHESIZER_USER_TEMPLATE.format(
+        query=question,
+        query_type=state["query_type"],
+        search_focus=search_focus,
+        context=_format_context_for_synthesis(chunks),
+        financial_verification=financial_verification,
+        inconsistencies=inconsistencies,
+        revision_feedback=feedback,
+    )
+
+
 async def answer_synthesizer_node(state: AgentState) -> dict:
     """
     LangGraph node — generates prose answer with citations.
@@ -263,7 +372,30 @@ async def answer_synthesizer_node(state: AgentState) -> dict:
     Returns:
         Partial state dict with answer and citations.
     """
-    logger.info("Agent 7: Answer Synthesizer starting")
+    return await synthesize_answer(state)
+
+
+async def synthesize_answer(
+    state: AgentState,
+    revision_feedback: list[str] | None = None,
+) -> dict:
+    """
+    Generates the answer; shared by the first synthesis and the retry.
+
+    Args:
+        state: Current AgentState.
+        revision_feedback: Statements a failed validation found unsupported. When
+            given, they are appended to the prompt with an instruction to remove
+            or correct them — otherwise a retry re-asks the identical prompt and
+            mostly reproduces the identical answer.
+
+    Returns:
+        Partial state dict with answer, citations and numerical_claims.
+    """
+    logger.info(
+        "Agent 7: Answer Synthesizer starting",
+        extra={"revision": bool(revision_feedback)},
+    )
 
     # Check for forced refusal
     if state.get("force_refusal"):
@@ -283,31 +415,30 @@ async def answer_synthesizer_node(state: AgentState) -> dict:
             ],
         }
 
-    chunks = state.get("expanded_context", state.get("reranked_results", []))
-    context = _format_context_for_synthesis(chunks)
-
-    # Financial verification results
-    financial_verification = ""
-    if state.get("numerical_registry"):
-        financial_verification = json.dumps(
-            state["numerical_registry"], indent=2, default=str
-        )
-
-    inconsistencies = ""
-    if state.get("inconsistencies"):
-        inconsistencies = json.dumps(
-            state["inconsistencies"], indent=2, default=str
-        )
-
-    user_prompt = ANSWER_SYNTHESIZER_USER_TEMPLATE.format(
-        query=state["current_query"],
-        query_type=state["query_type"],
-        context=context,
-        financial_verification=financial_verification or "N/A",
-        inconsistencies=inconsistencies or "None found",
-    )
+    chunks = state.get("expanded_context") or state.get("reranked_results") or []
+    user_prompt = _build_user_prompt(state, chunks, revision_feedback)
 
     tracker = await BudgetTracker.get_instance()
+
+    # Token streaming, when the run was started by stream_query. The client
+    # renders these as a draft; the validated answer replaces it on `result`.
+    sink = _token_sink()
+    draft_open = False
+
+    def emit_token(text: str) -> None:
+        nonlocal draft_open
+        draft_open = True
+        sink({"type": "token", "text": text})
+
+    def reset_draft(reason: str) -> None:
+        nonlocal draft_open
+        if sink is not None:
+            sink({"type": "answer_reset", "reason": reason})
+        draft_open = False
+
+    if sink is not None and revision_feedback:
+        # The first draft failed verification; the client should stop showing it.
+        reset_draft("revising after verification")
 
     # Walk down the ladder on quota refusals.
     #
@@ -329,14 +460,27 @@ async def answer_synthesizer_node(state: AgentState) -> dict:
         choice = await tracker.get_model_for_synthesis()
         model = choice.model
         try:
-            candidate = await call_prose_agent(
-                system_prompt=ANSWER_SYNTHESIZER_SYSTEM_PROMPT,
-                user_prompt=user_prompt,
-                model=model,
-                temperature=0.1,
-                max_tokens=3000,
-                api_key=choice.api_key,
-            )
+            if sink is not None:
+                candidate = await stream_prose_agent(
+                    system_prompt=ANSWER_SYNTHESIZER_SYSTEM_PROMPT,
+                    user_prompt=user_prompt,
+                    model=model,
+                    on_token=emit_token,
+                    temperature=0.1,
+                    max_tokens=3000,
+                    api_key=choice.api_key,
+                    agent="answer_synthesizer",
+                )
+            else:
+                candidate = await call_prose_agent(
+                    system_prompt=ANSWER_SYNTHESIZER_SYSTEM_PROMPT,
+                    user_prompt=user_prompt,
+                    model=model,
+                    temperature=0.1,
+                    max_tokens=3000,
+                    api_key=choice.api_key,
+                    agent="answer_synthesizer",
+                )
             if not _is_usable_answer(candidate, chunks):
                 # A response that violates the prompt's citation contract is a
                 # failed generation, not an answer. Retrying on another rung is
@@ -350,12 +494,25 @@ async def answer_synthesizer_node(state: AgentState) -> dict:
                         "context_chunks": len(chunks),
                     },
                 )
+                if draft_open:
+                    reset_draft("discarded an unusable draft")
                 last_error = RuntimeError("synthesis produced an uncited answer")
                 tracker.skip_model_for_request(model)
                 continue
             answer = candidate
             tracker.note_model_healthy(model)
             break
+        except StreamInterrupted as e:
+            # Tokens already reached the client; clear them, then treat the
+            # model as unavailable for this request like any mid-call failure.
+            reset_draft("model stream interrupted")
+            last_error = e.cause
+            tracker.skip_model_for_request(model)
+            logger.warning(
+                "Synthesis stream interrupted, trying another model",
+                extra={"model": model, "emitted_chars": e.emitted_chars},
+            )
+            continue
         except Exception as e:
             last_error = e
             if choice.key_index >= 0 and is_auth_error(e):
@@ -395,6 +552,8 @@ async def answer_synthesizer_node(state: AgentState) -> dict:
 
     if answer is None:
         e = last_error or RuntimeError("synthesis produced no answer")
+        if draft_open:
+            reset_draft("synthesis failed")
         # Synthesis is the one place where an upstream failure would otherwise
         # take down the whole request. Degrade to an explicit refusal instead:
         # a reviewer who is told the engine could not answer is strictly better
@@ -443,24 +602,34 @@ async def answer_synthesizer_node(state: AgentState) -> dict:
         for c in _select_cited_chunks(answer, chunks)
     ]
 
+    # The answer's own figures, each traced to the context (or not). This field
+    # used to be filled with the financial verifier's inconsistency list, which
+    # is a different thing entirely.
+    numerical_claims = ground_answer_numbers(answer, chunks)
+
     logger.info(
         "Agent 7: Answer Synthesizer complete",
         extra={
             "model": model,
             "answer_length": len(answer),
             "citations_count": len(citations),
+            "numerical_claims": len(numerical_claims),
+            "streamed": sink is not None,
         },
     )
 
     return {
         "generated_answer": answer,
         "citations": citations,
-        "numerical_claims": state.get("inconsistencies", []),
+        "numerical_claims": numerical_claims,
         "agent_trace": [
             {
                 "agent": "answer_synthesizer",
                 "model": model,
                 "answer_length": len(answer),
+                "revision": bool(revision_feedback),
+                "revision_items": len(revision_feedback or []),
+                "streamed": sink is not None,
             }
         ],
     }
