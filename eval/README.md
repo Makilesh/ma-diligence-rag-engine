@@ -13,7 +13,7 @@ Measures retrieval alone — no synthesis, so no model choice or quota state can
 
 **Limits.** The labels come from substring matches, not human judgement. A chunk that says the same thing in other words is scored as a miss. A short fact such as `12` or `peg` can match by accident. The corpus is 9 synthetic documents, so absolute numbers are optimistic compared with a real data room, and the comparison between ablations is the meaningful part. Local-mode Qdrant searches exactly, while the server uses HNSW with int8 quantization and rescoring.
 
-**Run** (GPU if available; about 4 minutes on an RTX-class GPU, much longer on CPU):
+**Run** (GPU if available). Measured: about 2 minutes on an RTX 5070 Ti, about 15 minutes on a 24-thread CPU, and slower on a 4-vCPU CI runner:
 
 ```bash
 python -m eval.run_retrieval_eval                                 # all ablations, k=5,10

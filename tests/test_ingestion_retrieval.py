@@ -328,18 +328,6 @@ class TestRewriterClamping:
         assert apply_filter_overrides({"document_category": "legal"}, {"document_category": None}) == {}
         assert apply_filter_overrides({}, {"document_category": "made-up"}) == {}
 
-    def test_reranker_threshold_is_applied_with_a_floor(self):
-        from src.agents.retrieval_executor import (
-            MIN_CHUNKS_AFTER_THRESHOLD,
-            _apply_reranker_threshold,
-        )
-
-        scored = [{"chunk_id": str(i), "reranker_score": s}
-                  for i, s in enumerate([0.9, 0.8, 0.7, 0.6, 0.2, 0.1])]
-        assert [c["chunk_id"] for c in _apply_reranker_threshold(scored, 0.5)] == ["0", "1", "2", "3"]
-        # Never empties the context: the Quality Assessor still judges the best few.
-        assert len(_apply_reranker_threshold(scored, 0.95)) == MIN_CHUNKS_AFTER_THRESHOLD
-
 
 # ==============================================================================
 # Upload route

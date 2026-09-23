@@ -34,17 +34,6 @@ class TestRetrievalStrategy:
         assert config is not None
         assert "dense_weight" in config
 
-    def test_numerical_precision_raises_threshold(self):
-        """requires_numerical_precision raises reranker threshold."""
-        from src.agents.retrieval_strategy import get_retrieval_config
-
-        config_normal = get_retrieval_config("financial", {})
-        config_precise = get_retrieval_config(
-            "financial", {"requires_numerical_precision": True}
-        )
-
-        assert config_precise["reranker_threshold"] >= config_normal["reranker_threshold"]
-
     def test_cross_document_increases_top_k(self):
         """requires_cross_document increases top_k values."""
         from src.agents.retrieval_strategy import get_retrieval_config
@@ -64,7 +53,9 @@ class TestRetrievalStrategy:
             config = get_retrieval_config(qt, {})
             assert "dense_weight" in config
             assert "sparse_weight" in config
-            assert "reranker_threshold" in config
+            # Removed deliberately: a score cut-off cost fact coverage on the
+            # retrieval eval, so no config may reintroduce one.
+            assert "reranker_threshold" not in config
 
 
 class TestQualityAssessorHeuristic:

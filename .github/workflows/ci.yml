@@ -115,9 +115,10 @@ jobs:
   # run makes zero LLM calls. Fails if a gated metric drops below
   # eval/baseline.json by more than the tolerance.
   #
-  # Runs on CPU here while the baseline is recorded on a GPU. Float differences
-  # between the two can reorder near-tied candidates, and on 35 questions one
-  # fact moving in or out of one question's context is ~0.6-0.7pp — hence a 3pp
+  # Runs on CPU here while the baseline is recorded on a GPU. Measured locally,
+  # a CPU run reproduced the GPU metrics and rankings exactly (reranker scores
+  # within 1e-4), but a different CPU/BLAS could reorder a near-tie, and on 35
+  # questions one fact moving in or out of one context is ~0.6-1pp — hence a 3pp
   # tolerance in CI against the 2pp default used locally.
   retrieval-eval:
     name: Retrieval eval (golden set, CPU)

@@ -233,10 +233,13 @@ demo runs a different reranker, they describe two, and both should be stated —
 the local profile the accuracy was measured on, and the deployed profile a
 visitor actually exercises.
 
-The reranker thresholds in `src/agents/retrieval_strategy.py` (0.25–0.4) were
-tuned against `bge-reranker-v2-m3`'s sigmoid output. A different cross-encoder's
-scores are on a comparable but not identical scale, so if the eval shows more
-refusals than expected, those thresholds are the first place to look.
+The Quality Assessor's relevance floors in `src/agents/quality_assessor.py`
+(`RELEVANCE_FLOOR`, `CONFIDENT_REFUSAL_CEILING`, `CONFIDENT_PASS_FLOOR`) were
+calibrated against `bge-reranker-v2-m3`'s sigmoid output. The Space runs the
+MiniLM cross-encoder, whose scores are on a comparable but not identical scale,
+so if the eval shows more refusals than expected, those floors are the first
+place to look — `python -m eval.run_retrieval_eval` reports the gate's decision
+per question and runs with `RERANKER_MODEL` set to either model.
 
 ---
 

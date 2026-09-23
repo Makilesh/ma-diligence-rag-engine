@@ -6,37 +6,37 @@ Percentages. fact_cov = share of expected facts present in the top-k chunk texts
 
 | ablation | fact_cov@5 | fact_cov@10 | fact_cov@context | recall@5 | recall@10 | mrr@10 | ndcg@10 | source_hit@5 | source_hit@10 | p50 ms | p95 ms |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| dense-only | 72.7 | 85.6 | — | 49.7 | 68.5 | 58.2 | 56.6 | 94.3 | 98.6 | 23 | 26 |
-| sparse-only (BM25) | 68.3 | 73.1 | — | 41.8 | 46.6 | 52.0 | 45.5 | 80.0 | 82.9 | 23 | 26 |
-| hybrid RRF (no rerank) | 73.8 | 85.3 | — | 47.1 | 61.5 | 60.4 | 54.5 | 82.9 | 91.4 | 24 | 28 |
-| production (hybrid + rerank) | 81.7 | 81.7 | 85.2 | 61.2 | 62.0 | 78.1 | 65.7 | 95.7 | 95.7 | 804 | 1131 |
-| production + decomposition | 84.1 | 84.1 | 87.1 | 63.1 | 64.5 | 76.7 | 67.8 | 95.7 | 95.7 | 887 | 4295 |
+| dense-only | 72.7 | 85.6 | — | 49.7 | 68.5 | 58.2 | 56.6 | 94.3 | 98.6 | 21 | 23 |
+| sparse-only (BM25) | 68.3 | 73.1 | — | 41.8 | 46.6 | 52.0 | 45.5 | 80.0 | 82.9 | 21 | 23 |
+| hybrid RRF (no rerank) | 73.8 | 85.3 | — | 47.1 | 61.5 | 60.4 | 54.5 | 82.9 | 91.4 | 22 | 24 |
+| production (hybrid + rerank) | 87.8 | 90.7 | 91.6 | 69.6 | 76.4 | 78.7 | 71.3 | 95.7 | 95.7 | 788 | 1057 |
+| production + decomposition | 87.4 | 91.6 | 92.6 | 69.3 | 77.2 | 77.2 | 72.3 | 95.7 | 95.7 | 832 | 3949 |
 
 ## production (hybrid + rerank) — by query type
 
 | type | n | fact_cov@5 | fact_cov@10 | fact_cov@context | recall@10 | mrr@10 | ndcg@10 |
 |---|---|---|---|---|---|---|---|
-| comparative | 5 | 68.0 | 68.0 | 70.0 | 66.7 | 80.0 | 52.7 |
-| financial | 8 | 87.5 | 87.5 | 87.5 | 87.5 | 62.5 | 69.8 |
-| legal | 8 | 100.0 | 100.0 | 100.0 | 58.8 | 93.8 | 80.8 |
-| multi_hop | 10 | 74.3 | 74.3 | 83.3 | 58.7 | 85.0 | 65.4 |
-| summary | 4 | 69.4 | 69.4 | 75.0 | 19.6 | 58.3 | 44.3 |
-| **all** | 35 | 81.7 | 81.7 | 85.2 | 62.0 | 78.1 | 65.7 |
+| comparative | 5 | 84.0 | 84.0 | 84.0 | 80.0 | 80.0 | 60.6 |
+| financial | 8 | 90.0 | 90.0 | 90.0 | 87.5 | 62.5 | 69.8 |
+| legal | 8 | 100.0 | 100.0 | 100.0 | 80.1 | 93.8 | 84.4 |
+| multi_hop | 10 | 80.0 | 83.3 | 86.7 | 69.0 | 85.0 | 72.3 |
+| summary | 4 | 83.3 | 100.0 | 100.0 | 61.3 | 63.3 | 59.1 |
+| **all** | 35 | 87.8 | 90.7 | 91.6 | 76.4 | 78.7 | 71.3 |
 
 ## production + decomposition — by query type
 
 | type | n | fact_cov@5 | fact_cov@10 | fact_cov@context | recall@10 | mrr@10 | ndcg@10 |
 |---|---|---|---|---|---|---|---|
-| comparative | 5 (5 dec.) | 68.0 | 68.0 | 70.0 | 66.7 | 63.3 | 49.2 |
-| financial | 8 (2 dec.) | 87.5 | 87.5 | 87.5 | 87.5 | 68.8 | 74.4 |
-| legal | 8 (2 dec.) | 100.0 | 100.0 | 100.0 | 60.6 | 85.4 | 78.5 |
-| multi_hop | 10 (9 dec.) | 82.7 | 82.7 | 90.0 | 66.2 | 90.0 | 72.5 |
-| summary | 4 (0 dec.) | 69.4 | 69.4 | 75.0 | 19.6 | 58.3 | 44.3 |
-| **all** | 35 (18 dec.) | 84.1 | 84.1 | 87.1 | 64.5 | 76.7 | 67.8 |
+| comparative | 5 (5 dec.) | 68.0 | 84.0 | 84.0 | 80.0 | 63.3 | 56.0 |
+| financial | 8 (2 dec.) | 90.0 | 90.0 | 90.0 | 87.5 | 68.8 | 74.4 |
+| legal | 8 (2 dec.) | 100.0 | 100.0 | 100.0 | 80.1 | 85.4 | 81.7 |
+| multi_hop | 10 (9 dec.) | 86.7 | 86.7 | 90.0 | 71.5 | 90.0 | 76.5 |
+| summary | 4 (0 dec.) | 83.3 | 100.0 | 100.0 | 61.3 | 63.3 | 59.1 |
+| **all** | 35 (18 dec.) | 87.4 | 91.6 | 92.6 | 77.2 | 77.2 | 72.3 |
 
-Decomposition, per question on fact_coverage@context: 2 improved, 0 regressed, 33 unchanged (18 of the 35 answerable questions were decomposed by Agent 1).
+Decomposition, per question on fact_coverage@context: 1 improved, 0 regressed, 34 unchanged (18 of the 35 answerable questions were decomposed by Agent 1).
 
-Changed: mh_05 66.7→100.0, mh_06 33.3→66.7
+Changed: mh_05 66.7→100.0
 
 ## Refusal gate (Quality Assessor heuristic, no LLM)
 

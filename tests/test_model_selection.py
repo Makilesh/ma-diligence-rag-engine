@@ -101,10 +101,10 @@ class TestOverride:
 
     def test_sigmoid_activation_survives_the_override(self, monkeypatch):
         """
-        Every reranker_threshold in RETRIEVAL_CONFIGS (0.25-0.4) assumes scores
-        in [0, 1]. A cross-encoder emits unbounded logits without an explicit
-        activation, so dropping it while swapping models would leave every
-        threshold comparing against the wrong scale — and nothing would raise.
+        The Quality Assessor's relevance floors assume scores in [0, 1]. A
+        cross-encoder emits unbounded logits without an explicit activation, so
+        dropping it while swapping models would leave every floor comparing
+        against the wrong scale — and nothing would raise.
         """
         import torch
 

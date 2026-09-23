@@ -23,7 +23,6 @@ RETRIEVAL_CONFIGS: dict[str, dict] = {
         "final_top_k": 10,
         "use_parent_expansion": True,
         "use_sibling_expansion": True,
-        "reranker_threshold": 0.3,
     },
     "financial": {
         "dense_weight": 0.5,
@@ -34,7 +33,6 @@ RETRIEVAL_CONFIGS: dict[str, dict] = {
         "final_top_k": 10,
         "use_parent_expansion": True,
         "use_sibling_expansion": True,
-        "reranker_threshold": 0.4,
     },
     "comparative": {
         "dense_weight": 0.6,
@@ -45,7 +43,6 @@ RETRIEVAL_CONFIGS: dict[str, dict] = {
         "final_top_k": 8,
         "use_parent_expansion": True,
         "use_sibling_expansion": False,
-        "reranker_threshold": 0.3,
         # NOTE: Comparative sub-query decomposition is a KNOWN LIMITATION in v1.
         # Comparative queries still work via query_expansions from Agent 1.
     },
@@ -58,7 +55,6 @@ RETRIEVAL_CONFIGS: dict[str, dict] = {
         "final_top_k": 10,
         "use_parent_expansion": True,
         "use_sibling_expansion": False,
-        "reranker_threshold": 0.25,
     },
     "multi_hop": {
         "dense_weight": 0.55,
@@ -69,7 +65,6 @@ RETRIEVAL_CONFIGS: dict[str, dict] = {
         "final_top_k": 12,
         "use_parent_expansion": True,
         "use_sibling_expansion": True,
-        "reranker_threshold": 0.3,
     },
 }
 
@@ -84,7 +79,6 @@ RETRIEVAL_CONFIG_BOUNDS: dict[str, tuple[type, float, float]] = {
     "top_k_sparse": (int, 5, 100),
     "reranker_top_k": (int, 5, 50),
     "final_top_k": (int, 3, 20),
-    "reranker_threshold": (float, 0.0, 0.9),
 }
 RETRIEVAL_CONFIG_FLAGS = frozenset({"use_parent_expansion", "use_sibling_expansion"})
 
@@ -204,13 +198,6 @@ def get_retrieval_config(query_type: str, parsed_intent: dict) -> dict:
     config = RETRIEVAL_CONFIGS[query_type].copy()
 
     # Augment with intent signals
-    if parsed_intent.get("requires_numerical_precision"):
-        config["reranker_threshold"] = max(config["reranker_threshold"], 0.4)
-        logger.info(
-            "Numerical precision required, raised reranker threshold",
-            extra={"reranker_threshold": config["reranker_threshold"]},
-        )
-
     if parsed_intent.get("requires_cross_document"):
         config["top_k_dense"] = min(config["top_k_dense"] + 10, 60)
         config["top_k_sparse"] = min(config["top_k_sparse"] + 10, 60)

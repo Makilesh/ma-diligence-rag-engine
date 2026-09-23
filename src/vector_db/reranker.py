@@ -101,8 +101,8 @@ def _get_reranker_model() -> CrossEncoder:
 
     CRITICAL: cross-encoders output RAW LOGITS (unbounded) by default.
     Without sigmoid normalization, scores can be negative or >1, which silently
-    breaks every reranker_threshold (0.25-0.8) and the Quality Assessor's
-    "mean reranker score of top-5" heuristic.
+    breaks the Quality Assessor's relevance floors, which are calibrated on
+    this [0, 1] scale.
     activation_fct=torch.nn.Sigmoid() normalizes output to [0, 1]. This applies
     to any substituted model, not just the default — swapping the model without
     it would leave every threshold comparing against a different scale, silently.
@@ -186,9 +186,8 @@ async def rerank_async(query: str, passages: list[str]) -> np.ndarray:
     numpy array. Callers must convert individual scores: float(score).
 
     Expected score range after sigmoid: [0.0, 1.0]
-    Scores > 0.5 indicate positive relevance. All reranker_threshold values
-    in RETRIEVAL_CONFIGS (0.25-0.8) and Quality Assessor heuristics assume
-    this normalized range.
+    Scores > 0.5 indicate positive relevance. The Quality Assessor heuristics
+    assume this normalized range.
 
     Args:
         query: The search query string.
