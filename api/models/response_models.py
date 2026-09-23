@@ -25,6 +25,10 @@ class QueryResponse(BaseModel):
     validation_status: str = Field(..., description="passed|warning|failed")
     citations: list[Citation] = Field(default_factory=list)
     hallucination_flags: list[str] = Field(default_factory=list)
+    claim_checks: list[dict] = Field(
+        default_factory=list,
+        description="Per-claim verification: claim, status, method, evidence source, score",
+    )
     total_latency_ms: float = Field(..., description="Total pipeline latency")
     session_id: str = Field(..., description="Session ID for this query")
     rewrite_iterations: int = Field(0, description="Number of query rewrites performed")

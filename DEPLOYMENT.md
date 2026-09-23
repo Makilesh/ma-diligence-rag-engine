@@ -85,6 +85,12 @@ python run_api.py
 for f in data/sample_deal/*.txt; do curl -sS -F "deal_id=aurora_vertex_2024" -F "file=@$f" http://localhost:8000/api/v1/ingest; echo; done
 ```
 
+Writing to a non-sandbox deal is an admin operation. A local API started with
+`ENVIRONMENT=development` and no `ADMIN_API_KEY` allows it; if you have set a
+key, add `-H "X-Admin-Key: $ADMIN_API_KEY"` to the curl above. Re-running the
+loop is safe — document and point IDs are derived from content, so identical
+files replace themselves instead of duplicating.
+
 Confirm it landed:
 
 ```bash
@@ -120,6 +126,11 @@ sleeping Space is often.
 4. Under **Settings → Variables and secrets**, add everything from
    `.env.deploy.example`. Credentials go in **Secrets**; the rest in
    **Variables**.
+5. Set the public-demo guardrails (`api/security.py`): a long random
+   `ADMIN_API_KEY` as a **Secret**, and `TRUST_PROXY_HEADERS=1` as a Variable so
+   per-IP rate limits see the visitor's address rather than the Space's proxy.
+   Without an admin key the Space runs in public mode: visitors can query and
+   use their own sandbox, but cannot write to or delete the demo deal.
 
 The first build takes a while — it bakes the model weights into the image on
 purpose. The free tier's disk is ephemeral, so a runtime download would be paid

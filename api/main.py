@@ -75,8 +75,10 @@ async def lifespan(app: FastAPI):
     # asked first. Set WARM_MODELS=0 to skip (faster restarts while developing).
     if os.getenv("WARM_MODELS", "1") != "0":
         from src.vector_db.reranker import warm_models
+        from src.verification.nli import warm_nli_model
 
         await warm_models()
+        await warm_nli_model()
 
     from api.routes.deals import start_sandbox_sweeper, stop_sandbox_sweeper
 

@@ -70,6 +70,7 @@ def _build_response(result: dict, session_id: str) -> QueryResponse:
         validation_status=result.get("validation_status", "passed"),
         citations=citations,
         hallucination_flags=result.get("hallucination_flags", []),
+        claim_checks=result.get("claim_checks", []),
         total_latency_ms=result.get("total_latency_ms", 0.0),
         session_id=session_id,
         rewrite_iterations=result.get("rewrite_iteration", 0),
