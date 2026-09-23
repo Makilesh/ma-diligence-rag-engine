@@ -78,8 +78,8 @@ CONTRADICTION_MIN_OVERLAP = 0.5
 
 # Evidence selection per claim: best windows (by lexical overlap) from the
 # chunks the claim cites, plus from the top retrieved chunks.
-CITED_WINDOWS_PER_CLAIM = 2
-OTHER_WINDOWS_PER_CLAIM = 2
+CITED_WINDOWS_PER_CLAIM = 6
+OTHER_WINDOWS_PER_CLAIM = 4
 FALLBACK_TOP_K = 6
 
 # Bounds on work per answer.

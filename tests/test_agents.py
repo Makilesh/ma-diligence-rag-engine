@@ -3,7 +3,6 @@ Tests for agent nodes with mocked LLM calls.
 """
 
 import pytest
-from unittest.mock import patch, AsyncMock, MagicMock
 
 
 class TestRetrievalStrategy:
@@ -541,7 +540,6 @@ class TestSubQuestionDecomposition:
         correctly into price, share count and EBITDA, but all three passes
         inherited one category filter and returned chunks from a single document.
         """
-        import numpy as np
         import src.agents.retrieval_executor as rx
 
         seen: list[dict] = []

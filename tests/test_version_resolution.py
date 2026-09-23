@@ -5,7 +5,6 @@ Tests for DocumentVersionResolver — version detection and chain construction.
 import pytest
 from src.data_processing.document_version_resolver import (
     DocumentVersionResolver,
-    DocumentVersion,
 )
 
 

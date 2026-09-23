@@ -2,8 +2,6 @@
 Tests for retrieval pipeline components.
 """
 
-import pytest
-from tests.conftest import make_scored_point
 
 
 class TestConditionalEdges:

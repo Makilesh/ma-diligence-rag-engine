@@ -2,7 +2,6 @@
 Tests for RRF fusion: flatten_deduplicate and reciprocal_rank_fusion.
 """
 
-import pytest
 from tests.conftest import make_scored_point
 
 
@@ -83,10 +82,13 @@ class TestReciprocalRankFusion:
             k=60, dense_weight=0.1, sparse_weight=0.9,
         )
 
-        # Different weights should produce different rankings
+        # Dense ranks a,b,c,d,e; sparse ranks c,f,a,g,h. chunk_a and chunk_c
+        # appear in both, so they lead either way — but the weights decide which
+        # one wins, and which single-channel chunk (b vs f) takes third place.
         ids_dense = [r[0] for r in result_dense_heavy[:3]]
         ids_sparse = [r[0] for r in result_sparse_heavy[:3]]
-        assert ids_dense != ids_sparse or len(sample_dense_results) == len(sample_sparse_results)
+        assert ids_dense == ["chunk_a", "chunk_c", "chunk_b"]
+        assert ids_sparse == ["chunk_c", "chunk_a", "chunk_f"]
 
     def test_rrf_empty_returns_empty(self):
         """

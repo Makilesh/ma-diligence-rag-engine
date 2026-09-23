@@ -21,9 +21,7 @@ What this does NOT test (requires Docker/Ollama):
 """
 
 import json
-import os
 import sys
-import time
 from pathlib import Path
 from collections import Counter
 

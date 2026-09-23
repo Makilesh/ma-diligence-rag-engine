@@ -2,9 +2,33 @@
 Shared pytest fixtures for M&A Due Diligence Intelligence Engine tests.
 """
 
-import pytest
-from unittest.mock import MagicMock, AsyncMock
+import os
 from dataclasses import dataclass
+
+import pytest
+
+
+# Scripts that live in tests/ but are not test modules. test_pipeline_offline.py
+# matches the test_*.py glob yet defines no tests — it is a CLI validation run
+# (`python tests/test_pipeline_offline.py`) — so collecting it only imports the
+# ingestion stack for nothing.
+collect_ignore = ["test_pipeline_offline.py"]
+
+
+def pytest_collection_modifyitems(config, items):
+    """
+    Skips `@pytest.mark.live` tests unless RUN_LIVE_TESTS=1.
+
+    Live tests need real services or credentials. Without this they would fail
+    — not skip — on any machine that lacks them, which trains people to ignore
+    red runs. CI additionally deselects them with `-m "not live and not models"`.
+    """
+    if os.getenv("RUN_LIVE_TESTS", "").strip().lower() in {"1", "true", "yes"}:
+        return
+    skip_live = pytest.mark.skip(reason="live test: set RUN_LIVE_TESTS=1 to run")
+    for item in items:
+        if item.get_closest_marker("live") is not None:
+            item.add_marker(skip_live)
 
 
 @dataclass
