@@ -42,11 +42,17 @@ WORKDIR /app
 # CPU-only torch, installed first and pinned to the CPU index so the later
 # `sentence-transformers` install sees the requirement already satisfied and
 # does not pull the CUDA build over the top of it.
-RUN pip install --no-cache-dir \
+#
+# --timeout/--retries: the CPU wheel is ~200MB, and pip's default 15s read
+# timeout is shorter than one quiet stretch on a slow or throttled connection
+# to pytorch.org's CDN. Measured locally: identical ReadTimeoutError at the same
+# ~100s mark on two consecutive attempts, so this is a real connection
+# characteristic to defend against, not a one-off blip.
+RUN pip install --no-cache-dir --timeout 120 --retries 5 \
         torch --index-url https://download.pytorch.org/whl/cpu
 
 COPY --chown=user requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --timeout 120 --retries 5 -r requirements.txt
 
 COPY --chown=user . .
 
