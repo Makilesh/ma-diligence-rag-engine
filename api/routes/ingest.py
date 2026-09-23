@@ -1,23 +1,82 @@
 """
 Document ingestion routes.
+
+The route owns the HTTP concerns — upload size cap, filename handling, error
+mapping. Everything from parsing to upsert lives in
+src/data_processing/ingest_pipeline.py so the evaluation harness indexes
+through exactly the same code.
 """
 
-import uuid
+import os
+import shutil
+import tempfile
 from pathlib import Path
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 
 from api.models.response_models import IngestResponse
 from api.routes.deals import register_document
-from src.data_processing.document_classifier import DocumentClassifier
+from src.data_processing.ingest_pipeline import (
+    SUPPORTED_EXTENSIONS,
+    IngestionError,
+    index_document,
+    mark_superseded,
+    sanitize_filename,
+)
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
 router = APIRouter()
 
-# Supported file types
-SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".pptx", ".xlsx", ".xls", ".txt"}
+_READ_CHUNK_BYTES = 1024 * 1024
+
+
+def _max_upload_bytes() -> int:
+    """Upload size cap in bytes (env MAX_UPLOAD_MB, default 25)."""
+    return int(os.getenv("MAX_UPLOAD_MB", "25")) * 1024 * 1024
+
+
+async def _save_upload(file: UploadFile, dest_path: str, max_bytes: int) -> int:
+    """
+    Streams an upload to disk, enforcing the size cap while reading.
+
+    Reading in fixed-size chunks keeps memory flat regardless of what the
+    client sends, and the cap is checked before each write rather than after
+    the whole body is buffered.
+
+    Args:
+        file: The multipart upload.
+        dest_path: Where to write it.
+        max_bytes: Maximum accepted size.
+
+    Returns:
+        Number of bytes written.
+
+    Raises:
+        HTTPException: 413 when over the cap, 400 when empty.
+    """
+    too_large = HTTPException(
+        status_code=413,
+        detail=f"File exceeds the {max_bytes // (1024 * 1024)} MB upload limit",
+    )
+    if file.size is not None and file.size > max_bytes:
+        raise too_large
+
+    written = 0
+    with open(dest_path, "wb") as out:
+        while True:
+            block = await file.read(_READ_CHUNK_BYTES)
+            if not block:
+                break
+            written += len(block)
+            if written > max_bytes:
+                raise too_large
+            out.write(block)
+
+    if written == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
+    return written
 
 
 @router.post("/ingest", response_model=IngestResponse)
@@ -32,13 +91,12 @@ async def ingest_document(
     Ingests a document into the RAG pipeline.
 
     Pipeline:
-    1. Validate file type
-    2. Save to temp location
-    3. Classify document (if category not provided)
-    4. Process with appropriate processor
-    5. Chunk (structural → semantic)
-    6. Embed and index in Qdrant
-    7. Return ingestion summary
+    1. Validate filename and file type
+    2. Stream to a temp file under a generated name (size-capped)
+    3. index_document(): classify → process → chunk → embed → upsert
+       (idempotent: identical bytes in the same deal keep the same doc_id)
+    4. Retire the superseded document, if any
+    5. Return ingestion summary
 
     Args:
         file: Uploaded file.
@@ -50,375 +108,109 @@ async def ingest_document(
     Returns:
         IngestResponse with doc_id and chunk count.
     """
-    # Validate file type
-    extension = Path(file.filename).suffix.lower()
+    try:
+        filename = sanitize_filename(file.filename)
+    except IngestionError as e:
+        raise HTTPException(status_code=e.status_code, detail=str(e))
+
+    extension = Path(filename).suffix.lower()
     if extension not in SUPPORTED_EXTENSIONS:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported file type: {extension}. Supported: {SUPPORTED_EXTENSIONS}",
+            detail=(
+                f"Unsupported file type: {extension or '(none)'}. "
+                f"Supported: {', '.join(sorted(SUPPORTED_EXTENSIONS))}"
+            ),
         )
-
-    doc_id = str(uuid.uuid4())
 
     logger.info(
         "Document ingestion started",
+        extra={"deal_id": deal_id, "file_name": filename, "extension": extension},
+    )
+
+    # The client's filename never becomes part of a filesystem path; it is kept
+    # only as metadata. The generated name preserves the extension, which is
+    # all the processors need.
+    temp_dir = tempfile.mkdtemp(prefix="manda_ingest_")
+    temp_path = os.path.join(temp_dir, f"upload{extension}")
+
+    try:
+        await _save_upload(file, temp_path, _max_upload_bytes())
+        result = await index_document(
+            temp_path,
+            filename,
+            deal_id,
+            document_category,
+            is_current_version=is_current_version,
+            supersedes_doc_id=supersedes_doc_id,
+        )
+    except HTTPException:
+        raise
+    except IngestionError as e:
+        logger.warning(
+            "Document rejected",
+            extra={"deal_id": deal_id, "file_name": filename, "reason": str(e)},
+        )
+        raise HTTPException(status_code=e.status_code, detail=str(e))
+    except Exception as e:
+        # Internal detail (paths, Qdrant errors) stays in the log.
+        logger.error(
+            "Document ingestion failed",
+            extra={"deal_id": deal_id, "file_name": filename, "error": str(e)},
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Ingestion failed due to an internal error",
+        )
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+    doc_id = result["doc_id"]
+
+    # Retire the superseded document's chunks so retrieval's is_current_version=1
+    # filter stops returning them, and any citation that does surface them
+    # carries the pointer forward.
+    if supersedes_doc_id:
+        await mark_superseded(
+            deal_id=deal_id,
+            superseded_doc_id=supersedes_doc_id,
+            superseded_by=doc_id,
+        )
+
+    register_document(
+        deal_id=deal_id,
+        doc_id=doc_id,
+        filename=filename,
+        document_category=result["document_category"],
+        chunks_created=result["chunks_created"],
+        is_current_version=is_current_version,
+        supersedes_doc_id=supersedes_doc_id,
+        risk_signals=result["risk_signals"],
+    )
+
+    logger.info(
+        "AUDIT_LOG",
         extra={
+            "event": "document_ingested",
             "doc_id": doc_id,
             "deal_id": deal_id,
-            "file_name": file.filename,
-            "extension": extension,
+            "file_name": filename,
+            "category": result["document_category"],
+            "chunks_created": result["chunks_created"],
+            "parent_chunks_created": result["parent_chunks_created"],
+            "previously_indexed": result["previously_indexed"],
+            "warnings": result["warnings"],
+            "risk_signal_types": [s["signal_type"] for s in result["risk_signals"]],
+            "supersedes_doc_id": supersedes_doc_id or "",
         },
     )
 
-    # Save uploaded file temporarily
-    import tempfile
-    import os
-
-    temp_dir = tempfile.mkdtemp()
-    temp_path = os.path.join(temp_dir, file.filename)
-
-    try:
-        content = await file.read()
-        with open(temp_path, "wb") as f:
-            f.write(content)
-
-        # Auto-classify if category not provided
-        if document_category is None:
-            classifier = DocumentClassifier()
-            document_category = classifier.classify(temp_path, file.filename)
-
-        # Process based on file type
-        chunks_created, risk_signals = await _process_and_index(
-            file_path=temp_path,
-            extension=extension,
-            doc_id=doc_id,
-            deal_id=deal_id,
-            document_category=document_category,
-            is_current_version=is_current_version,
-            supersedes_doc_id=supersedes_doc_id,
-            filename=file.filename,
-        )
-
-        # Retire the superseded document's chunks so retrieval's default
-        # is_current_version=1 filter stops returning them, and any citation that
-        # does surface them (include_stale queries) carries the pointer forward.
-        if supersedes_doc_id and chunks_created:
-            await _mark_superseded(
-                deal_id=deal_id,
-                superseded_doc_id=supersedes_doc_id,
-                superseded_by=doc_id,
-            )
-
-        register_document(
-            deal_id=deal_id,
-            doc_id=doc_id,
-            filename=file.filename,
-            document_category=document_category,
-            chunks_created=chunks_created,
-            is_current_version=is_current_version,
-            supersedes_doc_id=supersedes_doc_id,
-            risk_signals=risk_signals,
-        )
-
-        logger.info(
-            "AUDIT_LOG",
-            extra={
-                "event": "document_ingested",
-                "doc_id": doc_id,
-                "deal_id": deal_id,
-                "file_name": file.filename,
-                "category": document_category,
-                "chunks_created": chunks_created,
-                "risk_signal_types": [s["signal_type"] for s in risk_signals],
-                "supersedes_doc_id": supersedes_doc_id or "",
-            },
-        )
-
-        return IngestResponse(
-            doc_id=doc_id,
-            deal_id=deal_id,
-            document_category=document_category,
-            chunks_created=chunks_created,
-            status="success",
-        )
-
-    except Exception as e:
-        logger.error(
-            "Document ingestion failed",
-            extra={"doc_id": doc_id, "error": str(e)},
-        )
-        raise HTTPException(status_code=500, detail=f"Ingestion error: {str(e)}")
-
-    finally:
-        # Cleanup temp file
-        import shutil
-        shutil.rmtree(temp_dir, ignore_errors=True)
-
-
-async def _process_and_index(
-    file_path: str,
-    extension: str,
-    doc_id: str,
-    deal_id: str,
-    document_category: str,
-    is_current_version: bool,
-    supersedes_doc_id: str | None,
-    filename: str,
-) -> tuple[int, list[dict]]:
-    """
-    Processes document and indexes chunks in Qdrant.
-
-    Args:
-        file_path: Path to the saved file.
-        extension: File extension.
-        doc_id: Document identifier.
-        deal_id: Deal identifier.
-        document_category: Document category.
-        is_current_version: Whether this is the current version.
-        supersedes_doc_id: Doc ID this version supersedes.
-        filename: Original filename.
-
-    Returns:
-        Tuple of (number of chunks created, document-level risk signal dicts).
-    """
-    from src.data_processing.structural_chunker import StructuralChunker
-    from src.data_processing.semantic_chunker import SemanticChunker
-    from src.data_processing.pii_detector import PIIDetector
-    from src.data_processing.risk_signal_extractor import RiskSignalExtractor
-    from src.vector_db.reranker import embed_texts_async
-    from src.vector_db.hybrid_search import compute_sparse_bm25
-    from src.vector_db.qdrant_client import get_qdrant_client
-    from src.vector_db.constants import COLLECTION_NAME
-    from qdrant_client.models import PointStruct, NamedVector, NamedSparseVector
-
-    # Step 1: Extract sections based on file type
-    sections = []
-
-    if extension == ".pdf":
-        from src.data_processing.pdf_processor import PDFProcessor
-        is_legal = document_category == "legal"
-        processor = PDFProcessor(legal_mode=is_legal)
-        pdf_sections = processor.process(file_path, doc_id)
-        sections = [
-            {
-                "text": s.text,
-                "section_heading": s.section_heading,
-                "page_number": s.page_number,
-                "section_type": s.section_type,
-                "is_table": s.is_table,
-                "clause_id": s.clause_id,
-            }
-            for s in pdf_sections
-        ]
-
-    elif extension == ".docx":
-        from src.data_processing.docx_processor import process_docx_with_versions
-        clean_chunks, redline_chunks = process_docx_with_versions(file_path, doc_id)
-        for chunk in clean_chunks:
-            sections.append({
-                "text": chunk.text,
-                "section_heading": chunk.section_heading,
-                "section_type": "text",
-            })
-        # TODO: Index redline chunks separately with is_redline=1
-
-    elif extension == ".pptx":
-        from src.data_processing.pptx_processor import PPTXProcessor
-        processor = PPTXProcessor()
-        slides = processor.process(file_path, doc_id)
-        sections = processor.to_text_chunks(slides)
-
-    elif extension in (".xlsx", ".xls"):
-        from src.data_processing.excel_processor import ExcelProcessor
-        processor = ExcelProcessor()
-        excel_sheets = processor.process(file_path, doc_id)
-        sections = processor.to_chunks(excel_sheets)
-
-    elif extension == ".txt":
-        with open(file_path, "r", encoding="utf-8") as f:
-            text = f.read()
-        paragraphs = text.split("\n\n")
-        for i, para in enumerate(paragraphs):
-            para = para.strip()
-            if not para:
-                continue
-            lines = para.split("\n")
-            is_table = "|" in para or ("$" in para and "------" in text[max(0, text.index(para)-100):text.index(para)])
-            sections.append({
-                "text": para,
-                "section_heading": lines[0][:100] if len(lines) > 0 else "",
-                "page_number": i // 10 + 1,
-                "section_type": "table" if is_table else "text",
-                "is_table": is_table,
-            })
-
-    if not sections:
-        return 0, []
-
-    # Step 2: Structural chunking
-    structural_chunker = StructuralChunker()
-    structural_chunks = structural_chunker.chunk(sections)
-
-    # Step 3: Semantic chunking
-    semantic_chunker = SemanticChunker()
-    semantic_chunks = semantic_chunker.chunk_batch(structural_chunks)
-
-    if not semantic_chunks:
-        return 0, []
-
-    # Step 4: PII detection
-    pii_detector = PIIDetector()
-
-    # Step 4b: Risk signal extraction (regex only — no LLM, no added latency).
-    # Signals are written per-chunk into the payload AND aggregated to document
-    # level for the risk dashboard, which reports per-document not per-chunk.
-    risk_extractor = RiskSignalExtractor()
-    chunk_risk_signals: dict[int, list[str]] = {}
-    aggregated_risk: dict[str, dict] = {}
-
-    for i, chunk in enumerate(semantic_chunks):
-        result = risk_extractor.extract(
-            chunk.text,
-            file_name=filename,
-            document_category=document_category,
-        )
-        if not result.signals:
-            continue
-
-        chunk_risk_signals[i] = result.signals
-
-        for detail in result.signal_details:
-            signal_type = detail["signal_type"]
-            entry = aggregated_risk.setdefault(
-                signal_type,
-                {
-                    "signal_type": signal_type,
-                    "match_count": 0,
-                    "sample_matches": [],
-                    "page_number": chunk.page_number,
-                },
-            )
-            entry["match_count"] += detail["match_count"]
-            for sample in detail["sample_matches"]:
-                if sample and len(entry["sample_matches"]) < 3:
-                    entry["sample_matches"].append(sample)
-
-    risk_signals = list(aggregated_risk.values())
-
-    # Step 5: Embed and index
-    texts = [c.text for c in semantic_chunks]
-    embeddings = await embed_texts_async(texts)
-
-    client = get_qdrant_client()
-    points = []
-
-    import asyncio
-    from src.vector_db.reranker import get_embed_executor
-    loop = asyncio.get_running_loop()
-
-    for i, chunk in enumerate(semantic_chunks):
-        chunk_id = f"{deal_id}_{doc_id}_{i:04d}"
-        contains_pii = pii_detector.detect(chunk.text).contains_pii
-
-        # Compute sparse BM25 vector
-        sparse_vector = await loop.run_in_executor(
-            get_embed_executor(),
-            lambda text=chunk.text: compute_sparse_bm25(text),
-        )
-
-        point = PointStruct(
-            id=hash(chunk_id) % (2**63),
-            vector={
-                "dense": embeddings[i].tolist(),
-                "sparse": sparse_vector,
-            },
-            payload={
-                "chunk_id": chunk_id,
-                "deal_id": deal_id,
-                "doc_id": doc_id,
-                "text": chunk.text,
-                "source_file": filename,
-                "document_category": document_category,
-                "section_heading": chunk.section_heading,
-                "page_number": chunk.page_number,
-                "clause_id": chunk.clause_id,
-                "is_table": chunk.metadata.get("is_table", 0) if hasattr(chunk, "metadata") else 0,
-                "is_current_version": 1 if is_current_version else 0,
-                "contains_pii": contains_pii,
-                "content_type": chunk.metadata.get("content_type", "text") if hasattr(chunk, "metadata") else "text",
-                "token_count": chunk.token_count,
-                "risk_signals": chunk_risk_signals.get(i, []),
-                "supersedes_doc_id": supersedes_doc_id or "",
-                "superseded_by": "",  # stamped later if a newer version replaces this doc
-                "is_redline": 0,
-            },
-        )
-        points.append(point)
-
-    # Batch upsert
-    batch_size = 100
-    for batch_start in range(0, len(points), batch_size):
-        batch = points[batch_start:batch_start + batch_size]
-        await client.upsert(
-            collection_name=COLLECTION_NAME,
-            points=batch,
-        )
-
-    return len(points), risk_signals
-
-
-async def _mark_superseded(
-    deal_id: str,
-    superseded_doc_id: str,
-    superseded_by: str,
-) -> None:
-    """
-    Flips every chunk of a superseded document to is_current_version=0.
-
-    Without this, uploading a replacement document leaves both versions marked
-    current, and retrieval's default is_current_version=1 filter happily returns
-    stale terms alongside the ones that replaced them — the exact failure mode
-    the version metadata exists to prevent.
-
-    Failures are logged, not raised: the new document is already indexed and
-    usable, and losing the retirement stamp degrades results rather than
-    invalidating the upload.
-
-    Args:
-        deal_id: Deal scope, so one deal can never retire another deal's docs.
-        superseded_doc_id: Document being retired.
-        superseded_by: Document ID replacing it.
-    """
-    from qdrant_client.models import Filter, FieldCondition, MatchValue
-    from src.vector_db.qdrant_client import get_qdrant_client
-    from src.vector_db.constants import COLLECTION_NAME
-
-    try:
-        client = get_qdrant_client()
-        await client.set_payload(
-            collection_name=COLLECTION_NAME,
-            payload={"is_current_version": 0, "superseded_by": superseded_by},
-            points=Filter(
-                must=[
-                    FieldCondition(key="deal_id", match=MatchValue(value=deal_id)),
-                    FieldCondition(key="doc_id", match=MatchValue(value=superseded_doc_id)),
-                ]
-            ),
-        )
-        logger.info(
-            "Superseded document retired",
-            extra={
-                "deal_id": deal_id,
-                "superseded_doc_id": superseded_doc_id,
-                "superseded_by": superseded_by,
-            },
-        )
-    except Exception as e:
-        logger.error(
-            "Failed to retire superseded document",
-            extra={
-                "deal_id": deal_id,
-                "superseded_doc_id": superseded_doc_id,
-                "error": str(e),
-            },
-        )
+    return IngestResponse(
+        doc_id=doc_id,
+        deal_id=deal_id,
+        document_category=result["document_category"],
+        chunks_created=result["chunks_created"],
+        # Some sheets failed but others indexed — say so rather than "success".
+        status="partial" if result["warnings"] else "success",
+    )

@@ -11,11 +11,19 @@ import json
 import uuid
 from collections.abc import AsyncIterator
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
+from starlette.background import BackgroundTask
 
 from api.models.request_models import QueryRequest
 from api.models.response_models import QueryResponse, Citation
+from api.security import (
+    ClientContext,
+    acquire_pipeline_slot,
+    get_request_id,
+    public_error_detail,
+    query_rate_limit,
+)
 from src.workflow.orchestrator import run_query, stream_query
 from src.utils.logger import setup_logger
 
@@ -111,20 +119,36 @@ def _require_graph():
     return graph
 
 
+def _enforce_pii_policy(request: QueryRequest, client: ClientContext) -> None:
+    """
+    Forces include_pii off for public callers.
+
+    The flag is client-set, so on a public endpoint it is a request, not an
+    authorization. Mutating the request (rather than passing a separate value)
+    keeps the audit record truthful about what was actually served.
+    """
+    if request.include_pii and not client.is_admin:
+        request.include_pii = False
+
+
 @router.post("/query", response_model=QueryResponse)
-async def query_endpoint(request: QueryRequest):
+async def query_endpoint(
+    request: QueryRequest, client: ClientContext = Depends(query_rate_limit)
+):
     """
     Main query endpoint — runs the full agentic RAG pipeline.
     Logs every query to the immutable audit log.
 
     Args:
         request: QueryRequest with query, deal_id, optional session_id.
+        client: Caller context; resolving it enforces the per-client rate limit.
 
     Returns:
         QueryResponse with answer, citations, confidence, trace.
     """
     graph = _require_graph()
     session_id = request.session_id or str(uuid.uuid4())
+    _enforce_pii_policy(request, client)
 
     logger.info(
         "Query received",
@@ -135,6 +159,7 @@ async def query_endpoint(request: QueryRequest):
         },
     )
 
+    slot = acquire_pipeline_slot(client)
     try:
         result = await run_query(
             app=graph,
@@ -148,9 +173,11 @@ async def query_endpoint(request: QueryRequest):
     except Exception as e:
         logger.error(
             "Query pipeline failed",
-            extra={"error": str(e), "deal_id": request.deal_id},
+            extra={"error": str(e), "deal_id": request.deal_id, "request_id": client.request_id},
         )
-        raise HTTPException(status_code=500, detail=f"Query pipeline error: {str(e)}")
+        raise HTTPException(status_code=500, detail=public_error_detail("Query", client.request_id))
+    finally:
+        slot.release()
 
     response = _build_response(result, session_id)
     _audit(request, response, transport="blocking")
@@ -177,7 +204,9 @@ def _sse(event: str, payload: dict) -> str:
 
 
 @router.post("/query/stream")
-async def query_stream_endpoint(request: QueryRequest):
+async def query_stream_endpoint(
+    request: QueryRequest, client: ClientContext = Depends(query_rate_limit)
+):
     """
     Streams pipeline progress as Server-Sent Events, then the finished result.
 
@@ -192,12 +221,17 @@ async def query_stream_endpoint(request: QueryRequest):
 
     Args:
         request: QueryRequest with query, deal_id, optional session_id.
+        client: Caller context; resolving it enforces the per-client rate limit.
 
     Returns:
         StreamingResponse of `text/event-stream`.
     """
     graph = _require_graph()
     session_id = request.session_id or str(uuid.uuid4())
+    _enforce_pii_policy(request, client)
+    # Taken before the response starts, so a saturated engine is a real 503
+    # status rather than an in-band error event.
+    slot = acquire_pipeline_slot(client)
 
     logger.info(
         "Streamed query received",
@@ -228,12 +262,28 @@ async def query_stream_endpoint(request: QueryRequest):
             # only way to tell the client is an in-band error event.
             logger.error(
                 "Streamed query failed",
-                extra={"error": str(e), "deal_id": request.deal_id},
+                extra={
+                    "error": str(e),
+                    "deal_id": request.deal_id,
+                    "request_id": client.request_id,
+                },
             )
-            yield _sse("error", {"detail": str(e), "session_id": session_id})
+            yield _sse(
+                "error",
+                {
+                    "detail": public_error_detail("Query", client.request_id),
+                    "session_id": session_id,
+                    "request_id": client.request_id,
+                },
+            )
+        finally:
+            slot.release()
 
     return StreamingResponse(
         event_source(),
+        # Second release path: the generator's `finally` never runs if the
+        # client drops before the first chunk. Release is idempotent.
+        background=BackgroundTask(slot.release),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache, no-transform",
@@ -247,7 +297,7 @@ async def query_stream_endpoint(request: QueryRequest):
 
 
 @router.get("/budget")
-async def get_budget_status():
+async def get_budget_status(http_request: Request):
     """Returns current API budget status for all models."""
     from src.llm.budget_tracker import BudgetTracker
 
@@ -255,4 +305,10 @@ async def get_budget_status():
         tracker = await BudgetTracker.get_instance()
         return await tracker.get_budget_status()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Budget status error: {str(e)}")
+        request_id = get_request_id(http_request)
+        logger.error(
+            "Budget status failed", extra={"error": str(e), "request_id": request_id}
+        )
+        raise HTTPException(
+            status_code=500, detail=public_error_detail("Budget status", request_id)
+        )
