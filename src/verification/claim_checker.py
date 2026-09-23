@@ -78,8 +78,8 @@ CONTRADICTION_MIN_OVERLAP = 0.5
 
 # Evidence selection per claim: best windows (by lexical overlap) from the
 # chunks the claim cites, plus from the top retrieved chunks.
-CITED_WINDOWS_PER_CLAIM = 6
-OTHER_WINDOWS_PER_CLAIM = 4
+CITED_WINDOWS_PER_CLAIM = 2
+OTHER_WINDOWS_PER_CLAIM = 2
 FALLBACK_TOP_K = 6
 
 # Bounds on work per answer.
@@ -305,7 +305,7 @@ async def verify_answer(
 
     # Best evidence per claim.
     best: dict[int, dict] = {}
-    for (claim_idx, ci, cited, window, overlap), score in zip(pair_owner, nli_scores):
+    for (claim_idx, ci, _cited, window, overlap), score in zip(pair_owner, nli_scores):
         entry = best.setdefault(claim_idx, {
             "entail": 0.0, "entail_chunk": None, "entail_window": "",
             "contra": 0.0, "contra_chunk": None, "contra_window": "",

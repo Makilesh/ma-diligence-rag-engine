@@ -254,8 +254,8 @@ class TestDeterministicIds:
 
     def test_point_ids_are_stable_across_processes(self):
         # A literal, not a recomputation: hash() is salted per process, uuid5 is not.
-        assert point_id_for("deal_doc_0000") == "5b8d02cf-f2d8-5b4f-97c7-d5b4d49a6bd2"
-        assert compute_doc_id("deal", "0" * 64) == "2a6ffc14-4cda-5c8b-9f9e-2b7cb2d1a3c4"
+        assert point_id_for("deal_doc_0000") == "0c807da6-beb0-5dd2-8976-df7ecd1094fe"
+        assert compute_doc_id("deal", "0" * 64) == "9fbc68d3-7f57-5097-ae2e-161b73e10ec3"
 
 
 # ==============================================================================

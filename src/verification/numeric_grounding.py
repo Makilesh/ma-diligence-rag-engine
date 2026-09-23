@@ -548,7 +548,7 @@ def ground_texts(texts: list[str], index: ContextIndex) -> list[list[NumericChec
             if not progressed:
                 break
 
-        for mention, check in pending:
+        for _mention, check in pending:
             if check.status != "derived" and _COMPUTATION_CUE_RE.search(text):
                 check.status = "derived_unverified"
 

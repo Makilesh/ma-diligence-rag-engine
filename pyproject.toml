@@ -1,0 +1,69 @@
+# Tool configuration only — this project is not packaged, so there is no
+# [project] table. pytest is configured in pytest.ini (kept as the single source
+# of pytest settings; do not add [tool.pytest.ini_options] here, pytest.ini
+# would silently win).
+
+[tool.ruff]
+target-version = "py311"  # matches the Dockerfiles and CI
+line-length = 100
+extend-exclude = [
+    "web",
+    "data",
+    "docker_data",
+    "qdrant_local_db",
+    "qdrant_test_db",
+    "qdrant_test_db_v2",
+    "auric-application",
+    ".remember",
+]
+
+[tool.ruff.lint]
+# pycodestyle errors + warnings, pyflakes, bugbear. Import sorting (I) and
+# pyupgrade (UP) are deliberately not enabled yet: they are pure style and
+# would mean rewriting ~90 import blocks across files other work is touching.
+select = ["E", "W", "F", "B"]
+ignore = [
+    # Long lines are mostly docstrings and comments carrying measurements and
+    # rationale; wrapping them is churn. Revisit if a formatter is adopted.
+    "E501",
+    # FastAPI's dependency-injection idiom is `x = Depends(...)` / `File(...)`
+    # in the signature — exactly what B008 flags.
+    "B008",
+    # zip() without strict=: most zips here pair lists built from the same
+    # source, and adding strict= everywhere is churn for little signal.
+    "B905",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Route modules are imported after `app` and `get_graph` exist, to break the
+# import cycle with api.routes.*.
+"api/main.py" = ["E402"]
+# `streamlit run` only puts app/ on sys.path; the path bootstrap must precede
+# the app.* imports.
+"app/streamlit_app.py" = ["E402"]
+# Blind `pytest.raises(Exception)` on paths whose exception type is incidental.
+"tests/test_rate_limiter.py" = ["B017"]
+# Standalone eval script, not part of the test suite.
+"tests/run_end_to_end_validation.py" = ["W293", "F541"]
+
+# --- Baseline: pre-existing findings in source files, grandfathered so CI is
+# green today. Each entry is scoped to the file that has it, so new code is
+# still checked. Remove an entry when the file is next touched and fixed.
+# F401 unused imports.
+"api/routes/ingest.py" = ["F401", "B904"]
+"src/agents/quality_assessor.py" = ["F401"]
+"src/agents/retrieval_executor.py" = ["F401"]
+"src/data_processing/document_classifier.py" = ["F401"]
+"src/data_processing/document_version_resolver.py" = ["F401"]
+"src/data_processing/legal_clause_segmenter.py" = ["F401"]
+"src/data_processing/multi_page_table_stitcher.py" = ["F401"]
+"src/data_processing/risk_signal_extractor.py" = ["F401"]
+"src/utils/metrics.py" = ["F401"]
+# B904 `raise ... from err` inside except.
+"api/routes/deals.py" = ["B904"]
+"api/routes/query.py" = ["B904"]
+"src/data_processing/excel_normalizer.py" = ["B904"]
+"src/llm/litellm_wrapper.py" = ["B904"]
+# B023 false positive: the `emit` closure is only ever called within the loop
+# iteration that defines it, so late binding cannot bite.
+"src/data_processing/structural_chunker.py" = ["B023"]
