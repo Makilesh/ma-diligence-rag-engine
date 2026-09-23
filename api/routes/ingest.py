@@ -12,10 +12,18 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 
+from api.models.request_models import DEAL_ID_PATTERN
 from api.models.response_models import IngestResponse
 from api.routes.deals import register_document
+from api.security import (
+    ClientContext,
+    acquire_pipeline_slot,
+    ingest_rate_limit,
+    public_error_detail,
+    require_sandbox_deal,
+)
 from src.data_processing.ingest_pipeline import (
     SUPPORTED_EXTENSIONS,
     IngestionError,
@@ -81,16 +89,20 @@ async def _save_upload(file: UploadFile, dest_path: str, max_bytes: int) -> int:
 
 @router.post("/ingest", response_model=IngestResponse)
 async def ingest_document(
+    http_request: Request,
     file: UploadFile = File(...),
-    deal_id: str = Form(...),
+    deal_id: str = Form(..., pattern=DEAL_ID_PATTERN),
     document_category: str | None = Form(None),
     is_current_version: bool = Form(True),
-    supersedes_doc_id: str | None = Form(None),
+    supersedes_doc_id: str | None = Form(None, max_length=64),
+    client: ClientContext = Depends(ingest_rate_limit),
 ):
     """
     Ingests a document into the RAG pipeline.
 
     Pipeline:
+    0. Access control: non-admin callers may only write into a live sandbox
+       deal; per-client rate limit and a pipeline slot bound CPU use
     1. Validate filename and file type
     2. Stream to a temp file under a generated name (size-capped)
     3. index_document(): classify → process → chunk → embed → upsert
@@ -104,14 +116,18 @@ async def ingest_document(
         document_category: Override category (auto-detected if not provided).
         is_current_version: Whether this is the current version.
         supersedes_doc_id: Doc ID this version supersedes.
+        http_request: Incoming request (admin check for the sandbox guard).
+        client: Caller context from the ingest rate-limit dependency.
 
     Returns:
         IngestResponse with doc_id and chunk count.
     """
+    await require_sandbox_deal(deal_id, http_request)
+
     try:
         filename = sanitize_filename(file.filename)
     except IngestionError as e:
-        raise HTTPException(status_code=e.status_code, detail=str(e))
+        raise HTTPException(status_code=e.status_code, detail=str(e)) from None
 
     extension = Path(filename).suffix.lower()
     if extension not in SUPPORTED_EXTENSIONS:
@@ -134,6 +150,9 @@ async def ingest_document(
     temp_dir = tempfile.mkdtemp(prefix="manda_ingest_")
     temp_path = os.path.join(temp_dir, f"upload{extension}")
 
+    # Ingestion spends CPU, not Gemini quota: it holds a slot but does not
+    # count toward the daily query cap.
+    slot = acquire_pipeline_slot(client, count_toward_daily_cap=False)
     try:
         await _save_upload(file, temp_path, _max_upload_bytes())
         result = await index_document(
@@ -151,19 +170,25 @@ async def ingest_document(
             "Document rejected",
             extra={"deal_id": deal_id, "file_name": filename, "reason": str(e)},
         )
-        raise HTTPException(status_code=e.status_code, detail=str(e))
+        raise HTTPException(status_code=e.status_code, detail=str(e)) from None
     except Exception as e:
         # Internal detail (paths, Qdrant errors) stays in the log.
         logger.error(
             "Document ingestion failed",
-            extra={"deal_id": deal_id, "file_name": filename, "error": str(e)},
+            extra={
+                "deal_id": deal_id,
+                "file_name": filename,
+                "error": str(e),
+                "request_id": client.request_id,
+            },
             exc_info=True,
         )
         raise HTTPException(
             status_code=500,
-            detail="Ingestion failed due to an internal error",
-        )
+            detail=public_error_detail("Ingestion", client.request_id),
+        ) from e
     finally:
+        slot.release()
         shutil.rmtree(temp_dir, ignore_errors=True)
 
     doc_id = result["doc_id"]

@@ -123,13 +123,25 @@ def route_after_quality_check(state: AgentState) -> str:
     return "query_rewriter"
 
 
+# Validations allowed per query: the first, plus one after a single re-synthesis.
+# Each retry spends a synthesis call on the scarce reasoning-model quota, so the
+# loop is bounded at one.
+MAX_VALIDATION_ATTEMPTS = 2
+
+
 def route_after_validation(state: AgentState) -> str:
     """
     Routes after hallucination validation.
 
     Routes to:
-    - "retry_synthesis": if validation failed and retries remain
-    - "end": if validation passed or max retries exhausted
+    - "retry_synthesis": if validation failed and a retry remains
+    - "end": if validation passed or the retry was already used
+
+    The validator node increments `validation_attempt` BEFORE this runs, so the
+    first validation arrives here as 1. The original guard was `< 1`, which the
+    real node output can never satisfy — the retry path was dead code, and its
+    only test set the counter to 0 by hand. `< MAX_VALIDATION_ATTEMPTS` allows
+    exactly one retry after a failed first validation.
 
     Args:
         state: Current AgentState.
@@ -139,7 +151,7 @@ def route_after_validation(state: AgentState) -> str:
     """
     if (
         state["validation_status"] == "failed"
-        and state.get("validation_attempt", 0) < 1
+        and state.get("validation_attempt", 0) < MAX_VALIDATION_ATTEMPTS
     ):
         logger.info("Validation failed, retrying synthesis")
         return "retry_synthesis"

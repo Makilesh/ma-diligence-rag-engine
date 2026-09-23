@@ -321,7 +321,7 @@ class NumericalRegistry:
             One MetricComparison per (metric, period) with 2+ distinct sources.
         """
         results = []
-        for (metric, period), entries in self._entries.items():
+        for (_metric, period), entries in self._entries.items():
             if not period:
                 continue
             sources = {e.source_file for e in entries}

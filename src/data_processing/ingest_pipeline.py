@@ -965,7 +965,12 @@ async def index_document(
     }
     logger.info(
         "Document indexed",
-        extra={k: v for k, v in result.items() if k not in ("risk_signals", "warnings")},
+        extra={
+            # "filename" is a reserved LogRecord attribute
+            "file_name": filename,
+            **{k: v for k, v in result.items()
+               if k not in ("filename", "risk_signals", "warnings")},
+        },
     )
     return result
 

@@ -236,4 +236,4 @@ class ExcelNormalizer:
                 result = result / 100.0
             return result
         except ValueError:
-            raise ValueError(f"Cannot parse '{value}' as numeric")
+            raise ValueError(f"Cannot parse '{value}' as numeric") from None

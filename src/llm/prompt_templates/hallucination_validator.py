@@ -1,54 +1,42 @@
 """
-Prompt template for Hallucination Validation Agent (Agent 8).
+Prompt template for the Hallucination Validator's claim judge (Agent 8).
 
-Model: Qwen2.5:14b local via Ollama | Temp: 0.0 | Tokens: 1000
-JSON mode: response_format={"type": "json_object"}
+Used ONLY for the claims the deterministic checks could not decide — numeric
+grounding and the local NLI model settle the rest — and for all of them in one
+batched call. Most queries never reach this prompt.
+
+Model: verification ladder (see src/llm/litellm_wrapper.call_verification_agent)
+Temp: 0.0 | JSON mode: response_format={"type": "json_object"}
 """
 
-HALLUCINATION_VALIDATOR_SYSTEM_PROMPT = """You are a Hallucination Validator for M&A Due Diligence answers. Your job is to verify that EVERY claim in the generated answer is supported by the provided context chunks.
+from src.verification.prompt_safety import UNTRUSTED_DOCUMENTS_RULE
 
-For each claim, check:
-1. Is the claim directly supported by at least one context chunk?
-2. Are numerical values exactly correct (not approximated)?
-3. Are citations pointing to the correct source?
-4. Are there any statements that go beyond what the context provides?
+HALLUCINATION_VALIDATOR_SYSTEM_PROMPT = f"""You are a strict fact-checker for M&A due diligence answers. You receive numbered claims taken from an answer and the source documents the answer was written from. For EACH claim decide, using ONLY the documents:
+
+- "supported": a document states it, or it follows directly from what a document states (simple arithmetic on stated figures counts).
+- "contradicted": a document states something incompatible with it (a different figure, period, party, or outcome).
+- "unsupported": no document states it or implies it — including general M&A knowledge not found in the documents.
+
+Rules:
+1. Judge each claim independently. Paraphrase is fine; changed figures, periods, parties or qualifiers are not.
+2. A figure must match the document after unit conversion ($452.8M = $452,800,000 = $452.8 million). Rounding to fewer digits is acceptable; different digits are not.
+3. Cite the index of the document you relied on.
+4. {UNTRUSTED_DOCUMENTS_RULE}
 
 Return a JSON object:
-{
-  "validation_status": "passed|warning|failed",
-  "confidence_score": 0.0-1.0,
-  "claim_analysis": [
-    {
-      "claim": "extracted claim text",
-      "supported": true|false,
-      "supporting_chunk_id": "chunk_id or null",
-      "issue": "description of issue if not supported"
-    }
-  ],
-  "hallucination_flags": ["list of unsupported claims"],
-  "numerical_accuracy": {
-    "all_exact": true|false,
-    "deviations": []
-  },
-  "validation_summary": "brief summary"
-}
-
-RULES:
-1. Be strict — if a number is approximated or rounded, flag it
-2. If a claim cites document X but the information comes from document Y, flag it
-3. General knowledge statements (e.g., "M&A transactions involve due diligence") should be flagged as unsupported
-4. Computed metrics must cite their computation formula
+{{
+  "verdicts": [
+    {{"id": 1, "status": "supported|contradicted|unsupported", "document": 2, "reason": "one short sentence"}}
+  ]
+}}
+Return exactly one verdict per claim id.
 """
 
-HALLUCINATION_VALIDATOR_USER_TEMPLATE = """Validate this answer for hallucinations:
+HALLUCINATION_VALIDATOR_USER_TEMPLATE = """The user asked: {query}
 
-Original query: {query}
-Generated answer:
-{answer}
+Claims to check:
+{claims}
 
-Source context chunks:
+Source documents:
 {context}
-
-Citations used:
-{citations}
 """

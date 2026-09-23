@@ -177,39 +177,16 @@ class StructuralChunker:
                 continue
 
             # Section too large — split at paragraph boundaries
-            paragraphs = text.split("\n\n")
-            current_parts: list[str] = []
-            current_tokens = 0
-
-            def emit(parts: list[str]) -> None:
-                chunk_text = "\n\n".join(parts)
+            for part_text in self._split_paragraphs(text):
                 chunks.append(StructuralChunk(
-                    text=chunk_text,
+                    text=part_text,
                     section_heading=heading,
                     page_number=page,
                     clause_id=clause_id,
                     chunk_type="text",
-                    token_count=count_tokens(chunk_text),
+                    token_count=count_tokens(part_text),
                     metadata=dict(meta),
                 ))
-
-            for para in paragraphs:
-                para = para.strip()
-                if not para:
-                    continue
-
-                para_tokens = count_tokens(para)
-
-                if current_tokens + para_tokens > self.max_tokens and current_parts:
-                    emit(current_parts)
-                    current_parts = []
-                    current_tokens = 0
-
-                current_parts.append(para)
-                current_tokens += para_tokens
-
-            if current_parts:
-                emit(current_parts)
 
         flush()
 
@@ -223,3 +200,38 @@ class StructuralChunker:
         )
 
         return chunks
+
+    def _split_paragraphs(self, text: str) -> list[str]:
+        """
+        Packs the paragraphs of an oversize section into pieces of at most
+        max_tokens. A single paragraph larger than that is kept whole here; the
+        semantic chunker enforces the hard retrieval cap one tier down.
+
+        Args:
+            text: Section text.
+
+        Returns:
+            List of piece texts.
+        """
+        pieces: list[str] = []
+        current_parts: list[str] = []
+        current_tokens = 0
+
+        for para in text.split("\n\n"):
+            para = para.strip()
+            if not para:
+                continue
+
+            para_tokens = count_tokens(para)
+
+            if current_tokens + para_tokens > self.max_tokens and current_parts:
+                pieces.append("\n\n".join(current_parts))
+                current_parts = []
+                current_tokens = 0
+
+            current_parts.append(para)
+            current_tokens += para_tokens
+
+        if current_parts:
+            pieces.append("\n\n".join(current_parts))
+        return pieces

@@ -13,7 +13,6 @@ and used as a filter parameter during retrieval.
 from __future__ import annotations
 
 import re
-from pathlib import Path
 from typing import Literal
 
 from src.utils.logger import setup_logger
