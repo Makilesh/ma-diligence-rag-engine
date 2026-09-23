@@ -31,6 +31,7 @@ DEFAULT_TARGET_TOKENS = 512
 DEFAULT_MIN_TOKENS = 128
 DEFAULT_MAX_TOKENS = 800
 DEFAULT_OVERLAP_RATIO = 0.10
+DEFAULT_PARENT_TARGET_TOKENS = 2048
 
 
 @dataclass
@@ -40,10 +41,25 @@ class SemanticChunk:
     chunk_index: int = 0
     token_count: int = 0
     section_heading: str = ""
-    page_number: int = 0
+    page_number: int | None = None  # None when the format has no pages (.txt, .docx)
     clause_id: str | None = None
     parent_text: str = ""  # For parent-child retrieval
     metadata: dict = field(default_factory=dict)
+
+
+@dataclass
+class ParentChunk:
+    """
+    A ~2048-token context window for parent-child retrieval.
+
+    Children reference their parent through metadata["parent_index"]; the
+    ingestion pipeline turns that index into a stable parent_chunk_id.
+    """
+    text: str
+    parent_index: int
+    token_count: int = 0
+    section_heading: str = ""
+    page_number: int | None = None
 
 
 class SemanticChunker:
@@ -80,7 +96,7 @@ class SemanticChunker:
         self,
         text: str,
         section_heading: str = "",
-        page_number: int = 0,
+        page_number: int | None = None,
         clause_id: str | None = None,
         metadata: dict | None = None,
     ) -> list[SemanticChunk]:
@@ -181,40 +197,112 @@ class SemanticChunker:
             if hasattr(sc, "text"):
                 text = sc.text
                 heading = getattr(sc, "section_heading", "")
-                page = getattr(sc, "page_number", 0)
+                page = getattr(sc, "page_number", None)
                 clause = getattr(sc, "clause_id", None)
                 chunk_type = getattr(sc, "chunk_type", "text")
-                metadata = getattr(sc, "metadata", {})
+                metadata = getattr(sc, "metadata", {}) or {}
             else:
                 text = sc.get("text", "")
                 heading = sc.get("section_heading", "")
-                page = sc.get("page_number", 0)
+                page = sc.get("page_number")
                 clause = sc.get("clause_id")
                 chunk_type = sc.get("chunk_type", "text")
-                metadata = sc.get("metadata", {})
+                metadata = sc.get("metadata", {}) or {}
 
             # Propagate is_table and content_type/chunk_type
             meta = dict(metadata)
             meta["chunk_type"] = chunk_type
-            
+
             # Check if this represents a table
-            is_table_flag = (
+            is_table_flag = bool(
                 chunk_type == "table"
+                or meta.get("is_table")
                 or getattr(sc, "is_table", False)
                 or (isinstance(sc, dict) and sc.get("is_table", False))
             )
-            
-            if is_table_flag:
-                meta["is_table"] = 1
-                meta["content_type"] = "table_markdown"
-            else:
-                meta["is_table"] = 0
-                meta["content_type"] = "text"
+
+            # A content_type set upstream (table_narrative, computed_metric,
+            # slide, redline, ...) is the representation type that sibling
+            # retrieval and the synthesizer rely on — only fill it in when absent.
+            meta["is_table"] = 1 if is_table_flag else 0
+            meta.setdefault("content_type", "table_text" if is_table_flag else "text")
 
             chunks = self.chunk(text, heading, page, clause, metadata=meta)
             all_chunks.extend(chunks)
 
         return all_chunks
+
+    def chunk_with_parents(
+        self,
+        structural_chunks: list,
+        parent_target_tokens: int = DEFAULT_PARENT_TARGET_TOKENS,
+    ) -> tuple[list[SemanticChunk], list[ParentChunk]]:
+        """
+        Chunks structural chunks and groups them into parent context windows.
+
+        Consecutive prose structural chunks are packed into parents of up to
+        parent_target_tokens; every child produced from them carries
+        metadata["parent_index"]. Tables and redlines get no parent: tables are
+        expanded through their table_id siblings instead, and a redline
+        duplicates clean text that already sits in a parent.
+
+        Args:
+            structural_chunks: StructuralChunk objects (or dicts) in document order.
+            parent_target_tokens: Target parent size (default 2048).
+
+        Returns:
+            Tuple of (child SemanticChunks in document order, ParentChunks).
+        """
+        children: list[SemanticChunk] = []
+        parents: list[ParentChunk] = []
+        group: list = []
+        group_tokens = 0
+
+        def _get(sc, key, default=None):
+            if isinstance(sc, dict):
+                return sc.get(key, default)
+            return getattr(sc, key, default)
+
+        def flush_group() -> None:
+            nonlocal group, group_tokens
+            if not group:
+                return
+            parent_index = len(parents)
+            parent_text = "\n\n".join(_get(sc, "text", "") for sc in group).strip()
+            parents.append(ParentChunk(
+                text=parent_text,
+                parent_index=parent_index,
+                token_count=count_tokens(parent_text),
+                section_heading=_get(group[0], "section_heading", "") or "",
+                page_number=_get(group[0], "page_number"),
+            ))
+            for child in self.chunk_batch(group):
+                child.metadata["parent_index"] = parent_index
+                children.append(child)
+            group = []
+            group_tokens = 0
+
+        for sc in structural_chunks:
+            meta = _get(sc, "metadata", {}) or {}
+            parentless = (
+                _get(sc, "chunk_type") == "table"
+                or bool(_get(sc, "is_table"))
+                or bool(meta.get("is_table"))
+                or bool(meta.get("is_redline"))
+            )
+            if parentless:
+                flush_group()
+                children.extend(self.chunk_batch([sc]))
+                continue
+
+            sc_tokens = _get(sc, "token_count", 0) or count_tokens(_get(sc, "text", ""))
+            if group and group_tokens + sc_tokens > parent_target_tokens:
+                flush_group()
+            group.append(sc)
+            group_tokens += sc_tokens
+
+        flush_group()
+        return children, parents
 
     def _split_sentences(self, text: str) -> list[str]:
         """
@@ -240,9 +328,66 @@ class SemanticChunker:
 
         return sentences
 
+    def _hard_split(self, text: str) -> list[str]:
+        """
+        Splits a single oversize unit (a long sentence or an unpunctuated table)
+        into pieces of at most max_tokens.
+
+        Splits on line breaks first — for a table that keeps whole rows
+        together — then on whitespace, then on raw token boundaries for a
+        pathological run with no whitespace at all.
+
+        Args:
+            text: Text that may exceed max_tokens.
+
+        Returns:
+            List of pieces, each within max_tokens.
+        """
+        if count_tokens(text) <= self.max_tokens:
+            return [text]
+
+        for separator in ("\n", " "):
+            units = [u for u in text.split(separator) if u.strip()]
+            if len(units) <= 1:
+                continue
+            pieces: list[str] = []
+            current: list[str] = []
+            current_tokens = 0
+            for unit in units:
+                unit_tokens = count_tokens(unit)
+                if unit_tokens > self.max_tokens:
+                    if current:
+                        pieces.append(separator.join(current))
+                        current, current_tokens = [], 0
+                    pieces.extend(self._hard_split(unit))
+                    continue
+                if current and current_tokens + unit_tokens + 1 > self.max_tokens:
+                    pieces.append(separator.join(current))
+                    current, current_tokens = [], 0
+                current.append(unit)
+                current_tokens += unit_tokens + 1  # +1 for the joining separator
+            if current:
+                pieces.append(separator.join(current))
+            return pieces
+
+        # No whitespace to split on — cut on token boundaries. The headroom
+        # absorbs drift when decoded pieces are re-tokenized.
+        from src.utils.token_counter import get_tokenizer
+        tokenizer = get_tokenizer()
+        ids = tokenizer.encode(text, add_special_tokens=False)
+        step = max(1, self.max_tokens - 8)
+        return [
+            tokenizer.decode(ids[start:start + step])
+            for start in range(0, len(ids), step)
+        ]
+
     def _build_chunks_with_overlap(self, sentences: list[str]) -> list[str]:
         """
         Builds chunks from sentences with overlap at sentence boundaries.
+
+        Guarantees: every chunk is within max_tokens (oversize sentences are
+        hard-split first), and every iteration consumes at least one new
+        sentence, so the overlap step-back can never stall the loop.
 
         Args:
             sentences: List of sentence strings.
@@ -250,23 +395,31 @@ class SemanticChunker:
         Returns:
             List of chunk text strings.
         """
+        # Enforce the cap at the unit level so no single sentence can breach it.
+        units: list[str] = []
+        for sentence in sentences:
+            units.extend(self._hard_split(sentence))
+        unit_tokens = [count_tokens(u) for u in units]
+
         chunks = []
         overlap_tokens = int(self.target_tokens * self.overlap_ratio)
 
         i = 0
-        while i < len(sentences):
+        while i < len(units):
+            chunk_start = i
             current_parts = []
             current_tokens = 0
 
             # Add sentences until target is reached
-            while i < len(sentences):
-                sent_tokens = count_tokens(sentences[i])
+            while i < len(units):
+                # +1 approximates the joining space
+                sent_tokens = unit_tokens[i] + (1 if current_parts else 0)
 
                 # Would exceed max — flush if we have content
                 if current_tokens + sent_tokens > self.max_tokens and current_parts:
                     break
 
-                current_parts.append(sentences[i])
+                current_parts.append(units[i])
                 current_tokens += sent_tokens
                 i += 1
 
@@ -274,22 +427,26 @@ class SemanticChunker:
                 if current_tokens >= self.target_tokens:
                     break
 
-            if current_parts:
-                chunks.append(" ".join(current_parts))
+            chunk_text = " ".join(current_parts)
+            if count_tokens(chunk_text) > self.max_tokens:
+                # Tokenizer merges across the joining spaces can nudge the total
+                # over the cap; re-split rather than emit an oversize chunk.
+                chunks.extend(self._hard_split(chunk_text))
+            else:
+                chunks.append(chunk_text)
 
-            # Calculate overlap — step back by overlap_tokens worth of sentences
-            if overlap_tokens > 0 and i < len(sentences):
+            # Step back ~overlap_tokens worth of sentences for the next chunk,
+            # but never back to this chunk's own start: a chunk made of a single
+            # sentence would otherwise restart on that same sentence forever.
+            if overlap_tokens > 0 and i < len(units):
                 overlap_count = 0
                 overlap_text_tokens = 0
                 j = i - 1
-                while j >= 0 and overlap_text_tokens < overlap_tokens:
-                    overlap_text_tokens += count_tokens(sentences[j])
+                while j > chunk_start and overlap_text_tokens < overlap_tokens:
+                    overlap_text_tokens += unit_tokens[j]
                     overlap_count += 1
                     j -= 1
-
-                # Step back to create overlap
-                if overlap_count > 0:
-                    i = i - overlap_count
+                i = max(i - overlap_count, chunk_start + 1)
 
         return chunks
 

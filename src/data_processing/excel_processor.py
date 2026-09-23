@@ -3,6 +3,9 @@ Excel processor using pandas + openpyxl.
 
 Extracts sheets, detects tables, normalizes with ExcelNormalizer,
 and generates 4 representations via FinancialTableConverter.
+
+Only .xlsx is supported: openpyxl cannot read the legacy binary .xls format,
+and advertising it meant every .xls upload failed.
 """
 
 from pathlib import Path
@@ -11,10 +14,18 @@ from dataclasses import dataclass, field
 import pandas as pd
 
 from src.data_processing.excel_normalizer import ExcelNormalizer, TableNormalizationMeta
-from src.data_processing.financial_table_converter import FinancialTableConverter
+from src.data_processing.financial_table_converter import (
+    FinancialTableConverter,
+    frame_from_rows,
+    representation_content_type,
+)
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
+
+
+class ExcelProcessingError(Exception):
+    """Raised when no sheet of a workbook could be processed."""
 
 
 @dataclass
@@ -23,7 +34,9 @@ class ExcelSheet:
     sheet_name: str
     dataframe: pd.DataFrame = None
     normalization_meta: TableNormalizationMeta = None
-    representations: dict = field(default_factory=dict)
+    table_id: str = ""
+    # FinancialTableConverter output: one dict per representation, all sharing table_id
+    representations: list[dict] = field(default_factory=list)
     header_rows: list[str] = field(default_factory=list)
 
 
@@ -36,26 +49,38 @@ class ExcelProcessor:
     2. Detect and extract header rows
     3. Normalize scale/currency via ExcelNormalizer
     4. Generate 4 representations via FinancialTableConverter
+
+    Sheet-level failures are recorded in `failed_sheets` and logged at error.
+    If every non-empty sheet fails, process() raises instead of returning an
+    empty list — an upload that silently yields zero chunks looks like success.
     """
 
     def __init__(self):
         self._normalizer = ExcelNormalizer()
         self._converter = FinancialTableConverter()
+        self.failed_sheets: list[dict] = []
 
-    def process(self, excel_path: str, doc_id: str) -> list[ExcelSheet]:
+    def process(
+        self,
+        excel_path: str,
+        doc_id: str,
+        table_id_prefix: str | None = None,
+    ) -> list[ExcelSheet]:
         """
         Processes an Excel file into structured sheet objects.
 
         Args:
             excel_path: Absolute path to the Excel file.
             doc_id: Document identifier for metadata.
+            table_id_prefix: Prefix for per-sheet table_ids (default: doc_id).
+                The ingestion pipeline passes "{deal_id}_{doc_id}".
 
         Returns:
             List of ExcelSheet objects with normalized data and representations.
 
         Raises:
             FileNotFoundError: If excel_path does not exist.
-            ValueError: If file contains no readable sheets.
+            ExcelProcessingError: If sheets had content but none could be processed.
         """
         path = Path(excel_path)
         if not path.exists():
@@ -66,27 +91,39 @@ class ExcelProcessor:
             extra={"path": excel_path, "doc_id": doc_id},
         )
 
-        # Read all sheets
-        xl = pd.ExcelFile(excel_path, engine="openpyxl")
-        sheets: list[ExcelSheet] = []
+        prefix = table_id_prefix or doc_id
+        self.failed_sheets = []
 
-        for sheet_name in xl.sheet_names:
-            try:
-                sheet = self._process_sheet(xl, sheet_name, doc_id)
-                if sheet is not None:
-                    sheets.append(sheet)
-            except Exception as e:
-                logger.warning(
-                    f"Failed to process sheet '{sheet_name}'",
-                    extra={"error": str(e), "doc_id": doc_id},
-                )
-                continue
+        # Read all sheets
+        sheets: list[ExcelSheet] = []
+        with pd.ExcelFile(excel_path, engine="openpyxl") as xl:
+            for seq, sheet_name in enumerate(xl.sheet_names):
+                try:
+                    sheet = self._process_sheet(
+                        xl, sheet_name, doc_id, table_id=f"{prefix}_t{seq:03d}"
+                    )
+                    if sheet is not None:
+                        sheets.append(sheet)
+                except Exception as e:
+                    logger.error(
+                        f"Failed to process sheet '{sheet_name}'",
+                        extra={"error": str(e), "doc_id": doc_id},
+                        exc_info=True,
+                    )
+                    self.failed_sheets.append({"sheet_name": sheet_name, "error": str(e)})
+
+        if not sheets and self.failed_sheets:
+            raise ExcelProcessingError(
+                f"None of {len(self.failed_sheets)} sheet(s) could be processed: "
+                + "; ".join(f"{f['sheet_name']}: {f['error']}" for f in self.failed_sheets)
+            )
 
         logger.info(
             "Excel processing complete",
             extra={
                 "doc_id": doc_id,
                 "total_sheets": len(sheets),
+                "failed_sheets": [f["sheet_name"] for f in self.failed_sheets],
                 "sheet_names": [s.sheet_name for s in sheets],
             },
         )
@@ -98,6 +135,7 @@ class ExcelProcessor:
         xl: pd.ExcelFile,
         sheet_name: str,
         doc_id: str,
+        table_id: str,
     ) -> ExcelSheet | None:
         """
         Processes a single sheet.
@@ -106,6 +144,7 @@ class ExcelProcessor:
             xl: Open ExcelFile object.
             sheet_name: Name of the sheet to process.
             doc_id: Document identifier.
+            table_id: Identifier shared by all representations of this sheet.
 
         Returns:
             ExcelSheet object or None if sheet is empty.
@@ -131,9 +170,7 @@ class ExcelProcessor:
                     break
 
         # Re-read with detected header row
-        df = pd.read_excel(
-            xl, sheet_name=sheet_name, header=header_row_idx, engine="openpyxl"
-        )
+        df = pd.read_excel(xl, sheet_name=sheet_name, header=header_row_idx)
 
         # Drop completely empty rows/columns
         df = df.dropna(how="all").dropna(axis=1, how="all")
@@ -157,18 +194,37 @@ class ExcelProcessor:
         # Normalize scale and currency
         norm_meta = self._normalizer.detect_scale(all_header_context)
 
-        # Generate 4 representations
-        representations = self._converter.convert(
-            df=df,
-            sheet_name=sheet_name,
-            normalization_meta=norm_meta,
-            doc_id=doc_id,
-        )
+        # The converter expects row labels as the index and periods as columns;
+        # the first sheet column holds the line-item labels.
+        table_df = frame_from_rows(header_cells, df.values.tolist())
+        if table_df is not None:
+            representations = self._converter.generate_all_representations(
+                df=table_df,
+                meta=norm_meta,
+                table_id=table_id,
+                source_metadata={"sheet_name": sheet_name},
+            )
+        else:
+            # No numeric table (a notes or assumptions sheet): index the cells
+            # verbatim rather than inventing financial representations.
+            lines = [" | ".join(header_cells)] + [
+                " | ".join("" if pd.isna(v) else str(v) for v in row)
+                for row in df.values.tolist()
+            ]
+            representations = [{
+                "text": "\n".join(lines),
+                "table_representation": "verbatim",
+                "table_id": table_id,
+                "currency": norm_meta.currency,
+                "scale_factor": norm_meta.scale_factor,
+                "scale_label": norm_meta.scale_label,
+            }]
 
         return ExcelSheet(
             sheet_name=sheet_name,
-            dataframe=df,
+            dataframe=table_df,
             normalization_meta=norm_meta,
+            table_id=table_id,
             representations=representations,
             header_rows=header_cells,
         )
@@ -187,37 +243,45 @@ class ExcelProcessor:
 
     def to_chunks(self, sheets: list[ExcelSheet]) -> list[dict]:
         """
-        Converts ExcelSheet objects to chunks for the ingestion pipeline.
-        Each representation becomes a separate chunk with shared table_id.
+        Converts ExcelSheet objects to sections for the ingestion pipeline.
+        Each representation becomes a separate section sharing the sheet's
+        table_id, so sibling retrieval can pull every representation back.
 
         Args:
             sheets: List of ExcelSheet from process().
 
         Returns:
-            List of chunk dicts ready for embedding and indexing.
+            List of section dicts ready for chunking.
         """
         chunks = []
         for sheet in sheets:
-            for rep_type, rep_text in sheet.representations.items():
-                if not rep_text:
+            for rep in sheet.representations:
+                rep_type = rep["table_representation"]
+                text = rep.get("text", "")
+                # A metrics summary with no computable metric is only its title.
+                if rep_type == "metrics_summary" and not rep.get("metrics"):
                     continue
-                chunks.append({
-                    "text": rep_text,
-                    "sheet_name": sheet.sheet_name,
-                    "content_type": f"table_{rep_type}",
+                if not text.strip():
+                    continue
+                chunk = {
+                    "text": f"{sheet.sheet_name}\n{text}",
+                    "section_heading": sheet.sheet_name,
+                    "page_number": None,
+                    "section_type": "table",
                     "is_table": 1,
-                    "currency": (
-                        sheet.normalization_meta.currency
-                        if sheet.normalization_meta else "UNKNOWN"
+                    "sheet_name": sheet.sheet_name,
+                    "table_id": sheet.table_id,
+                    "table_representation": rep_type,
+                    "content_type": (
+                        "table_text" if rep_type == "verbatim"
+                        else representation_content_type(rep_type)
                     ),
-                    "scale_factor": (
-                        sheet.normalization_meta.scale_factor
-                        if sheet.normalization_meta else 1.0
-                    ),
-                    "scale_label": (
-                        sheet.normalization_meta.scale_label
-                        if sheet.normalization_meta else "units"
-                    ),
-                })
+                    "currency": rep.get("currency", "UNKNOWN"),
+                    "scale_factor": rep.get("scale_factor", 1.0),
+                    "scale_label": rep.get("scale_label", "units"),
+                }
+                if rep.get("metrics"):
+                    chunk["metrics"] = rep["metrics"]
+                chunks.append(chunk)
 
         return chunks
