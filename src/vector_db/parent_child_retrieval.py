@@ -31,6 +31,7 @@ from qdrant_client.models import (
 )
 
 from src.vector_db.constants import (
+    COLLECTION_NAME,
     PARENT_COLLECTION_NAME,
     QDRANT_MAX_RETRIES,
     QDRANT_BASE_DELAY_S,
@@ -49,6 +50,9 @@ async def expand_context(
     include_siblings: bool = True,
     client: AsyncQdrantClient | None = None,
     include_pii: bool = False,
+    deal_id: str | None = None,
+    collection_name: str = COLLECTION_NAME,
+    parent_collection_name: str = PARENT_COLLECTION_NAME,
 ) -> list[dict]:
     """
     Expands reranked chunks with parent context and table siblings.
@@ -68,6 +72,11 @@ async def expand_context(
         include_siblings: Whether to fetch table siblings (from retrieval config).
         client: AsyncQdrantClient. If None, uses get_qdrant_client().
         include_pii: Compliance authorization override. If False, filters out PII content.
+        deal_id: Deal scope applied to parent and sibling lookups (defence in
+                 depth — ids already embed the deal). When None it is derived
+                 from the chunks' own deal_id payloads.
+        collection_name: Child collection (for sibling lookups).
+        parent_collection_name: Parent collection.
     Returns:
         Expanded list of chunk dicts. Each chunk that has a parent gets a
         "parent_text" key added. Table chunks are augmented with sibling
@@ -103,7 +112,15 @@ async def expand_context(
                 extra={"parent_id_count": len(parent_ids)},
             )
 
+            deal_scope = (
+                [deal_id] if deal_id
+                else sorted({c["deal_id"] for c in chunks if c.get("deal_id")})
+            )
             must_conditions = [
+                FieldCondition(
+                    key="deal_id",
+                    match=MatchAny(any=deal_scope),
+                ),
                 FieldCondition(
                     key="chunk_id",
                     match=MatchAny(any=parent_ids),
@@ -124,7 +141,7 @@ async def expand_context(
                 try:
                     op_start = time.monotonic()
                     parent_results = await client.scroll(
-                        collection_name=PARENT_COLLECTION_NAME,
+                        collection_name=parent_collection_name,
                         scroll_filter=Filter(must=must_conditions),
                         limit=len(parent_ids),
                         with_payload=True,
@@ -190,6 +207,8 @@ async def expand_context(
             required_representations=["narrative", "row_by_row", "metrics_summary", "markdown"],
             client=client,
             include_pii=include_pii,
+            deal_id=deal_id,
+            collection_name=collection_name,
         )
 
     elapsed_ms = (time.monotonic() - start) * 1000

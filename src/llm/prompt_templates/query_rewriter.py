@@ -25,7 +25,7 @@ Return a JSON object:
 {
   "rewritten_query": "improved query text",
   "alternative_formulations": ["alt1", "alt2"],
-  "updated_metadata_filters": {},
+  "updated_metadata_filters": {"document_category": "legal or null to remove the category filter"},
   "updated_retrieval_config": {
     "dense_weight": 0.5,
     "sparse_weight": 0.5,
@@ -37,10 +37,12 @@ Return a JSON object:
 RULES:
 1. Focus on addressing the specific missing_aspects
 2. Try different vocabulary, more specific terms, or broader scope
-3. Adjust weights if semantic (dense) vs keyword (sparse) balance seems wrong
-4. Increase top_k values if too few results were retrieved
-5. Lower reranker_threshold if good results are being filtered out
-6. NEVER include "include_pii" in updated_metadata_filters
+3. Adjust weights if semantic (dense) vs keyword (sparse) balance seems wrong (each 0.0-1.0)
+4. Increase top_k values if too few results were retrieved (top_k_dense / top_k_sparse 5-100, reranker_top_k 5-50, final_top_k 3-20)
+5. Lower reranker_threshold (0.0-0.9) if good results are being filtered out
+6. updated_metadata_filters may only set document_category (financial|legal|board|audit|regulatory|operational|other, or null to remove it)
+7. NEVER include "include_pii" in updated_metadata_filters
+8. Values outside these ranges are clamped and unknown keys are ignored
 """
 
 QUERY_REWRITER_USER_TEMPLATE = """Rewrite this query to improve retrieval:
