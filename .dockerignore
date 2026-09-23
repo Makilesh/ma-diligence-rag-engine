@@ -7,9 +7,8 @@
 
 # Live database state — locked while containers run, and never needed in an image
 docker_data/
-qdrant_local_db/
-qdrant_test_db/
-qdrant_test_db_v2/
+qdrant_*db/
+qdrant_*db_*/
 
 # Secrets — the image must receive keys via the environment, never baked in
 .env
@@ -20,12 +19,14 @@ qdrant_test_db_v2/
 .venv/
 venv/
 
-# VCS and editor state
+# VCS, editor and agent-tooling state
 .git/
 .gitignore
 .github/
 .idea/
 .vscode/
+.claude/
+.remember/
 
 # Python caches and test artifacts
 __pycache__/
@@ -45,13 +46,23 @@ models/
 
 # Logs and scratch
 *.log
+**/*.log
 logs/
 scratchpad/
 
 # Deal documents are mounted at runtime via the ./data volume, not copied in
 data/
 
+# Private notes and job-application material — never belong in a pushed image
+ppp.md
+PROJECT_KNOWLEDGE_BASE.md
+questions_mock.md
+ai_engineer_interview_guide.md
+auric*
+
 # Frontend — deployed separately to Vercel, and never imported by the API. Its
 # node_modules alone is several hundred MB of build context the backend image
-# would copy and never open.
+# would copy and never open. (node_modules is listed on its own as well, so it
+# stays out even if web/ is ever re-included for a frontend image.)
 web/
+web/node_modules/
