@@ -1,0 +1,88 @@
+{
+  "_provenance": {
+    "about": "Agent 1 (src/agents/query_intelligence.py) output for each golden question, cached so the retrieval eval is deterministic and makes no LLM calls. Consumed by eval/run_retrieval_eval.py (production_decomp ablation). An entry whose `query` no longer matches the golden set is ignored.",
+    "generator": "python -m eval.generate_sub_questions",
+    "generated_at": "2026-09-23T09:24:32+00:00",
+    "golden_set_sha256": "a192d34a93c330963ff0fbec68c33264b08205c194844905fe0b82c398f05005",
+    "models": [
+      "gemini/gemini-3.5-flash-lite"
+    ]
+  },
+  "questions": {
+    "fin_01": {
+      "query": "What was Aurora's total revenue in FY2023 and how does it compare to FY2022?",
+      "golden_query_type": "financial",
+      "query_type": "comparative",
+      "sub_questions": [
+        "What was Aurora's total revenue in FY2023?",
+        "What was Aurora's total revenue in FY2022?"
+      ],
+      "reformulated_query": "What is Aurora's total revenue for FY2023 and how does it compare numerically and percentage-wise to its total revenue in FY2022?",
+      "model": "gemini/gemini-3.5-flash-lite"
+    },
+    "fin_02": {
+      "query": "What is the EBITDA and Adjusted EBITDA for FY2023?",
+      "golden_query_type": "financial",
+      "query_type": "financial",
+      "sub_questions": [],
+      "reformulated_query": "What are the reported EBITDA and Adjusted EBITDA figures for fiscal year 2023?",
+      "model": "gemini/gemini-3.5-flash-lite"
+    },
+    "fin_03": {
+      "query": "What is the company's free cash flow for FY2023 and what were the components?",
+      "golden_query_type": "financial",
+      "query_type": "financial",
+      "sub_questions": [],
+      "reformulated_query": "What is the company's free cash flow for FY2023, and what are the specific cash flow components and capital expenditure figures that comprise it?",
+      "model": "gemini/gemini-3.5-flash-lite"
+    },
+    "fin_04": {
+      "query": "What is the Net Debt/EBITDA leverage ratio and how has it changed?",
+      "golden_query_type": "financial",
+      "query_type": "financial",
+      "sub_questions": [
+        "What is the total net debt of Aurora for the applicable periods?",
+        "What is the EBITDA of Aurora for the applicable periods?",
+        "What was the leverage ratio in prior comparable periods?"
+      ],
+      "reformulated_query": "What is the current Net Debt to EBITDA leverage ratio for Aurora and how has this ratio changed compared to prior fiscal periods?",
+      "model": "gemini/gemini-3.5-flash-lite"
+    },
+    "fin_05": {
+      "query": "What are the terms of the company's revolving credit facility?",
+      "golden_query_type": "financial",
+      "query_type": "legal",
+      "sub_questions": [],
+      "reformulated_query": "What are the key terms, borrowing capacity, interest rates, and financial covenants of the company's revolving credit facility?",
+      "model": "gemini/gemini-3.5-flash-lite"
+    },
+    "legal_01": {
+      "query": "What is the per share merger consideration and what premium does it represent?",
+      "golden_query_type": "legal",
+      "query_type": "comparative",
+      "sub_questions": [
+        "What is the per-share merger consideration in the Vertex acquisition agreement?",
+        "What was the unaffected trading price of the target company's stock prior to the transaction announcement?",
+        "What is the calculated percentage premium represented by the per-share merger consideration over the unaffected share price?"
+      ],
+      "reformulated_query": "What is the agreed per-share merger consideration for the Vertex transaction, and what is the exact percentage premium this price represents over the target's unaffected share price?",
+      "model": "gemini/gemini-3.5-flash-lite"
+    },
+    "legal_02": {
+      "query": "What are the termination fee provisions?",
+      "golden_query_type": "legal",
+      "query_type": "legal",
+      "sub_questions": [],
+      "reformulated_query": "What are the termination fee provisions, including payment triggers, amounts, and conditions, specified in the legal agreements?",
+      "model": "gemini/gemini-3.5-flash-lite"
+    },
+    "legal_03": {
+      "query": "What are the indemnification caps and deductible?",
+      "golden_query_type": "legal",
+      "query_type": "legal",
+      "sub_questions": [],
+      "reformulated_query": "What are the specific indemnification caps and deductible amounts outlined in the acquisition agreement?",
+      "model": "gemini/gemini-3.5-flash-lite"
+    }
+  }
+}
