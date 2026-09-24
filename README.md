@@ -1,12 +1,14 @@
-# M&A Due Diligence Intelligence Engine
+# Redline
 
-[![CI](https://github.com/Makilesh/M-A/actions/workflows/ci.yml/badge.svg)](https://github.com/Makilesh/M-A/actions/workflows/ci.yml)
+**Evidence-grounded M&A due diligence.** Ask a question of a deal's data room; get an answer where every claim is traced to its source and every figure is checked against it — or a clear statement of what the documents don't say.
+
+[![CI](https://github.com/Makilesh/redline-diligence/actions/workflows/ci.yml/badge.svg)](https://github.com/Makilesh/redline-diligence/actions/workflows/ci.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![Vector Database](https://img.shields.io/badge/vector__db-Qdrant-red.svg)](https://qdrant.tech/)
 [![Orchestration](https://img.shields.io/badge/orchestration-LangGraph-purple.svg)](https://github.com/langchain-ai/langgraph)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-A **hybrid agentic RAG engine for M&A (mergers & acquisitions) due diligence**. It ingests a multi-format data room — financial statements, merger agreements, board decks, credit agreements — and answers questions that require combining facts across several documents, with every claim traced to a source and checked against it.
+Redline is a **hybrid agentic RAG engine for M&A (mergers & acquisitions) due diligence**. It ingests a multi-format data room — financial statements, merger agreements, board decks, credit agreements — and answers questions that require combining facts across several documents. The name is the term of art for a marked-up contract draft; the engine tracks redlines as first-class metadata.
 
 The design constraint that shapes everything: **in due diligence a wrong number is a hard failure, not graceful degradation.** A reviewer told "I can't find this" loses a minute. A reviewer given a confident, wrong EBITDA figure can misprice a deal. So the engine is built to refuse, every figure in an answer is checked against the source text, and refusal is measured as carefully as accuracy.
 
@@ -229,7 +231,7 @@ The hosted demo runs on free tiers and is open to anyone, so the API assumes it 
 | **Database** | PostgreSQL | Quota tracking, LangGraph checkpoints |
 | **Observability** | Langfuse (optional) | LLM call tracing via LiteLLM callbacks when keys are set |
 
-Hosted on free tiers end to end — Vercel, a Hugging Face Space, Qdrant Cloud and Neon. See [`DEPLOYMENT.md`](DEPLOYMENT.md).
+Deployed as a Next.js frontend on Vercel and a single Linux VM running the API, Qdrant and Postgres behind Caddy (automatic HTTPS) via `docker-compose.prod.yml`. See [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
 ---
 
@@ -241,6 +243,7 @@ Docker and Python 3.11+.
 ### 2. Setup
 
 ```bash
+git clone https://github.com/Makilesh/redline-diligence.git && cd redline-diligence
 cp .env.example .env
 # Edit .env — add GEMINI_API_KEYS (one or more, comma-separated) and the DB password
 

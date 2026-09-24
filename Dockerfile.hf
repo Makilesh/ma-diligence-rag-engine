@@ -1,4 +1,5 @@
-# Backend image for Hugging Face Spaces (Docker SDK, free CPU tier).
+# CPU backend image: used by docker-compose.prod.yml on a VM (see DEPLOYMENT.md),
+# and runnable unchanged as a Hugging Face Space (Docker SDK).
 #
 # The free tier gives 2 vCPU / 16GB RAM / 50GB disk, which is the only free host
 # that fits this workload at all — bge-m3 alone is 2.27GB resident, so the 512MB

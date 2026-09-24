@@ -1,0 +1,30 @@
+# Public entrypoint for the API (docker-compose.prod.yml).
+#
+# Caddy obtains and renews the TLS certificate for $DOMAIN on its own; the only
+# requirements are that the name resolves to this machine and ports 80 and 443
+# are reachable from the internet (both the cloud firewall and the host's).
+
+{$DOMAIN} {
+	# Uploads are capped at MAX_UPLOAD_MB (default 25) by the API itself; this
+	# rejects anything absurd before it is streamed across the proxy at all.
+	request_body {
+		max_size 30MB
+	}
+
+	# No `encode` directive on purpose: compressing the /query/stream SSE
+	# response buffers it, and the pipeline timeline would arrive all at once.
+	# Caddy flushes text/event-stream responses immediately without one.
+	reverse_proxy api:7860
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
