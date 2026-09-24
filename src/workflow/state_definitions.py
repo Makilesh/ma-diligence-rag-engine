@@ -58,8 +58,12 @@ class AgentState(TypedDict):
     # ==================== Quality ====================
     context_quality_score: float
     quality_breakdown: dict
-    quality_method: Literal["heuristic", "llm"]
+    quality_method: Literal["heuristic", "heuristic+laya", "laya", "llm"]
     missing_aspects: list[str]
+    # Laya found no facet of the question stated in the best passages. Routes
+    # like a failed quality check even when the reranker scores pass — see
+    # src/decisions/answerability.py.
+    answerability_veto: bool
 
     # ==================== Self-Correction ====================
     # ⚠ Do NOT use lambdas here: PostgresSaver requires picklable reducers.

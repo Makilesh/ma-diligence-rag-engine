@@ -508,15 +508,21 @@ def _summarize_stage(node: str, delta: dict) -> tuple[str, dict]:
         score = delta.get("context_quality_score", 0.0)
         missing = delta.get("missing_aspects") or []
         method = delta.get("quality_method", "heuristic")
+        breakdown = delta.get("quality_breakdown", {}) or {}
         summary = f"Context quality {score:.2f} ({method})"
-        if missing:
+        if delta.get("answerability_veto"):
+            # The reranker alone would have passed this; say why it did not.
+            summary += " - relevant passages do not state the answer"
+        elif missing:
             plural = "s" if len(missing) > 1 else ""
             summary += f" - {len(missing)} aspect{plural} missing"
         return summary, {
             "score": score,
             "method": method,
             "missing_aspects": missing,
-            "breakdown": delta.get("quality_breakdown", {}),
+            "breakdown": breakdown,
+            "answerability": breakdown.get("answerability"),
+            "answerability_veto": bool(delta.get("answerability_veto", False)),
         }
 
     if node == "query_rewriter":

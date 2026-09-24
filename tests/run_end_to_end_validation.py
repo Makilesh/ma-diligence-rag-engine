@@ -7,6 +7,9 @@ import time
 from pathlib import Path
 import httpx
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from src.utils.admin_client import admin_headers  # noqa: E402
+
 # The harness echoes each answer to stdout, and answers carry the synthesizer's
 # citation emoji. On Windows the console defaults to cp1252, which cannot encode
 # them: the print raises UnicodeEncodeError, the exception is caught as a query
@@ -306,7 +309,9 @@ async def main():
     print("M&A DUE DILIGENCE ENGINE -- END-TO-END VALIDATION RUN")
     print("=====================================================")
     
-    async with httpx.AsyncClient() as client:
+    # The run is 41 queries back to back — an operator workload, not a visitor's,
+    # so it authenticates past the per-IP limits when an admin key is configured.
+    async with httpx.AsyncClient(headers=admin_headers()) as client:
         # Step 1: Wait for API to be healthy
         print("Checking API connection...")
         healthy = False

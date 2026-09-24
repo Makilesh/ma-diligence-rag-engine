@@ -100,7 +100,10 @@ def route_after_quality_check(state: AgentState) -> str:
     score = state["context_quality_score"]
     iteration = state["rewrite_iteration"]
 
-    if score >= 0.3 and _meets_type_threshold(state):
+    # The thresholds read reranker relevance; an answerability veto says the
+    # relevant passages still do not state what was asked, so it overrides them.
+    vetoed = bool(state.get("answerability_veto", False))
+    if score >= 0.3 and _meets_type_threshold(state) and not vetoed:
         logger.info(
             "Quality check passed, routing to synthesizer",
             extra={"score": score, "iteration": iteration},
@@ -118,7 +121,7 @@ def route_after_quality_check(state: AgentState) -> str:
 
     logger.info(
         "Quality insufficient, routing to rewriter",
-        extra={"score": score, "iteration": iteration},
+        extra={"score": score, "iteration": iteration, "answerability_veto": vetoed},
     )
     return "query_rewriter"
 
