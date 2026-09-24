@@ -4,7 +4,8 @@ Ingestion pipeline — file → sections → chunks → embeddings → Qdrant.
 This is the single code path behind POST /ingest and the one an evaluation
 harness calls directly, so what gets measured is what gets served:
 
-    extract_and_chunk()   pure CPU work, no models, no network — testable alone
+    extract_and_chunk()   parse, chunk, PII/risk/category (Laya when enabled; none
+                          with LAYA_ENABLED=0) — testable alone
     index_document()      extract_and_chunk + embed + BM25 + upsert (async)
 
 Identity is content-derived. doc_id = uuid5(deal_id, sha256(file bytes)) and
@@ -18,9 +19,16 @@ Payload fields written per child chunk (see _child_payload):
     .docx, .xlsx), clause_id, is_table, content_type, table_id (tables only),
     table_representation (converter tables only), parent_chunk_id (prose only),
     chunk_index, token_count, is_current_version, contains_pii, risk_signals,
-    supersedes_doc_id, superseded_by, is_redline, plus format extras
-    (sheet_name, currency, scale_factor, scale_label, slide_number, page_range,
-    metrics, redline_base_doc_id).
+    risk_decisions, pii_source, pii_confidence, supersedes_doc_id,
+    superseded_by, is_redline, plus format extras (sheet_name, currency,
+    scale_factor, scale_label, slide_number, page_range, metrics,
+    redline_base_doc_id).
+
+risk_signals stays a list of type strings (what filters and the dashboard
+read). risk_decisions records how each was decided — {type: {"source":
+"regex" | "laya" | "regex+laya", "confidence": Laya P or None, "accepted":
+bool}} — including regex matches Laya overruled (accepted=False), so a
+dropped signal is auditable rather than silently gone.
 """
 
 from __future__ import annotations
@@ -52,6 +60,8 @@ from src.data_processing.semantic_chunker import (
 )
 from src.data_processing.structural_chunker import StructuralChunker
 from src.data_processing.text_processor import parse_text_sections
+from src.decisions import ingest_signals
+from src.decisions.laya_client import LayaUnavailable, laya_enabled
 from src.vector_db.constants import (
     COLLECTION_NAME,
     PARENT_COLLECTION_NAME,
@@ -150,6 +160,8 @@ class ExtractedDocument:
     risk_signals: list[dict] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     has_redline: bool = False
+    category_source: str = "rules"  # "override" | "laya" | "rules"
+    category_confidence: float | None = None
 
 
 # ==============================================================================
@@ -544,6 +556,9 @@ def _child_payload(
     contains_pii: int,
     risk_signals: list[str],
     parent_chunk_id: str | None,
+    risk_decisions: dict[str, dict] | None = None,
+    pii_source: str = "regex",
+    pii_confidence: float | None = None,
 ) -> dict:
     """
     Builds the Qdrant payload for one child chunk.
@@ -558,6 +573,9 @@ def _child_payload(
         contains_pii: 0/1 PII flag.
         risk_signals: Risk signal types detected in this chunk.
         parent_chunk_id: Parent chunk id, or None for tables/redlines.
+        risk_decisions: How each risk signal was decided (see module docstring).
+        pii_source: "regex" or "regex+laya".
+        pii_confidence: Laya's P(PII) when it was consulted.
 
     Returns:
         Payload dict.
@@ -581,6 +599,9 @@ def _child_payload(
         "is_current_version": 1 if is_current_version else 0,
         "contains_pii": contains_pii,
         "risk_signals": risk_signals,
+        "risk_decisions": risk_decisions or {},
+        "pii_source": pii_source,
+        "pii_confidence": pii_confidence,
         "supersedes_doc_id": supersedes_doc_id or "",
         "superseded_by": "",  # stamped later if a newer version replaces this doc
         "is_redline": int(meta.get("is_redline", 0)),
@@ -593,6 +614,55 @@ def _child_payload(
         if meta.get(key) is not None:
             payload[key] = meta[key]
     return payload
+
+
+def _laya_chunk_scores(
+    texts: list[str],
+    regex_risk: list,
+    filename: str,
+) -> tuple[list[ingest_signals.ChunkScores] | None, bool]:
+    """
+    Runs the enabled Laya ingest questions over every chunk of one document.
+
+    One request per chunk carries all of that chunk's questions (risk and PII
+    together). In "confirm" risk mode a chunk is asked only about the categories
+    its regex matched, so a chunk with no match and PII off costs nothing.
+
+    Args:
+        texts: Child chunk texts.
+        regex_risk: RiskSignalResult per chunk from the regex pass.
+        filename: For logging.
+
+    Returns:
+        (scores, risk_used): scores is None when Laya is off or unavailable —
+        the caller keeps the regex results; risk_used says whether the scores
+        carry risk judgements to apply.
+    """
+    use_risk = ingest_signals.laya_risk_enabled()
+    use_pii = ingest_signals.laya_pii_enabled()
+    if not texts or not laya_enabled() or not (use_risk or use_pii):
+        return None, False
+
+    risk_categories = None
+    mode = None
+    if use_risk:
+        mode = ingest_signals.risk_mode()
+        risk_categories = (
+            [None] * len(texts) if mode == "union" else [r.signals for r in regex_risk]
+        )
+    try:
+        scores = ingest_signals.score_chunks(texts, risk_categories=risk_categories, pii=use_pii)
+    except LayaUnavailable as e:
+        logger.warning(
+            "Laya unavailable at ingest; keeping regex risk and PII results",
+            extra={"file_name": filename, "error": str(e)},
+        )
+        return None, False
+    logger.info(
+        "Laya ingest decisions applied",
+        extra={"file_name": filename, "chunks": len(texts), "risk_mode": mode, "pii": use_pii},
+    )
+    return scores, use_risk
 
 
 def extract_and_chunk(
@@ -608,9 +678,10 @@ def extract_and_chunk(
     """
     Extracts, chunks and annotates a document — everything short of embedding.
 
-    Synchronous and CPU-bound (parsing, tokenising, PII and risk regexes):
-    call it through asyncio.to_thread from async code. No models are loaded
-    and no network is used, so it is directly unit-testable.
+    Synchronous and CPU-bound (parsing, tokenising, PII and risk regexes, and
+    the Laya decision model when enabled): call it through asyncio.to_thread
+    from async code. With LAYA_ENABLED=0 no model is loaded and no network is
+    used, so it is directly unit-testable.
 
     Args:
         file_path: Path to the file on disk (any name; the format is taken
@@ -643,11 +714,14 @@ def extract_and_chunk(
     content_sha256 = compute_content_hash(file_path)
     doc_id = doc_id or compute_doc_id(deal_id, content_sha256)
 
+    category_source, category_confidence = "override", None
     if document_category is None:
-        document_category = DocumentClassifier().classify(
-            file_name=filename,
-            file_type=extension.lstrip("."),
-            content_sample=_content_sample(file_path, extension),
+        document_category, category_source, category_confidence = (
+            DocumentClassifier().classify_with_source(
+                file_name=filename,
+                file_type=extension.lstrip("."),
+                content_sample=_content_sample(file_path, extension),
+            )
         )
 
     try:
@@ -678,6 +752,8 @@ def extract_and_chunk(
         content_sha256=content_sha256,
         warnings=warnings,
         has_redline=has_redline,
+        category_source=category_source,
+        category_confidence=category_confidence,
     )
 
     if not sections:
@@ -690,8 +766,11 @@ def extract_and_chunk(
     if not children:
         raise NoExtractableContentError("No text could be extracted from the document")
 
-    # PII and risk signals are regex scans — no LLM, no added latency. Signals
-    # are written per chunk AND aggregated per document for the risk dashboard.
+    # PII and risk signals start as regex scans. When enabled, Laya then judges
+    # every chunk in one batched pass (see _laya_chunk_scores) and the regex
+    # results are combined with its probabilities; if Laya is unavailable the
+    # regex results stand. Signals are written per chunk AND aggregated per
+    # document for the risk dashboard.
     pii_detector = PIIDetector()
     risk_extractor = RiskSignalExtractor()
     aggregated_risk: dict[str, dict] = {}
@@ -699,13 +778,34 @@ def extract_and_chunk(
     parent_pii = [0] * len(parents)
     parent_children: list[list[str]] = [[] for _ in parents]
 
+    regex_risk = [
+        risk_extractor.extract(c.text, file_name=filename, document_category=document_category)
+        for c in children
+    ]
+    laya_scores, laya_risk_used = _laya_chunk_scores(
+        [c.text for c in children], regex_risk, filename
+    )
+
     for i, chunk in enumerate(children):
         chunk_id = f"{deal_id}_{doc_id}_{i:04d}"
-        contains_pii = pii_detector.detect(chunk.text).contains_pii
-
-        risk = risk_extractor.extract(
-            chunk.text, file_name=filename, document_category=document_category
+        scores = laya_scores[i] if laya_scores else None
+        pii = pii_detector.detect(
+            chunk.text, laya_probability=scores.pii_probability if scores else None
         )
+        contains_pii = pii.contains_pii
+
+        risk = regex_risk[i]
+        if scores is not None and laya_risk_used:
+            risk = risk_extractor.apply_laya(risk, scores.risk)
+        risk_decisions = {
+            d["signal_type"]: {"source": d["source"], "confidence": d["confidence"], "accepted": True}
+            for d in risk.signal_details
+        }
+        for r in risk.rejected:
+            risk_decisions[r["signal_type"]] = {
+                "source": "regex", "confidence": r["confidence"], "accepted": False,
+            }
+
         for detail in risk.signal_details:
             entry = aggregated_risk.setdefault(
                 detail["signal_type"],
@@ -714,12 +814,20 @@ def extract_and_chunk(
                     "match_count": 0,
                     "sample_matches": [],
                     "page_number": chunk.page_number,
+                    "source": "regex",
+                    "confidence": None,
                 },
             )
             entry["match_count"] += detail["match_count"]
             for sample in detail["sample_matches"]:
                 if sample and len(entry["sample_matches"]) < 3:
                     entry["sample_matches"].append(sample)
+            # Document level: "laya" once Laya flagged or confirmed the type in
+            # any chunk; confidence is the highest Laya probability seen.
+            if "laya" in detail["source"]:
+                entry["source"] = "laya"
+            if detail["confidence"] is not None:
+                entry["confidence"] = max(entry["confidence"] or 0.0, detail["confidence"])
 
         parent_index = chunk.metadata.get("parent_index")
         parent_chunk_id = None
@@ -735,6 +843,9 @@ def extract_and_chunk(
             contains_pii=contains_pii,
             risk_signals=risk.signals,
             parent_chunk_id=parent_chunk_id,
+            risk_decisions=risk_decisions,
+            pii_source=pii.source,
+            pii_confidence=pii.laya_probability,
         ))
 
     for j, parent in enumerate(parents):
@@ -867,8 +978,9 @@ async def index_document(
         from src.vector_db.collection_manager import setup_collections
         await setup_collections(client, collection_name, parent_collection_name)
 
-    # Parsing, chunking, PII and risk scans are CPU-bound; running them on the
-    # event loop froze every other request on the single-worker API.
+    # Parsing, chunking, PII and risk scans (and Laya's forward passes) are
+    # CPU/GPU-bound; running them on the event loop froze every other request
+    # on the single-worker API.
     doc = await asyncio.to_thread(
         extract_and_chunk,
         file_path,
@@ -958,6 +1070,8 @@ async def index_document(
         "parent_chunks_created": len(parent_points),
         "table_count": len({c["table_id"] for c in doc.chunks if c.get("table_id")}),
         "risk_signals": doc.risk_signals,
+        "category_source": doc.category_source,
+        "category_confidence": doc.category_confidence,
         "has_redline": doc.has_redline,
         "warnings": doc.warnings,
         "content_sha256": doc.content_sha256,

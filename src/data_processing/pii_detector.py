@@ -15,15 +15,20 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from src.decisions import ingest_signals
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
 # ─── PII detection patterns ──────────────────────────────────────────────────
 
-# Social Security Numbers: XXX-XX-XXXX, XXX XX XXXX, XXXXXXXXX
+# Social Security Numbers: XXX-XX-XXXX, or a bare/spaced 9-digit number only when
+# an SSN label precedes it. A bare 9-digit run on its own is far more often an
+# invoice, order or account number ("Invoice 123456789") than an SSN.
 SSN_PATTERN = re.compile(
-    r'\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b'
+    r'\b\d{3}-\d{2}-\d{4}\b'
+    r'|(?i:\b(?:ssn|social\s+security(?:\s+(?:number|no\.?|#))?)\s*[:#\-]?\s*)'
+    r'\d{3}[-\s]?\d{2}[-\s]?\d{4}\b'
 )
 
 # Email addresses
@@ -43,10 +48,12 @@ DOB_PATTERN = re.compile(
 )
 
 # Salary / compensation data
+# The amount must carry a currency sign: with `\$?` optional, "Transaction Bonus
+# 2024" and "Commission 5" were salary data.
 SALARY_PATTERNS = [
-    re.compile(r'(?i)\b(?:salary|base\s+pay|compensation|annual\s+pay)\s*[:\-]?\s*\$?\s*[\d,]+'),
-    re.compile(r'(?i)\b(?:bonus|incentive|commission|stock\s+option|equity\s+grant)\s*[:\-]?\s*\$?\s*[\d,]+'),
-    re.compile(r'(?i)\b(?:hourly\s+rate|pay\s+rate|wage)\s*[:\-]?\s*\$?\s*[\d,.]+'),
+    re.compile(r'(?i)\b(?:salary|base\s+pay|compensation|annual\s+pay)\s*[:\-]?\s*\$\s*[\d,]+'),
+    re.compile(r'(?i)\b(?:bonus|incentive|commission|stock\s+option|equity\s+grant)\s*[:\-]?\s*\$\s*[\d,]+'),
+    re.compile(r'(?i)\b(?:hourly\s+rate|pay\s+rate|wage)\s*[:\-]?\s*\$\s*[\d,.]+'),
 ]
 
 # Bank account / routing numbers
@@ -95,6 +102,9 @@ class PIIDetectionResult:
     pii_count: int
     is_hr_document: bool
     confidence: float  # 0.0 to 1.0
+    # Laya's P(PII) when it was consulted (LAYA_PII=1), else None.
+    laya_probability: float | None = None
+    source: str = "regex"  # "regex" or "regex+laya"
 
 
 class PIIDetector:
@@ -108,6 +118,11 @@ class PIIDetector:
     The compliance filter in hybrid_search.py applies contains_pii=0
     unless explicitly overridden for authorized users.
     """
+
+    # Structured identifiers whose regex match is specific enough to trust on
+    # its own. Every other type (salary wording, bank/tax-id labels, keyword
+    # counts) matches business text too, so a Laya check can overrule it.
+    STRONG_TYPES = frozenset({"ssn", "date_of_birth", "passport"})
 
     def __init__(self, sensitivity: str = "high") -> None:
         """
@@ -125,6 +140,7 @@ class PIIDetector:
         self,
         text: str,
         file_name: str = "",
+        laya_probability: float | None = None,
     ) -> PIIDetectionResult:
         """
         Detect PII in text content and filename.
@@ -132,6 +148,10 @@ class PIIDetector:
         Args:
             text: Document or chunk text content to scan.
             file_name: Original filename for HR/comp document detection.
+            laya_probability: Laya's P(PII) for this text, when LAYA_PII is on.
+                A strong identifier (STRONG_TYPES) or HR filename always flags;
+                any other regex hit needs P >= PII_CONFIRM_THRESHOLD, and Laya
+                alone flags at P >= PII_THRESHOLD. None runs the regex alone.
 
         Returns:
             PIIDetectionResult with contains_pii flag and details.
@@ -170,12 +190,27 @@ class PIIDetector:
         # Calculate confidence
         confidence = self._calculate_confidence(is_hr, pii_types, pii_count)
 
+        source = "regex"
+        if laya_probability is not None:
+            source = "regex+laya"
+            # Excluding real PII is a compliance feature, so structured
+            # identifiers are never second-guessed; Laya only arbitrates the
+            # keyword-level hits and may add what the regex cannot see.
+            strong = is_hr or bool(set(pii_types) & self.STRONG_TYPES)
+            contains_pii = (
+                strong
+                or (contains_pii and laya_probability >= ingest_signals.PII_CONFIRM_THRESHOLD)
+                or laya_probability >= ingest_signals.PII_THRESHOLD
+            )
+
         result = PIIDetectionResult(
             contains_pii=1 if contains_pii else 0,
-            pii_types=list(set(pii_types)),
+            pii_types=sorted(set(pii_types)),
             pii_count=pii_count,
             is_hr_document=is_hr,
             confidence=confidence,
+            laya_probability=laya_probability,
+            source=source,
         )
 
         logger.info(
@@ -295,7 +330,8 @@ class PIIDetector:
         Returns:
             True if it's likely a real SSN.
         """
-        digits = re.sub(r'[-\s]', '', candidate)
+        # The labelled branch of SSN_PATTERN includes the "SSN:" prefix.
+        digits = re.sub(r'\D', '', candidate)
         if len(digits) != 9:
             return False
 
