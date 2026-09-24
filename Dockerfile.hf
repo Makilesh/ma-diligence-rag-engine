@@ -79,6 +79,17 @@ CrossEncoder('${RERANKER_MODEL}'); \
 CrossEncoder('${NLI_MODEL}'); \
 print('models cached')"
 
+# Laya's typed-decisions checkpoint (~1.7GB) for the decision layer in
+# src/decisions — same reasoning: fetched here once, not on the first request.
+# (No backticks in the probe question: inside this double-quoted shell string
+# they would be command substitution.)
+RUN python -c "\
+from laya import Router; \
+Router(device='cpu', max_loaded=1).predict({'passage': 'probe'}, \
+    {'q': {'type': 'noul', 'instructions': 'Is the passage empty?'}}, \
+    model='typed-decisions'); \
+print('laya cached')"
+
 # FastEmbed's BM25 model is small but is fetched on first use like the others.
 RUN python -c "\
 from fastembed import SparseTextEmbedding; \
