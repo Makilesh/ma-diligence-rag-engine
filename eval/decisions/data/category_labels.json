@@ -1,0 +1,338 @@
+{
+ "_meta": {
+  "task": "document category (financial|legal|board|audit|regulatory|operational|other)",
+  "provenance": "Corpus categories follow run_demo.py CATEGORY_OVERRIDES and the documents' own titles; fixtures are the tests/fixtures/ingestion_docs.py writers; synthetic openings (syn-cat-*) were written by the implementing agent, several with generic or misleading filenames. 'acceptable' lists categories a reasonable analyst could also file the document under: strict accuracy scores 'category', lenient scores 'acceptable'. Split: even synthetic rows = dev (phrasing selection); corpus, fixtures and odd synthetic rows = test."
+ },
+ "documents": [
+  {
+   "id": "aurora_financials_fy2023.txt",
+   "source": "corpus",
+   "filename": "aurora_financials_fy2023.txt",
+   "category": "financial",
+   "acceptable": [
+    "financial"
+   ],
+   "split": "test"
+  },
+  {
+   "id": "board_deck_strategic_review_mar2024.txt",
+   "source": "corpus",
+   "filename": "board_deck_strategic_review_mar2024.txt",
+   "category": "board",
+   "acceptable": [
+    "board"
+   ],
+   "split": "test"
+  },
+  {
+   "id": "credit_agreement_summary.txt",
+   "source": "corpus",
+   "filename": "credit_agreement_summary.txt",
+   "category": "legal",
+   "acceptable": [
+    "legal",
+    "financial"
+   ],
+   "split": "test"
+  },
+  {
+   "id": "customer_contracts_schedule.txt",
+   "source": "corpus",
+   "filename": "customer_contracts_schedule.txt",
+   "category": "legal",
+   "acceptable": [
+    "legal",
+    "operational"
+   ],
+   "split": "test"
+  },
+  {
+   "id": "employment_and_retention_agreements.txt",
+   "source": "corpus",
+   "filename": "employment_and_retention_agreements.txt",
+   "category": "legal",
+   "acceptable": [
+    "legal",
+    "operational"
+   ],
+   "split": "test"
+  },
+  {
+   "id": "ip_portfolio_and_litigation_schedule.txt",
+   "source": "corpus",
+   "filename": "ip_portfolio_and_litigation_schedule.txt",
+   "category": "legal",
+   "acceptable": [
+    "legal"
+   ],
+   "split": "test"
+  },
+  {
+   "id": "merger_agreement_v2_final.txt",
+   "source": "corpus",
+   "filename": "merger_agreement_v2_final.txt",
+   "category": "legal",
+   "acceptable": [
+    "legal"
+   ],
+   "split": "test"
+  },
+  {
+   "id": "quality_of_earnings_report_fy2023.txt",
+   "source": "corpus",
+   "filename": "quality_of_earnings_report_fy2023.txt",
+   "category": "financial",
+   "acceptable": [
+    "financial",
+    "audit"
+   ],
+   "split": "test"
+  },
+  {
+   "id": "regulatory_and_data_privacy_memo.txt",
+   "source": "corpus",
+   "filename": "regulatory_and_data_privacy_memo.txt",
+   "category": "regulatory",
+   "acceptable": [
+    "regulatory"
+   ],
+   "split": "test"
+  },
+  {
+   "id": "aurora_sample.txt",
+   "source": "fixture",
+   "writer": "write_txt",
+   "filename": "aurora_sample.txt",
+   "category": "financial",
+   "acceptable": [
+    "financial",
+    "legal"
+   ],
+   "split": "test",
+   "note": "income statement followed by an indemnification article"
+  },
+  {
+   "id": "financial_report.pdf",
+   "source": "fixture",
+   "writer": "write_pdf",
+   "filename": "financial_report.pdf",
+   "category": "financial",
+   "acceptable": [
+    "financial"
+   ],
+   "split": "test"
+  },
+  {
+   "id": "merger_agreement_draft.docx",
+   "source": "fixture",
+   "writer": "write_docx",
+   "filename": "merger_agreement_draft.docx",
+   "category": "legal",
+   "acceptable": [
+    "legal"
+   ],
+   "split": "test"
+  },
+  {
+   "id": "income_statement_model.xlsx",
+   "source": "fixture",
+   "writer": "write_xlsx",
+   "filename": "income_statement_model.xlsx",
+   "category": "financial",
+   "acceptable": [
+    "financial"
+   ],
+   "split": "test"
+  },
+  {
+   "id": "board_deck.pptx",
+   "source": "fixture",
+   "writer": "write_pptx",
+   "filename": "board_deck.pptx",
+   "category": "board",
+   "acceptable": [
+    "board"
+   ],
+   "split": "test"
+  },
+  {
+   "id": "syn-cat-00",
+   "filename": "doc_0147.pdf",
+   "text": "INDEPENDENT AUDITOR'S REPORT\nTo the Board of Directors and Shareholders of Northwind Holdings Inc.\nOpinion\nWe have audited the accompanying consolidated financial statements of Northwind Holdings Inc., which comprise the consolidated balance sheets as of December 31, 2023 and 2022. In our opinion, the financial statements present fairly, in all material respects, the financial position of the Company in accordance with accounting principles generally accepted in the United States.\nBasis for Opinion\nWe conducted our audits in accordance with auditing standards generally accepted in the United States.",
+   "category": "audit",
+   "split": "dev",
+   "acceptable": [
+    "audit"
+   ],
+   "source": "synthetic"
+  },
+  {
+   "id": "syn-cat-01",
+   "filename": "scan_2024_03.pdf",
+   "text": "MINUTES OF A MEETING OF THE BOARD OF DIRECTORS OF NORTHWIND HOLDINGS INC.\nHeld by video conference on 14 March 2024 at 10:00 a.m.\nPresent: J. Example (Chair), K. Sample, L. Placeholder, M. Testcase\nIn attendance: Company Secretary\n1. Quorum. The Chair noted that a quorum was present.\n2. Strategic review. The Board discussed the indications of interest received and, after discussion, it was RESOLVED that management be authorised to grant exclusivity to the preferred bidder.",
+   "category": "board",
+   "split": "test",
+   "acceptable": [
+    "board"
+   ],
+   "source": "synthetic"
+  },
+  {
+   "id": "syn-cat-02",
+   "filename": "data_room_item_12.docx",
+   "text": "SHARE PURCHASE AGREEMENT\nTHIS AGREEMENT is made on 2 April 2024\nBETWEEN\n(1) NORTHWIND HOLDINGS LIMITED (the Seller); and\n(2) ORION BIDCO LIMITED (the Buyer).\nWHEREAS the Seller is the legal and beneficial owner of the Shares and has agreed to sell the Shares to the Buyer on the terms of this Agreement.\nNOW IT IS AGREED as follows:\n1. Definitions and interpretation",
+   "category": "legal",
+   "split": "dev",
+   "acceptable": [
+    "legal"
+   ],
+   "source": "synthetic"
+  },
+  {
+   "id": "syn-cat-03",
+   "filename": "item_33.pdf",
+   "text": "NOTIFICATION AND REPORT FORM FOR CERTAIN MERGERS AND ACQUISITIONS\nPremerger Notification Office, Federal Trade Commission\nItem 1: Person filing notification: Orion Bidco LLC\nItem 2: Transaction description: acquisition of 100% of the voting securities of Northwind Holdings Inc.\nItem 4(c): Documents prepared for the purpose of evaluating the acquisition with respect to market shares, competition and competitors.",
+   "category": "regulatory",
+   "split": "test",
+   "acceptable": [
+    "regulatory"
+   ],
+   "source": "synthetic"
+  },
+  {
+   "id": "syn-cat-04",
+   "filename": "Q3_update.pdf",
+   "text": "MONTHLY MANAGEMENT ACCOUNTS - SEPTEMBER 2023\nRevenue for the month was $38.2 million, 4% ahead of budget, and year-to-date revenue is $331.0 million.\nGross margin was 61.2%. EBITDA for the month was $7.9 million.\nCash and cash equivalents at month end were $88.1 million; net debt was $21.4 million.\nWorking capital movements: receivables increased by $3.2 million.",
+   "category": "financial",
+   "split": "dev",
+   "acceptable": [
+    "financial"
+   ],
+   "source": "synthetic"
+  },
+  {
+   "id": "syn-cat-05",
+   "filename": "tech_findings.pdf",
+   "text": "IT INFRASTRUCTURE AND CYBERSECURITY ASSESSMENT\nScope: network architecture, endpoint security, identity and access management, backup and disaster recovery, and the software development lifecycle.\nSummary: the Company operates two co-located data centres and a public cloud tenancy. Recovery time objectives are documented but have not been tested since 2021. Multi-factor authentication is enforced for all remote access.",
+   "category": "operational",
+   "split": "test",
+   "acceptable": [
+    "operational"
+   ],
+   "source": "synthetic"
+  },
+  {
+   "id": "syn-cat-06",
+   "filename": "supply_overview.docx",
+   "text": "SUPPLY CHAIN AND VENDOR OVERVIEW\nThe Company sources electronic components from 42 suppliers across six countries. Three components are single-sourced, including the main sensor module supplied by a vendor in Taiwan.\nInventory is held in two warehouses; average inventory turns were 5.4x in FY2023.\nVendor management: suppliers are reviewed annually against quality, delivery and cost scorecards.",
+   "category": "operational",
+   "split": "dev",
+   "acceptable": [
+    "operational"
+   ],
+   "source": "synthetic"
+  },
+  {
+   "id": "syn-cat-07",
+   "filename": "memo_final.docx",
+   "text": "MEMORANDUM\nTo: Deal Team\nFrom: Environmental and Regulatory Counsel\nRe: Permit status and Clean Air Act compliance at the Elkhart facility\nThe facility operates under a Title V air permit that expires in 2025. The state agency issued a notice of violation in 2022 for excess emissions, which was resolved by consent order. Renewal of the permit will be required before the transaction closes.",
+   "category": "regulatory",
+   "split": "test",
+   "acceptable": [
+    "regulatory"
+   ],
+   "source": "synthetic"
+  },
+  {
+   "id": "syn-cat-08",
+   "filename": "report.pdf",
+   "text": "SOC 1 TYPE II REPORT\nReport on Management's Description of Northwind's Payroll Processing System and on the Suitability of the Design and Operating Effectiveness of Controls\nIndependent Service Auditor's Report\nScope: We have examined Northwind's description of its payroll processing system for the period January 1, 2023 to December 31, 2023 and the operating effectiveness of the controls stated in the description.",
+   "category": "audit",
+   "split": "dev",
+   "acceptable": [
+    "audit"
+   ],
+   "source": "synthetic"
+  },
+  {
+   "id": "syn-cat-09",
+   "filename": "vdr_4_2_1.pdf",
+   "text": "FINANCIAL DUE DILIGENCE REPORT - PROJECT ORION\nKey findings\nNormalised EBITDA of $61.4 million compares with reported EBITDA of $57.9 million, the difference arising from non-recurring professional fees and a one-off inventory write-down.\nNet debt and debt-like items total $48.3 million, including deferred consideration and unpaid bonuses.\nNet working capital is seasonal; we recommend a peg based on a 12-month average.",
+   "category": "financial",
+   "acceptable": [
+    "financial",
+    "audit"
+   ],
+   "split": "test",
+   "source": "synthetic"
+  },
+  {
+   "id": "syn-cat-10",
+   "filename": "board_pack_q2.pdf",
+   "text": "BOARD PACK - Q2 2024\nContents: 1. CEO report 2. KPI dashboard 3. Items for approval 4. Items for noting\nCEO report: bookings were ahead of plan and the strategic review is progressing. The Board is asked to approve the FY2025 budget framework and the appointment of a new independent non-executive director.",
+   "category": "board",
+   "split": "dev",
+   "acceptable": [
+    "board"
+   ],
+   "source": "synthetic"
+  },
+  {
+   "id": "syn-cat-11",
+   "filename": "Employee_Handbook_2024.pdf",
+   "text": "EMPLOYEE HANDBOOK 2024\nWelcome to Northwind. This handbook describes our policies on working hours, paid time off, remote work, expenses, the code of conduct and how to raise a concern.\nSection 1: Working hours. Standard working hours are 9:00 to 17:30, Monday to Friday.",
+   "category": "operational",
+   "split": "test",
+   "acceptable": [
+    "operational"
+   ],
+   "source": "synthetic"
+  },
+  {
+   "id": "syn-cat-12",
+   "filename": "lease_summary.docx",
+   "text": "COMMERCIAL LEASE ABSTRACT\nLandlord: Harbour Properties LLC\nTenant: Northwind Holdings Inc.\nPremises: 42,000 square feet, 3rd and 4th floors, 100 Harbour Street\nTerm: 10 years from 1 July 2019; one renewal option of 5 years\nRent: $2.1 million per year, escalating 3% annually\nAssignment: landlord consent required for assignment, including on a change of control.",
+   "category": "legal",
+   "acceptable": [
+    "legal",
+    "operational"
+   ],
+   "split": "dev",
+   "source": "synthetic"
+  },
+  {
+   "id": "syn-cat-13",
+   "filename": "Project_Quality_Review.pdf",
+   "text": "INTERNAL AUDIT REPORT - REVENUE CYCLE CONTROLS\nAudit period: FY2023\nObjective: to assess the design and operating effectiveness of controls over contract review, invoicing and revenue recognition.\nOverall rating: Needs improvement. Findings: 1. Contract modifications were not consistently reviewed by finance before invoicing. Management response: agreed; a review control will be implemented by Q3.",
+   "category": "audit",
+   "split": "test",
+   "acceptable": [
+    "audit"
+   ],
+   "source": "synthetic"
+  },
+  {
+   "id": "syn-cat-14",
+   "filename": "customer_nps_2023.pdf",
+   "text": "CUSTOMER SATISFACTION SURVEY RESULTS 2023\nNet Promoter Score: 42 (2022: 38). Response rate: 31% of active accounts.\nTop drivers of satisfaction: product reliability and support responsiveness. Top detractors: onboarding time and reporting flexibility.\nActions: the customer success team will introduce a structured onboarding programme in Q1.",
+   "category": "operational",
+   "acceptable": [
+    "operational",
+    "other"
+   ],
+   "split": "dev",
+   "source": "synthetic"
+  },
+  {
+   "id": "syn-cat-15",
+   "filename": "dpia_v3.docx",
+   "text": "DATA PROTECTION IMPACT ASSESSMENT\nProcessing activity: behavioural analytics on end-user telemetry\nLegal basis: legitimate interests (Article 6(1)(f) GDPR)\nThis assessment is carried out under Article 35 of the General Data Protection Regulation. Risks to data subjects have been identified in relation to profiling and international transfers; mitigating measures are set out in Section 5.",
+   "category": "regulatory",
+   "split": "test",
+   "acceptable": [
+    "regulatory"
+   ],
+   "source": "synthetic"
+  }
+ ]
+}
