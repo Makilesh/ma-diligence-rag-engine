@@ -35,12 +35,18 @@ from src.utils.logger import setup_logger
 logger = setup_logger(__name__)
 
 DEFAULT_MODEL = "typed-decisions"
-# Requests per forward pass. 16 keeps a CPU host responsive between batches
-# while still amortising the encoder over many (state, questions) pairs.
-BATCH_SIZE = 16
+# Upper bound on (state, question) sequences per forward pass. Laya's own
+# batch_size counts states, and each state is encoded once per question, so a
+# fixed state count lets an 11-question ingest pass balloon to 176 sequences —
+# enough to exhaust memory on a small CPU host. Batches are sized from this.
+MAX_SEQUENCES_PER_BATCH = 64
 
 _router = None
 _load_failed = False
+# Router() is cheap; the checkpoint loads on the first predict. Until one
+# prediction has succeeded, a failure is treated as a load failure and
+# remembered, so an offline host is not re-downloaded on every upload.
+_has_predicted = False
 _load_lock = threading.Lock()
 # The Router is not documented as thread-safe; to_thread callers share it.
 _predict_lock = threading.Lock()
@@ -129,15 +135,22 @@ def decide_batch(requests: list[tuple[dict, dict]]) -> list[dict[str, dict[str, 
         LayaUnavailable: If Laya is disabled or cannot be loaded, or inference
             fails.
     """
+    global _has_predicted, _load_failed
+
     if not requests:
         return []
     router = _get_router()
     batch = [{"state": s, "questions": q, "model": laya_model()} for s, q in requests]
+    widest = max(len(q) for _, q in requests) or 1
+    batch_size = max(1, MAX_SEQUENCES_PER_BATCH // widest)
     try:
         with _predict_lock:
-            outputs = router.predict_batch(batch, batch_size=BATCH_SIZE)
+            outputs = router.predict_batch(batch, batch_size=batch_size)
     except Exception as e:
+        if not _has_predicted:
+            _load_failed = True
         raise LayaUnavailable(f"Laya inference failed: {e}") from e
+    _has_predicted = True
     return [out.get("answers", {}) for out in outputs]
 
 

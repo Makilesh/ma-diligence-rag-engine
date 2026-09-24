@@ -42,7 +42,7 @@ _RISK_SEVERITY: dict[str, str] = {
     "environmental_liability": "medium",
     "ip_risk": "medium",
     "customer_concentration": "low",
-    "key_person": "low",
+    "key_person_dependency": "low",
     "indemnification": "low",
 }
 
