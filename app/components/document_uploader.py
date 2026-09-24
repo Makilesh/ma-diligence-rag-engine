@@ -5,6 +5,8 @@ Document uploader component — file upload with category override and version c
 import streamlit as st
 import requests
 
+from src.utils.admin_client import admin_headers
+
 
 SUPPORTED_TYPES = ["pdf", "docx", "pptx", "xlsx", "txt"]
 CATEGORIES = [
@@ -69,6 +71,7 @@ def render_document_uploader(api_url: str, deal_id: str) -> None:
                         f"{api_url}/ingest",
                         files={"file": (file.name, file.getvalue())},
                         data=data,
+                        headers=admin_headers(),
                         timeout=120,
                     )
 

@@ -24,6 +24,7 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 from app.styles import inject_styles, pill, stat_row
+from src.utils.admin_client import admin_headers
 from app.components.deal_manager import render_deal_manager
 from app.components.document_uploader import render_document_uploader
 from app.components.query_interface import render_query_interface
@@ -58,7 +59,7 @@ def _get_json(path: str, timeout: int = 10):
     transport errors degrade to an empty panel rather than a crashed script.
     """
     try:
-        resp = requests.get(f"{API_URL}{path}", timeout=timeout)
+        resp = requests.get(f"{API_URL}{path}", headers=admin_headers(), timeout=timeout)
         if resp.status_code == 200:
             return resp.json()
     except requests.RequestException:
@@ -147,6 +148,7 @@ def run_query(query: str, deal_id: str, include_pii: bool) -> dict | None:
         resp = requests.post(
             f"{API_URL}/query",
             json={"query": query, "deal_id": deal_id, "include_pii": include_pii},
+            headers=admin_headers(),
             timeout=QUERY_TIMEOUT_S,
         )
     except requests.ConnectionError:

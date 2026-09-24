@@ -5,6 +5,8 @@ Deal manager component — deal CRUD UI.
 import streamlit as st
 import requests
 
+from src.utils.admin_client import admin_headers
+
 
 def render_deal_manager(api_url: str) -> str | None:
     """
@@ -30,6 +32,7 @@ def render_deal_manager(api_url: str) -> str | None:
                     resp = requests.post(
                         f"{api_url}/deals",
                         json={"deal_name": deal_name, "description": description},
+                        headers=admin_headers(),
                         timeout=10,
                     )
                     if resp.status_code == 200:
@@ -45,7 +48,7 @@ def render_deal_manager(api_url: str) -> str | None:
 
     # List and select deals
     try:
-        resp = requests.get(f"{api_url}/deals", timeout=10)
+        resp = requests.get(f"{api_url}/deals", headers=admin_headers(), timeout=10)
         if resp.status_code == 200:
             deals = resp.json()
             if deals:
