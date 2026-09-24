@@ -1,0 +1,140 @@
+AURORA TECHNOLOGIES INC.
+SCHEDULE OF EXECUTIVE EMPLOYMENT AND RETENTION ARRANGEMENTS
+Disclosure Schedule 3.11(b) to the Agreement and Plan of Merger
+As of March 15, 2024
+
+CONFIDENTIAL - CONTAINS COMPENSATION INFORMATION
+
+================================================================================
+SECTION 1: EXECUTIVE COMPENSATION SUMMARY (FY2023)
+================================================================================
+
+Name                Title                    Base Salary   Cash Bonus   Equity Value
+------------------  -----------------------  -----------   ----------   ------------
+Elena Marsh         Chief Executive Officer     $625,000     $437,500      $8,120,000
+Dr. James Wu        Chief Technology Officer    $540,000     $324,000      $6,850,000
+Robert Chen         Chief Financial Officer     $445,000     $267,000      $2,940,000
+Priya Raghavan      Chief Revenue Officer       $420,000     $294,000      $2,610,000
+Marcus Delgado      General Counsel             $385,000     $192,500      $1,480,000
+                                              ----------   ----------   ------------
+Total Named Executive Officers                 $2,415,000   $1,515,000    $22,000,000
+
+Equity value is calculated at the merger consideration of $58.00 per share and
+includes both vested and unvested awards.
+
+================================================================================
+SECTION 2: CHANGE OF CONTROL SEVERANCE ("GOLDEN PARACHUTE")
+================================================================================
+
+Each named executive officer is party to an employment agreement providing for
+severance upon a qualifying termination following a change of control. All five
+agreements are "double trigger": severance is payable only if the executive is
+terminated without cause, or resigns for good reason, within 24 months after the
+change of control.
+
+Severance multiples and estimated cost, assuming all five executives are
+terminated immediately following closing:
+
+Name                Multiple    Cash Severance   Equity Acceleration   Total
+------------------  ---------   --------------   -------------------   -----------
+Elena Marsh          3.0x           $3,187,500            $4,260,000    $7,447,500
+Dr. James Wu         2.5x           $2,160,000            $3,595,000    $5,755,000
+Robert Chen          2.0x           $1,424,000            $1,543,000    $2,967,000
+Priya Raghavan       2.0x           $1,428,000            $1,370,000    $2,798,000
+Marcus Delgado       1.5x             $866,250              $777,000    $1,643,250
+                                 ------------          ------------   -----------
+Total Potential Parachute Cost      $9,065,750           $11,545,000   $20,610,750
+
+The multiple is applied to the sum of base salary and target cash bonus.
+
+Section 280G: Marsh, Wu and Chen are expected to exceed the Section 280G safe
+harbour, exposing the Company to a 20% excise tax and loss of the corresponding
+deduction. The Company has NOT obtained a shareholder cleansing vote. Estimated
+excise tax exposure is $2.4 million. The merger agreement allocates this cost to
+the Company at closing.
+
+================================================================================
+SECTION 3: RETENTION POOL
+================================================================================
+
+The Board approved a retention pool of $6,500,000 on March 1, 2024, payable to
+non-executive employees identified as critical to post-closing continuity.
+
+  Engineering (41 employees)                 $3,900,000
+  Customer Success (18 employees)            $1,300,000
+  Finance and Operations (11 employees)        $780,000
+  Other (7 employees)                          $520,000
+                                            -----------
+  Total Retention Pool (77 employees)        $6,500,000
+
+Retention payments vest 50% at 12 months post-closing and 50% at 24 months
+post-closing, subject to continued employment. The pool is funded by the Company
+and is not deducted from the merger consideration.
+
+================================================================================
+SECTION 4: KEY PERSON DEPENDENCY
+================================================================================
+
+Dr. James Wu, Chief Technology Officer, is named as sole or first inventor on 12
+of the Company's 47 issued U.S. patents, including the four patents underlying
+the real-time data reconciliation engine that is the subject of the DataFlow
+Systems litigation.
+
+Dr. Wu's employment agreement contains:
+  - A non-competition covenant of 12 months post-termination, enforceable in
+    Delaware but of uncertain enforceability in California, where he resides.
+  - A non-solicitation covenant of 24 months.
+  - An assignment-of-inventions clause covering all work product.
+
+Dr. Wu has NOT executed a post-closing employment agreement with Vertex Capital
+Partners. Buyer has identified this as a material integration risk. Aurora
+management represents that Dr. Wu has verbally indicated willingness to remain
+for a transition period of not less than 12 months, but this is not documented.
+
+CEO Elena Marsh has indicated she intends to depart at closing. Her severance is
+therefore expected to be triggered.
+
+================================================================================
+SECTION 5: EQUITY PLAN TREATMENT
+================================================================================
+
+At the effective time, each outstanding option and restricted stock unit will be
+treated as follows:
+
+  Vested options            Cancelled in exchange for a cash payment equal to
+                            the excess of $58.00 over the exercise price,
+                            multiplied by the number of shares.
+
+  Unvested options          Accelerated in full and cashed out on the same
+                            basis. Total acceleration cost: $11,545,000 across
+                            named executives and $4,180,000 for all other
+                            employees.
+
+  Restricted stock units    Accelerated in full and settled in cash at $58.00
+                            per share.
+
+  Employee Stock Purchase   The current offering period terminates immediately
+  Plan                      prior to closing; accumulated payroll deductions are
+                            applied to a final purchase.
+
+Total equity plan cost at closing across all holders: $15,725,000.
+
+================================================================================
+SECTION 6: WORKFORCE SUMMARY
+================================================================================
+
+Headcount as of December 31, 2023:
+
+  Engineering and Product                    312
+  Sales and Marketing                        186
+  Customer Success and Support               124
+  General and Administrative                  78
+                                            ----
+  Total Employees                            700
+
+The Austin development center closed in Q3 FY2023, affecting 32 employees. The
+associated $4.5 million restructuring charge is reflected in FY2023 operating
+expenses. No further reductions are planned.
+
+Voluntary attrition in engineering was 11.4% in FY2023, against a peer benchmark
+of 13.2%. No union or collective bargaining arrangements exist.

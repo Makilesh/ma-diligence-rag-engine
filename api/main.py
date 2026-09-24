@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from src.vector_db.qdrant_client import (
     get_qdrant_client,
@@ -22,6 +23,7 @@ from src.vector_db.collection_manager import setup_collections
 from src.llm.budget_tracker import BudgetTracker
 from src.workflow.orchestrator import get_compiled_graph, close_checkpointer
 from src.utils.logger import setup_logger
+from api.security import REQUEST_ID_HEADER, RequestIdMiddleware
 
 logger = setup_logger(__name__)
 
@@ -73,8 +75,10 @@ async def lifespan(app: FastAPI):
     # asked first. Set WARM_MODELS=0 to skip (faster restarts while developing).
     if os.getenv("WARM_MODELS", "1") != "0":
         from src.vector_db.reranker import warm_models
+        from src.verification.nli import warm_nli_model
 
         await warm_models()
+        await warm_nli_model()
 
     from api.routes.deals import start_sandbox_sweeper, stop_sandbox_sweeper
 
@@ -121,7 +125,10 @@ app.add_middleware(
     allow_origins=_cors_origins,
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    # Lets the browser read the correlation id that generic error messages cite.
+    expose_headers=[REQUEST_ID_HEADER],
 )
+app.add_middleware(RequestIdMiddleware)
 
 
 def get_graph():
@@ -141,5 +148,38 @@ app.include_router(deals_router, prefix="/api/v1", tags=["deals"])
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
+    """
+    Liveness probe. Deliberately static and dependency-free: the keepalive
+    workflow and the container healthcheck hit it, and a liveness check that
+    fails when Qdrant blips would get a healthy process restarted.
+    """
     return {"status": "healthy", "service": "manda-rag"}
+
+
+@app.get("/ready")
+async def readiness_check():
+    """
+    Readiness probe: can this process actually answer a query?
+
+    Checks that the LangGraph pipeline has been compiled (startup finished) and
+    that Qdrant answers within a few seconds. Returns 503 with per-check detail
+    otherwise, so a deploy can wait on this rather than on `/health`.
+
+    Returns:
+        JSON with overall status and each check's result.
+    """
+    checks = {"graph_compiled": _app_graph is not None, "qdrant_reachable": False}
+    try:
+        # Looked up at call time so a replaced client (tests, reconnects) is used.
+        from src.vector_db import qdrant_client as qdrant_module
+
+        await asyncio.wait_for(qdrant_module.get_qdrant_client().get_collections(), timeout=5)
+        checks["qdrant_reachable"] = True
+    except Exception as e:
+        logger.warning("Readiness check: Qdrant unreachable", extra={"error": str(e)})
+
+    ready = all(checks.values())
+    return JSONResponse(
+        status_code=200 if ready else 503,
+        content={"status": "ready" if ready else "not_ready", "checks": checks},
+    )

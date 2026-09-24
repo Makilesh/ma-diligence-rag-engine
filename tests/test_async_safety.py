@@ -72,12 +72,38 @@ class TestBudgetTrackerSafety:
         assert hasattr(BudgetTracker, "get_instance")
         assert asyncio.iscoroutinefunction(BudgetTracker.get_instance)
 
-    def test_rate_limiters_not_created_at_class_level(self):
-        """Rate limiters dict should be empty at import time."""
-        from src.llm.budget_tracker import BudgetTracker
+    @pytest.mark.asyncio
+    async def test_rate_limiters_are_per_instance_not_class_level(self, monkeypatch):
+        """
+        Limiters are created lazily on the instance, never on the shared class dict.
 
-        # _rate_limiters should be empty — populated lazily
-        assert len(BudgetTracker._rate_limiters) == 0 or True  # May have been used in other tests
+        `_rate_limiters` is declared on the class as a mutable `{}`. If the
+        factory ever stopped giving each instance its own dict, every limiter
+        would be written into that class-level default and shared process-wide.
+        Builds the tracker through the real factory (Postgres unavailable, so it
+        takes the in-memory path) and checks where a limiter actually lands.
+        """
+        import src.llm.budget_tracker as bt
+        from src.llm.model_registry import SYNTHESIS_LADDER, is_local
+
+        async def no_postgres(*args, **kwargs):
+            raise OSError("no Postgres in unit tests")
+
+        monkeypatch.setattr(bt.asyncpg, "create_pool", no_postgres)
+        monkeypatch.setattr(bt.BudgetTracker, "_instance", None)
+        monkeypatch.setattr(bt.BudgetTracker, "_instance_lock", None)
+
+        tracker = await bt.BudgetTracker.get_instance("postgresql://unused")
+        assert tracker._is_mock is True
+        assert tracker._rate_limiters is not bt.BudgetTracker._rate_limiters
+
+        model = next(m for m in SYNTHESIS_LADDER if not is_local(m))
+        slot = f"0{tracker.SLOT_SEPARATOR}{model}"
+        limiter = tracker._get_rate_limiter(slot)
+
+        assert tracker._rate_limiters[slot] is limiter
+        assert tracker._get_rate_limiter(slot) is limiter, "limiter must be cached"
+        assert slot not in bt.BudgetTracker._rate_limiters
 
 
 class TestEmbeddingAsyncSafety:

@@ -79,7 +79,10 @@ async def _retry_operation(operation, operation_name: str) -> None:
             await asyncio.sleep(delay)
 
 
-async def create_collection(client: AsyncQdrantClient | None = None) -> None:
+async def create_collection(
+    client: AsyncQdrantClient | None = None,
+    collection_name: str = COLLECTION_NAME,
+) -> None:
     """
     Creates the main child-chunk collection with hybrid vector support.
     HNSW parameters are explicitly set — do not rely on Qdrant defaults,
@@ -87,6 +90,8 @@ async def create_collection(client: AsyncQdrantClient | None = None) -> None:
 
     Args:
         client: Initialized AsyncQdrantClient instance. If None, uses singleton.
+        collection_name: Collection to create (defaults to the standard name;
+                         overridable so an eval harness can index elsewhere).
 
     Raises:
         QdrantException: If collection creation fails after retries.
@@ -97,15 +102,15 @@ async def create_collection(client: AsyncQdrantClient | None = None) -> None:
     # Check if collection already exists
     collections = await client.get_collections()
     existing_names = [c.name for c in collections.collections]
-    if COLLECTION_NAME in existing_names:
+    if collection_name in existing_names:
         logger.info(
-            f"Collection '{COLLECTION_NAME}' already exists, skipping creation"
+            f"Collection '{collection_name}' already exists, skipping creation"
         )
         return
 
     async def _create():
         await client.create_collection(
-            collection_name=COLLECTION_NAME,
+            collection_name=collection_name,
             vectors_config={
                 "dense": VectorParams(
                     size=VECTOR_SIZE,           # 1024 — immutable
@@ -138,9 +143,9 @@ async def create_collection(client: AsyncQdrantClient | None = None) -> None:
             ),
         )
 
-    await _retry_operation(_create, f"Create collection '{COLLECTION_NAME}'")
+    await _retry_operation(_create, f"Create collection '{collection_name}'")
     logger.info(
-        f"Collection '{COLLECTION_NAME}' created successfully",
+        f"Collection '{collection_name}' created successfully",
         extra={
             "vector_size": VECTOR_SIZE,
             "distance": "cosine",
@@ -151,7 +156,10 @@ async def create_collection(client: AsyncQdrantClient | None = None) -> None:
     )
 
 
-async def create_parent_collection(client: AsyncQdrantClient | None = None) -> None:
+async def create_parent_collection(
+    client: AsyncQdrantClient | None = None,
+    collection_name: str = PARENT_COLLECTION_NAME,
+) -> None:
     """
     Creates the parent-chunk collection for context expansion.
     Parent text blobs are large — do NOT set always_ram on payload.
@@ -166,6 +174,8 @@ async def create_parent_collection(client: AsyncQdrantClient | None = None) -> N
 
     Args:
         client: Initialized AsyncQdrantClient instance. If None, uses singleton.
+        collection_name: Collection to create (defaults to the standard name;
+                         overridable so an eval harness can index elsewhere).
 
     Raises:
         QdrantException: If collection creation fails after retries.
@@ -176,15 +186,15 @@ async def create_parent_collection(client: AsyncQdrantClient | None = None) -> N
     # Check if collection already exists
     collections = await client.get_collections()
     existing_names = [c.name for c in collections.collections]
-    if PARENT_COLLECTION_NAME in existing_names:
+    if collection_name in existing_names:
         logger.info(
-            f"Collection '{PARENT_COLLECTION_NAME}' already exists, skipping creation"
+            f"Collection '{collection_name}' already exists, skipping creation"
         )
         return
 
     async def _create():
         await client.create_collection(
-            collection_name=PARENT_COLLECTION_NAME,
+            collection_name=collection_name,
             vectors_config={
                 "dense": VectorParams(
                     size=VECTOR_SIZE,
@@ -196,11 +206,15 @@ async def create_parent_collection(client: AsyncQdrantClient | None = None) -> N
             ),
         )
 
-    await _retry_operation(_create, f"Create collection '{PARENT_COLLECTION_NAME}'")
-    logger.info(f"Collection '{PARENT_COLLECTION_NAME}' created successfully")
+    await _retry_operation(_create, f"Create collection '{collection_name}'")
+    logger.info(f"Collection '{collection_name}' created successfully")
 
 
-async def create_payload_indexes(client: AsyncQdrantClient | None = None) -> None:
+async def create_payload_indexes(
+    client: AsyncQdrantClient | None = None,
+    collection_name: str = COLLECTION_NAME,
+    parent_collection_name: str = PARENT_COLLECTION_NAME,
+) -> None:
     """
     Creates payload indexes for filtered search.
 
@@ -209,6 +223,8 @@ async def create_payload_indexes(client: AsyncQdrantClient | None = None) -> Non
 
     Args:
         client: AsyncQdrantClient instance. If None, uses singleton.
+        collection_name: Child collection to index.
+        parent_collection_name: Parent collection to index.
 
     Raises:
         QdrantException: If index creation fails after retries.
@@ -228,6 +244,10 @@ async def create_payload_indexes(client: AsyncQdrantClient | None = None) -> Non
         ("currency",            PayloadSchemaType.KEYWORD),
         ("contains_pii",        PayloadSchemaType.INTEGER),    # 0 or 1
         ("content_type",        PayloadSchemaType.KEYWORD),
+        # Re-ingest deletes a document's stale points and supersession
+        # retires them — both filter on doc_id.
+        ("doc_id",              PayloadSchemaType.KEYWORD),
+        ("chunk_id",            PayloadSchemaType.KEYWORD),
         # Indexed so /deals can facet distinct documents per deal without
         # scrolling the whole collection. Qdrant refuses to facet an unindexed
         # field outright, so this is a requirement of that endpoint, not a
@@ -238,23 +258,25 @@ async def create_payload_indexes(client: AsyncQdrantClient | None = None) -> Non
     for field_name, field_type in indexes:
         async def _create_index(fn=field_name, ft=field_type):
             await client.create_payload_index(
-                collection_name=COLLECTION_NAME,
+                collection_name=collection_name,
                 field_name=fn,
                 field_schema=ft,
             )
 
         await _retry_operation(
             _create_index,
-            f"Create index '{field_name}' on '{COLLECTION_NAME}'",
+            f"Create index '{field_name}' on '{collection_name}'",
         )
 
     logger.info(
-        f"Created {len(indexes)} payload indexes on '{COLLECTION_NAME}'"
+        f"Created {len(indexes)} payload indexes on '{collection_name}'"
     )
 
     # Parent collection indexes (used during context expansion)
     parent_indexes = [
         ("chunk_id",            PayloadSchemaType.KEYWORD),
+        ("deal_id",             PayloadSchemaType.KEYWORD),
+        ("doc_id",              PayloadSchemaType.KEYWORD),
         ("is_current_version",  PayloadSchemaType.INTEGER),
         ("contains_pii",        PayloadSchemaType.INTEGER),
     ]
@@ -262,34 +284,40 @@ async def create_payload_indexes(client: AsyncQdrantClient | None = None) -> Non
     for field_name, field_type in parent_indexes:
         async def _create_parent_index(fn=field_name, ft=field_type):
             await client.create_payload_index(
-                collection_name=PARENT_COLLECTION_NAME,
+                collection_name=parent_collection_name,
                 field_name=fn,
                 field_schema=ft,
             )
 
         await _retry_operation(
             _create_parent_index,
-            f"Create index '{field_name}' on '{PARENT_COLLECTION_NAME}'",
+            f"Create index '{field_name}' on '{parent_collection_name}'",
         )
 
     logger.info(
-        f"Created {len(parent_indexes)} payload indexes on '{PARENT_COLLECTION_NAME}'"
+        f"Created {len(parent_indexes)} payload indexes on '{parent_collection_name}'"
     )
 
 
-async def setup_collections(client: AsyncQdrantClient | None = None) -> None:
+async def setup_collections(
+    client: AsyncQdrantClient | None = None,
+    collection_name: str = COLLECTION_NAME,
+    parent_collection_name: str = PARENT_COLLECTION_NAME,
+) -> None:
     """
     Complete collection setup: creates both collections and all payload indexes.
     Idempotent — safe to call on every startup.
 
     Args:
         client: AsyncQdrantClient instance. If None, uses singleton.
+        collection_name: Child collection name.
+        parent_collection_name: Parent collection name.
     """
     if client is None:
         client = get_qdrant_client()
 
     logger.info("Starting Qdrant collection setup")
-    await create_collection(client)
-    await create_parent_collection(client)
-    await create_payload_indexes(client)
+    await create_collection(client, collection_name)
+    await create_parent_collection(client, parent_collection_name)
+    await create_payload_indexes(client, collection_name, parent_collection_name)
     logger.info("Qdrant collection setup complete")

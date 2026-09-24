@@ -15,9 +15,8 @@ Strategy:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from difflib import SequenceMatcher
-from typing import Any
 
 import pdfplumber
 
@@ -311,6 +310,7 @@ class MultiPageTableStitcher:
         Determines if a candidate table is a continuation of the current stitched table.
 
         Criteria:
+        - Candidate is on the page immediately after the current table's last page
         - Candidate has no header row (continuation tables typically lack headers)
         - Column count matches
         - If candidate has headers, they must be very similar to current headers
@@ -322,6 +322,12 @@ class MultiPageTableStitcher:
         Returns:
             True if the candidate is a continuation.
         """
+        # A table can only continue across a page break. Two tables on the same
+        # page, or pages apart, are distinct tables even when their column
+        # counts match — merging them fabricates rows the source never had.
+        if candidate.page_number != current.page_range[1] + 1:
+            return False
+
         # If candidate has a header, it's likely a new table
         # Unless the headers match very closely (repeated header across pages)
         if candidate.has_header and candidate.headers:

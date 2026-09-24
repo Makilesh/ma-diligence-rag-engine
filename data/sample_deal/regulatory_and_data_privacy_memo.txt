@@ -1,0 +1,142 @@
+AURORA TECHNOLOGIES INC.
+REGULATORY APPROVALS AND DATA PRIVACY DILIGENCE MEMORANDUM
+Prepared by: Wilson Sonsini Goodrich & Rosati
+For: Vertex Capital Partners LLC
+Date: March 8, 2024
+
+CONFIDENTIAL - ATTORNEY CLIENT PRIVILEGED
+
+================================================================================
+SECTION 1: ANTITRUST AND MERGER CONTROL
+================================================================================
+
+HART-SCOTT-RODINO (UNITED STATES)
+
+The transaction is reportable under the Hart-Scott-Rodino Antitrust Improvements
+Act. The transaction value of approximately $696 million exceeds the size-of-
+transaction threshold, and both parties exceed the size-of-person thresholds.
+
+  Filing fee (transactions $500M to $1B tier)              $260,000
+  Filing responsibility                                    Both parties
+  Fee allocation per merger agreement                      Buyer pays 100%
+  Initial waiting period                                   30 calendar days
+
+Filing was submitted on March 20, 2024. The initial waiting period expires on
+April 19, 2024 absent a Second Request.
+
+Substantive assessment: Vertex Capital Partners is a financial sponsor with no
+existing portfolio company in enterprise data analytics. There is no horizontal
+overlap and no vertical relationship. Counsel assesses the probability of a
+Second Request as low.
+
+FOREIGN MERGER CONTROL
+
+  Germany     Not reportable. Aurora's German turnover of EUR 14.2 million is
+              below the EUR 17.5 million domestic threshold.
+  Austria     Not reportable.
+  United      Not reportable on a turnover basis. The share of supply test is
+  Kingdom     theoretically available to the CMA but counsel assesses call-in
+              risk as remote.
+  Canada      Not reportable; below the CAD 93 million transaction size test.
+
+No foreign investment or national security filing is required. Aurora holds no
+government contracts, no facility security clearance, and no controlled
+technology subject to ITAR or the EAR beyond mass-market encryption eligible for
+License Exception ENC.
+
+================================================================================
+SECTION 2: DATA PRIVACY POSTURE
+================================================================================
+
+GDPR (EUROPEAN UNION)
+
+Aurora processes personal data of EU data subjects on behalf of customers and
+acts as a processor in that capacity. It acts as a controller with respect to
+its own employee and prospect data.
+
+  Standard Contractual Clauses in place                    Yes, 2021 SCCs
+  Records of processing (Article 30)                       Maintained
+  Data Protection Impact Assessments                       2 completed
+  EU representative appointed (Article 27)                 Yes, Dublin
+  Data Protection Officer                                  Not required;
+                                                           voluntarily appointed
+  Supervisory authority inquiries                          None received
+  Reportable personal data breaches (last 3 years)         None
+
+A transfer impact assessment was completed in November 2023 following the EU-US
+Data Privacy Framework adequacy decision. Aurora is NOT self-certified under the
+Data Privacy Framework and relies on SCCs plus supplementary measures.
+
+CALIFORNIA (CCPA/CPRA)
+
+Aurora qualifies as a "service provider" for customer data. Its standard data
+processing addendum contains the required service provider terms. Aurora does
+not sell or share personal information as those terms are defined.
+
+HIPAA
+
+One customer, Meridian Health Networks, is a covered entity. Aurora executed a
+Business Associate Agreement dated April 12, 2022. Aurora's HIPAA compliance
+programme was reviewed and no material gaps were identified. The BAA does not
+contain an assignment restriction and survives a change of control.
+
+================================================================================
+SECTION 3: SECURITY CERTIFICATIONS AND INCIDENTS
+================================================================================
+
+  SOC 2 Type II            FY2023 examination issued with NO exceptions.
+                           The FY2022 examination identified 3 control gaps in
+                           logical access review and change management. All were
+                           remediated at a one-time cost of $1.6 million,
+                           reflected as a non-recurring adjustment in the
+                           quality of earnings report.
+
+  ISO 27001                Certified, valid through October 2025.
+
+  Penetration testing      Annual third party test. The FY2023 test identified
+                           2 medium-severity findings, both remediated within
+                           the 30-day SLA. No high or critical findings.
+
+SECURITY INCIDENTS
+
+One security incident occurred during the review period. In August 2023 a
+misconfigured storage bucket in a non-production environment was accessible
+without authentication for approximately 41 hours. The environment contained
+synthetic test data only. No personal data or customer data was exposed. Counsel
+confirmed no notification obligation arose under GDPR, CCPA or any state breach
+notification statute. The incident is unrelated to the service credit recorded
+for the Meridian Health Networks availability event in the same month.
+
+================================================================================
+SECTION 4: CONDITIONS TO CLOSING
+================================================================================
+
+The regulatory conditions to closing under Article VI of the merger agreement
+are:
+
+  1. Expiration or early termination of the HSR waiting period.
+  2. No injunction or order prohibiting the transaction.
+  3. No law enacted after signing that makes the transaction illegal.
+
+There is no financing condition. There is no condition relating to obtaining
+customer consents, notwithstanding that two material customer contracts
+(Northstar Financial Group and Pacific Data Systems, together representing
+$92.8 million or 20.5% of FY2023 revenue) contain consent-based termination
+rights. Buyer therefore bears the risk of those consents not being obtained.
+
+Counsel draws attention to this allocation: the customer consent risk sits with
+the Buyer post-closing rather than operating as a condition, and is addressed,
+if at all, through the indemnification provisions in Article VIII.
+
+================================================================================
+SECTION 5: OUTSIDE DATE AND TERMINATION
+================================================================================
+
+The outside date under Section 7.1(b) is December 31, 2024, subject to a single
+automatic extension of 90 days if the only unsatisfied condition is the HSR
+waiting period.
+
+Given a March 20, 2024 HSR filing and a low assessed probability of a Second
+Request, counsel considers the outside date to provide substantial headroom.
+Even in a Second Request scenario, typical timelines of 6 to 10 months from
+filing would fall within the extended date.

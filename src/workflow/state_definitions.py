@@ -75,13 +75,22 @@ class AgentState(TypedDict):
     # ==================== Answer ====================
     generated_answer: str
     citations: list[dict]
+    # Every figure the answer states, grounded against the context:
+    # [{raw, value, kind, status: grounded|derived|derived_unverified|unsupported,
+    #   evidence_source, evidence_snippet, formula}] — see numeric_grounding.py.
     numerical_claims: list[dict]
 
     # ==================== Validation ====================
+    # Computed from claim_checks, not self-reported by a model — see
+    # src/verification/claim_checker.py for the definition.
     confidence_score: float
-    hallucination_flags: list[str]
+    hallucination_flags: list[str]  # human-readable; kept for UI compatibility
+    # Per-claim verdicts: [{claim, status: supported|contradicted|unsupported|
+    # unverified, method: numeric|nli|llm|none, score, evidence_source,
+    # evidence_page, evidence_section, evidence, numbers, cited, reason}]
+    claim_checks: list[dict]
     validation_status: Literal["passed", "warning", "failed"]
-    validation_attempt: int
+    validation_attempt: int  # validations run so far; 1 after the first
     force_refusal: bool  # Set by quality_assessor_node when context is insufficient
 
     # ==================== Session ====================

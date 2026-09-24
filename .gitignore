@@ -1,20 +1,38 @@
+# Secrets
 .env
+
+# Python
 __pycache__/
 *.pyc
 *.pyo
 .pytest_cache/
+.ruff_cache/
 *.egg-info/
 dist/
 build/
 .venv/
 venv/
+
+# Logs and local runtime state
 *.log
-data/sample_deal/*
-!data/sample_deal/.gitkeep
-ppp.md
+logs/
+.remember/
+docker_data/
 qdrant_local_db/
 qdrant_test_db/
 qdrant_test_db_v2/
-docker_data/
-*.md
+
+# Sample data room: only the synthetic corpus (*.txt) is tracked, so a fresh
+# clone can run the demo and the eval. Anything else dropped in here stays local.
+data/sample_deal/*
+!data/sample_deal/.gitkeep
+!data/sample_deal/*.txt
+
+# Private notes — never pushed (build prompts, interview prep, study notes)
+ppp.md
+PROJECT_KNOWLEDGE_BASE.md
+questions_mock.md
+ai_engineer_interview_guide.md
+
+# Job-application material
 auric*

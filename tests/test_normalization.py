@@ -3,7 +3,7 @@ Tests for ExcelNormalizer scale/currency detection.
 """
 
 import pytest
-from src.data_processing.excel_normalizer import ExcelNormalizer, TableNormalizationMeta
+from src.data_processing.excel_normalizer import ExcelNormalizer
 
 
 @pytest.fixture

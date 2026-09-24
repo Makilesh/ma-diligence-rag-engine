@@ -8,6 +8,7 @@ import {
   BadgeCheck,
   Clock,
   Gauge,
+  Loader2,
   RefreshCw,
   ShieldAlert,
   ShieldX,
@@ -18,9 +19,25 @@ import { parseAnswer, type ParsedCitation } from "@/lib/citations";
 import type { QueryResponse } from "@/lib/types";
 
 interface AnswerPanelProps {
-  result: QueryResponse;
+  /** The validated answer. Null while the answer is still being written. */
+  result: QueryResponse | null;
+  /**
+   * Streamed answer text, shown only until `result` arrives. It has not been
+   * verified yet, so it renders as a draft with no verdict or confidence.
+   */
+  draft?: string;
   onSelectCitation?: (index: number) => void;
 }
+
+const NO_CITATIONS: QueryResponse["citations"] = [];
+
+/** Header treatment while the answer is still streaming in, unverified. */
+const DRAFT_VERDICT = {
+  icon: Loader2,
+  label: "Drafting…",
+  detail: "Unverified draft — replaced by the checked answer when validation finishes",
+  className: "text-ash-300 bg-ink-850/70 border-line",
+} as const;
 
 /** Visual treatment per validation outcome. */
 const VERDICT = {
@@ -77,14 +94,21 @@ function Metric({
 
 export default function AnswerPanel({
   result,
+  draft = "",
   onSelectCitation,
 }: AnswerPanelProps) {
+  const isDraft = !result;
+  const body = result ? result.answer : draft;
+  const records = result ? result.citations : NO_CITATIONS;
+
   // Parsing rewrites every bracket citation into a numbered link, so it must
   // run before the markdown is handed to the renderer — and only when the
-  // answer changes, since it walks the whole body.
+  // answer changes, since it walks the whole body. While drafting that is once
+  // per streamed token; a half-written bracket simply stays literal until it
+  // closes.
   const { markdown, citations } = useMemo(
-    () => parseAnswer(result.answer, result.citations),
-    [result.answer, result.citations],
+    () => parseAnswer(body, records),
+    [body, records],
   );
 
   const byIndex = useMemo(() => {
@@ -93,10 +117,12 @@ export default function AnswerPanel({
     return map;
   }, [citations]);
 
-  const verdict = VERDICT[result.validation_status] ?? VERDICT.passed;
+  const verdict = result
+    ? (VERDICT[result.validation_status] ?? VERDICT.passed)
+    : DRAFT_VERDICT;
   const VerdictIcon = verdict.icon;
 
-  const confidence = Math.round(result.confidence_score * 100);
+  const confidence = Math.round((result?.confidence_score ?? 0) * 100);
   const confidenceTone =
     confidence >= 75 ? "good" : confidence >= 45 ? "warn" : "bad";
 
@@ -116,12 +142,15 @@ export default function AnswerPanel({
           className={`inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 ${verdict.className}`}
           title={verdict.detail}
         >
-          <VerdictIcon size={14} />
+          <VerdictIcon size={14} className={isDraft ? "animate-spin" : undefined} />
           <span className="text-[0.74rem] font-semibold tracking-wide">
             {verdict.label}
           </span>
         </div>
 
+        {isDraft ? (
+          <span className="text-[0.74rem] text-ash-500">{verdict.detail}</span>
+        ) : result && (
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
           <Metric
             icon={Gauge}
@@ -143,9 +172,10 @@ export default function AnswerPanel({
             />
           )}
         </div>
+        )}
       </div>
 
-      <div className="answer-body px-6 py-6">
+      <div className={`answer-body px-6 py-6 ${isDraft ? "opacity-80" : ""}`}>
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
@@ -191,7 +221,7 @@ export default function AnswerPanel({
         </ReactMarkdown>
       </div>
 
-      {result.hallucination_flags.length > 0 && (
+      {result && result.hallucination_flags.length > 0 && (
         <div className="border-t border-line bg-bad/[0.05] px-6 py-4">
           <div className="mb-2.5 flex items-center gap-2 text-[0.72rem] font-semibold uppercase tracking-wider text-bad">
             <ShieldAlert size={13} />

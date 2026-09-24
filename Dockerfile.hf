@@ -42,11 +42,17 @@ WORKDIR /app
 # CPU-only torch, installed first and pinned to the CPU index so the later
 # `sentence-transformers` install sees the requirement already satisfied and
 # does not pull the CUDA build over the top of it.
-RUN pip install --no-cache-dir \
+#
+# --timeout/--retries: the CPU wheel is ~200MB, and pip's default 15s read
+# timeout is shorter than one quiet stretch on a slow or throttled connection
+# to pytorch.org's CDN. Measured locally: identical ReadTimeoutError at the same
+# ~100s mark on two consecutive attempts, so this is a real connection
+# characteristic to defend against, not a one-off blip.
+RUN pip install --no-cache-dir --timeout 120 --retries 5 \
         torch --index-url https://download.pytorch.org/whl/cpu
 
 COPY --chown=user requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --timeout 120 --retries 5 -r requirements.txt
 
 COPY --chown=user . .
 
@@ -62,10 +68,14 @@ USER user
 # the real reranker on first query, which is the exact cost this avoids.
 ARG EMBEDDING_MODEL=BAAI/bge-m3
 ARG RERANKER_MODEL=cross-encoder/ms-marco-MiniLM-L-6-v2
+# The claim-level entailment check in the hallucination validator. xsmall is the
+# CPU default in src/verification/nli.py; pinned here so build and runtime agree.
+ARG NLI_MODEL=cross-encoder/nli-deberta-v3-xsmall
 RUN python -c "\
 from sentence_transformers import SentenceTransformer, CrossEncoder; \
 SentenceTransformer('${EMBEDDING_MODEL}'); \
 CrossEncoder('${RERANKER_MODEL}'); \
+CrossEncoder('${NLI_MODEL}'); \
 print('models cached')"
 
 # FastEmbed's BM25 model is small but is fetched on first use like the others.
@@ -79,6 +89,7 @@ print('bm25 cached')"
 # work in 3.2s. See src/vector_db/reranker.py for the full measurement.
 ENV EMBEDDING_MODEL=${EMBEDDING_MODEL} \
     RERANKER_MODEL=${RERANKER_MODEL} \
+    NLI_MODEL=${NLI_MODEL} \
     RERANKER_MAX_LENGTH=512 \
     WARM_MODELS=1
 

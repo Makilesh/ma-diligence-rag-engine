@@ -10,8 +10,10 @@ Agent 7 (Answer Synthesizer) returns prose and uses call_prose_agent().
 """
 
 import asyncio
+import contextvars
 import json
 import os
+import time
 
 import litellm
 
@@ -19,6 +21,124 @@ from src.llm.model_registry import AGENT_LADDER, LOCAL_MODEL
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
+
+# ─── Observability (optional, free) ────────────────────────────────────────────
+# Per-request context attached to every LLM call's metadata: which deal/session
+# the call served. Set once per query by the orchestrator; contextvars propagate
+# into LangGraph's node tasks, so no agent has to thread it through.
+_trace_context: contextvars.ContextVar[dict | None] = contextvars.ContextVar(
+    "llm_trace_context", default=None
+)
+
+# The model that actually answered the most recent verification call in this
+# context. See active_verification_model().
+_last_verification_model: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "last_verification_model", default=None
+)
+
+
+def set_trace_context(**fields) -> None:
+    """
+    Records request-scoped metadata (deal_id, session_id) for LLM call tracing.
+
+    Args:
+        **fields: Values to attach to every subsequent call in this context.
+    """
+    _trace_context.set({k: v for k, v in fields.items() if v is not None})
+
+
+def _langfuse_enabled() -> bool:
+    """True when both Langfuse keys are configured."""
+    return bool(os.getenv("LANGFUSE_PUBLIC_KEY") and os.getenv("LANGFUSE_SECRET_KEY"))
+
+
+def _configure_tracing() -> bool:
+    """
+    Enables LiteLLM's Langfuse callbacks when LANGFUSE_PUBLIC_KEY and
+    LANGFUSE_SECRET_KEY are set; a no-op otherwise.
+
+    Langfuse is deliberately NOT a hard dependency (`pip install langfuse` to
+    use it; LANGFUSE_HOST selects a self-hosted or regional instance). If the
+    keys are set but the package is missing, tracing is skipped with a warning
+    rather than failing every LLM call at the callback.
+
+    Returns:
+        True when tracing was enabled.
+    """
+    if not _langfuse_enabled():
+        return False
+    try:
+        import langfuse  # noqa: F401  (presence check only)
+    except ImportError:
+        logger.warning(
+            "LANGFUSE_* keys are set but the langfuse package is not installed; "
+            "tracing disabled (pip install langfuse)"
+        )
+        return False
+    for hook in (litellm.success_callback, litellm.failure_callback):
+        if "langfuse" not in hook:
+            hook.append("langfuse")
+    logger.info("LLM tracing enabled (Langfuse via LiteLLM callbacks)")
+    return True
+
+
+_TRACING = _configure_tracing()
+
+
+def _call_metadata(agent: str | None) -> dict | None:
+    """
+    LiteLLM `metadata` for a call — only when tracing is on, so untraced calls
+    send exactly the kwargs they always did.
+
+    Args:
+        agent: Pipeline agent making the call.
+
+    Returns:
+        Metadata dict, or None.
+    """
+    if not _TRACING:
+        return None
+    ctx = _trace_context.get() or {}
+    tags = [t for t in (agent, ctx.get("deal_id")) if t]
+    return {
+        "generation_name": agent or "llm_call",
+        "trace_name": "manda-query",
+        "session_id": ctx.get("session_id"),
+        "tags": tags,
+        "trace_metadata": {**ctx, "agent": agent},
+    }
+
+
+def _log_usage(response, model: str, agent: str | None, started: float) -> None:
+    """
+    Logs token usage and latency for one completed call.
+
+    Free observability even without Langfuse: the structured log line is enough
+    to see which agent spends the quota. Tolerates responses without `usage`
+    (test doubles, some local backends).
+    """
+    usage = getattr(response, "usage", None)
+
+    def _get(name: str):
+        if usage is None:
+            return None
+        value = getattr(usage, name, None)
+        if value is None and isinstance(usage, dict):
+            value = usage.get(name)
+        return value
+
+    logger.info(
+        "LLM call usage",
+        extra={
+            "model": model,
+            "agent": agent,
+            "prompt_tokens": _get("prompt_tokens"),
+            "completion_tokens": _get("completion_tokens"),
+            "total_tokens": _get("total_tokens"),
+            "latency_ms": round((time.monotonic() - started) * 1000, 1),
+            **{k: v for k, v in (_trace_context.get() or {}).items() if k == "deal_id"},
+        },
+    )
 
 # Local fallback for the verification agents. The cloud model is no longer named
 # here — it comes from BudgetTracker's agent ladder, so verification routes and
@@ -182,6 +302,7 @@ async def call_structured_agent(
     temperature: float = 0.0,
     max_tokens: int = 1000,
     api_key: str | None = None,
+    agent: str | None = None,
 ) -> dict:
     """
     Wrapper for all agents that return JSON.
@@ -196,6 +317,7 @@ async def call_structured_agent(
         max_tokens: Maximum output tokens.
         api_key: Credential for this specific call. Required when multiple keys
             are configured — see the note at the kwargs assembly below.
+        agent: Calling agent's name, for usage logs and optional tracing.
 
     Returns:
         Parsed JSON dict from the agent response.
@@ -235,8 +357,13 @@ async def call_structured_agent(
                 # env var would send every call to key 1 while the tracker
                 # debited whichever key it thought it had picked.
                 kwargs["api_key"] = api_key
+            metadata = _call_metadata(agent)
+            if metadata:
+                kwargs["metadata"] = metadata
 
+            started = time.monotonic()
             response = await litellm.acompletion(**kwargs)
+            _log_usage(response, model, agent, started)
 
             raw = response.choices[0].message.content
             # Strip accidental markdown fences before parsing
@@ -303,6 +430,7 @@ async def call_prose_agent(
     temperature: float = 0.1,
     max_tokens: int = 3000,
     api_key: str | None = None,
+    agent: str | None = None,
 ) -> str:
     """
     Wrapper for agents that return prose (not JSON).
@@ -315,6 +443,8 @@ async def call_prose_agent(
         model: LiteLLM model string.
         temperature: Sampling temperature (default 0.1 for slight variety).
         max_tokens: Maximum output tokens (default 3000 for long answers).
+        api_key: Credential for this specific call.
+        agent: Calling agent's name, for usage logs and optional tracing.
 
     Returns:
         Raw string response from the agent. Never None.
@@ -356,7 +486,12 @@ async def call_prose_agent(
             }
             if api_key:
                 prose_kwargs["api_key"] = api_key
+            metadata = _call_metadata(agent)
+            if metadata:
+                prose_kwargs["metadata"] = metadata
+            started = time.monotonic()
             response = await litellm.acompletion(**prose_kwargs)
+            _log_usage(response, model, agent, started)
             content = response.choices[0].message.content
 
             if content and content.strip():
@@ -402,62 +537,59 @@ async def call_prose_agent(
     )
 
 
-async def call_verification_agent(
+async def call_verification_agent_with_model(
     system_prompt: str,
     user_prompt: str,
     temperature: float = 0.0,
     max_tokens: int = 1500,
-) -> dict:
+    agent: str | None = None,
+) -> tuple[dict, str]:
     """
-    Wrapper for the verification agents (Agent 4 Financial Verifier,
-    Agent 8 Hallucination Validator). Enforces JSON mode.
+    Verification call that also reports which model actually answered.
 
     Model routing is a deployment choice, not an architectural one, so it is
     controlled by VERIFICATION_BACKEND:
 
-      "cloud" (default) — Gemini. Higher-quality structured reasoning and no
-          local GPU requirement, which also means the project runs from a clone
-          plus an API key: no 9GB model pull, no CUDA.
+      "cloud" (default) — Gemini via the budget tracker's agent ladder. Higher-
+          quality structured reasoning and no local GPU requirement.
       "local"           — Ollama / Qwen2.5:14b. Keeps verification off the
-          metered API entirely and out of the daily quota, at the cost of a
-          12GB-VRAM machine. This was the original design: verification is the
-          highest-volume agent traffic, so pushing it to a local model was how
-          the pipeline stayed inside the free Gemini tier.
+          metered API entirely, at the cost of a 12GB-VRAM machine.
 
-    Both paths are live; the constant only decides the default. If the cloud
-    call fails for any reason, the local model is tried before giving up, so a
-    quota exhaustion degrades rather than fails.
+    If the cloud ladder fails for any reason, the local model is tried before
+    giving up, so a quota exhaustion degrades rather than fails.
 
     Args:
         system_prompt: System-level instructions.
         user_prompt: User query / context.
         temperature: Sampling temperature (default 0.0).
         max_tokens: Maximum output tokens (default 1500).
+        agent: Calling agent's name, for usage logs and optional tracing.
 
     Returns:
-        Parsed JSON dict from the verification model.
+        (parsed JSON dict, model string that served the call).
 
     Raises:
         ValueError: If every configured model returns invalid JSON.
+        Exception: The last transport error when even the local fallback fails.
     """
     backend = os.getenv("VERIFICATION_BACKEND", "cloud").strip().lower()
 
     if backend == "local":
-        return await call_structured_agent(
+        result = await call_structured_agent(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             model=LOCAL_VERIFICATION_MODEL,
             temperature=temperature,
             max_tokens=max_tokens,
+            agent=agent,
         )
+        _last_verification_model.set(LOCAL_VERIFICATION_MODEL)
+        return result, LOCAL_VERIFICATION_MODEL
 
-    # Route through the budget tracker rather than calling Gemini directly.
-    # Verification is now the highest-volume cloud traffic in the pipeline (two
-    # calls per query), so it has to take a rate-limiter slot and debit the daily
-    # quota like every other cloud call — otherwise it would silently blow
-    # through the 15 RPM free-tier limit. get_model_for_agent() already returns
-    # the local model when the quota is spent, which gives cloud-first routing
-    # with automatic local fallback for free.
+    # Route through the budget tracker rather than calling Gemini directly, so
+    # verification takes a rate-limiter slot and debits the daily quota like
+    # every other cloud call. get_model_for_agent() already returns the local
+    # model when the quota is spent.
     from src.llm.budget_tracker import BudgetTracker  # deferred: avoids import cycle
 
     tracker = await BudgetTracker.get_instance()
@@ -471,14 +603,17 @@ async def call_verification_agent(
     for _ in range(MAX_LADDER_FALLBACKS):
         choice = await tracker.get_model_for_agent()
         try:
-            return await call_structured_agent(
+            result = await call_structured_agent(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
                 model=choice.model,
                 temperature=temperature,
                 max_tokens=max_tokens,
                 api_key=choice.api_key,
+                agent=agent,
             )
+            _last_verification_model.set(choice.model)
+            return result, choice.model
         except Exception as e:
             last_error = e
             if choice.key_index >= 0 and is_auth_error(e):
@@ -502,9 +637,8 @@ async def call_verification_agent(
                 continue
             if (is_service_unavailable(e) or is_timeout_error(e)) and choice.key_index >= 0:
                 # The model is down or unresponsive for everyone, so rotating
-                # keys is pointless.
-                # Skip the whole model for this request without debiting quota —
-                # this clears in minutes and should not cost the day's capacity.
+                # keys is pointless. Skip the whole model for this request
+                # without debiting quota — this clears in minutes.
                 tracker.skip_model_for_request(choice.model)
                 logger.warning(
                     "Verification rung unavailable provider-side, trying another model",
@@ -516,19 +650,54 @@ async def call_verification_agent(
     if choice is not None and choice.model == LOCAL_VERIFICATION_MODEL:
         raise last_error if last_error else RuntimeError("verification failed")
 
-    if True:
-        e = last_error
-        logger.warning(
-            "Cloud verification failed, falling back to local model",
-            extra={"error": str(e), "fallback": LOCAL_VERIFICATION_MODEL},
-        )
-        return await call_structured_agent(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            model=LOCAL_VERIFICATION_MODEL,
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
+    logger.warning(
+        "Cloud verification failed, falling back to local model",
+        extra={"error": str(last_error), "fallback": LOCAL_VERIFICATION_MODEL},
+    )
+    result = await call_structured_agent(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        model=LOCAL_VERIFICATION_MODEL,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        agent=agent,
+    )
+    _last_verification_model.set(LOCAL_VERIFICATION_MODEL)
+    return result, LOCAL_VERIFICATION_MODEL
+
+
+async def call_verification_agent(
+    system_prompt: str,
+    user_prompt: str,
+    temperature: float = 0.0,
+    max_tokens: int = 1500,
+    agent: str | None = None,
+) -> dict:
+    """
+    Wrapper for the verification LLM calls. Enforces JSON mode.
+
+    Thin form of call_verification_agent_with_model for callers that only need
+    the result; the serving model is still recorded for
+    active_verification_model().
+
+    Args:
+        system_prompt: System-level instructions.
+        user_prompt: User query / context.
+        temperature: Sampling temperature (default 0.0).
+        max_tokens: Maximum output tokens (default 1500).
+        agent: Calling agent's name, for usage logs and optional tracing.
+
+    Returns:
+        Parsed JSON dict from the verification model.
+    """
+    result, _model = await call_verification_agent_with_model(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        agent=agent,
+    )
+    return result
 
 
 # Backwards-compatible alias — the verification agents were originally local-only.
@@ -537,13 +706,155 @@ call_local_agent = call_verification_agent
 
 def active_verification_model() -> str:
     """
-    Returns the model string the verification agents will try first.
+    The model that served the most recent verification call in this context,
+    or — before any call — the model the verification path will try first.
 
-    Used for the agent trace so the UI reports the model actually in use rather
-    than a hardcoded name that silently goes stale when the backend changes.
+    This used to return AGENT_LADDER[0] unconditionally, so the trace named the
+    top rung even when quota exhaustion or a 503 had sent the call down the
+    ladder or to the local model. The served model is now recorded by
+    call_verification_agent_with_model; prefer the model that function returns
+    over calling this.
     """
+    served = _last_verification_model.get()
+    if served:
+        return served
     backend = os.getenv("VERIFICATION_BACKEND", "cloud").strip().lower()
     if backend == "local":
         return LOCAL_VERIFICATION_MODEL
-    # First rung of the agent ladder — what the selector will try first.
     return AGENT_LADDER[0]
+
+
+# ─── Streaming ────────────────────────────────────────────────────────────────
+
+
+class StreamInterrupted(RuntimeError):
+    """
+    A streamed completion failed after tokens had already been emitted.
+
+    Distinct from a failure before the first token: the client has partial text
+    on screen, so the caller must tell it to discard that draft before falling
+    back to another model.
+    """
+
+    def __init__(self, message: str, emitted_chars: int, cause: Exception):
+        super().__init__(message)
+        self.emitted_chars = emitted_chars
+        self.cause = cause
+
+
+class _UsageHolder:
+    """Response-shaped holder so _log_usage can read a streamed call's usage."""
+
+    def __init__(self, usage):
+        self.usage = usage
+
+
+async def stream_prose_agent(
+    system_prompt: str,
+    user_prompt: str,
+    model: str,
+    on_token,
+    temperature: float = 0.1,
+    max_tokens: int = 3000,
+    api_key: str | None = None,
+    agent: str | None = None,
+) -> str:
+    """
+    Prose completion streamed token by token, returning the full text.
+
+    Failure semantics mirror call_prose_agent so the synthesizer's ladder logic
+    is unchanged:
+
+    - fails BEFORE the first token: a 503 / timeout / quota / auth error is
+      re-raised for the ladder to classify; any other error falls back to the
+      non-streamed call_prose_agent on the same model (which retries), and its
+      whole answer is emitted as one token.
+    - fails AFTER tokens were emitted: raises StreamInterrupted, and the caller
+      emits an answer reset before trying elsewhere.
+
+    Args:
+        system_prompt: System-level instructions.
+        user_prompt: User prompt.
+        model: LiteLLM model string.
+        on_token: Callable receiving each text delta.
+        temperature: Sampling temperature.
+        max_tokens: Maximum output tokens.
+        api_key: Credential for this call.
+        agent: Calling agent's name.
+
+    Returns:
+        The complete generated text. Never empty.
+
+    Raises:
+        StreamInterrupted: The stream broke after emitting text.
+        RuntimeError: Empty completion.
+        Exception: Provider errors the ladder classifies (see above).
+    """
+    kwargs = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "timeout": PROSE_TIMEOUT_SECONDS,
+        "stream": True,
+    }
+    if api_key:
+        kwargs["api_key"] = api_key
+    metadata = _call_metadata(agent)
+    if metadata:
+        kwargs["metadata"] = metadata
+
+    parts: list[str] = []
+    emitted = 0
+    started = time.monotonic()
+    usage = None
+    try:
+        stream = await litellm.acompletion(**kwargs)
+        async for chunk in stream:
+            usage = getattr(chunk, "usage", None) or usage
+            try:
+                delta = chunk.choices[0].delta.content
+            except (AttributeError, IndexError):
+                delta = None
+            if delta:
+                parts.append(delta)
+                emitted += len(delta)
+                on_token(delta)
+    except Exception as e:
+        if emitted:
+            raise StreamInterrupted(
+                f"stream from {model} failed after {emitted} chars: {e}", emitted, e
+            ) from e
+        if (
+            is_service_unavailable(e)
+            or is_timeout_error(e)
+            or is_quota_error(e)
+            or is_auth_error(e)
+            or is_model_unavailable_for_key(e)
+        ):
+            raise
+        logger.warning(
+            "Streaming failed before the first token; retrying without streaming",
+            extra={"model": model, "error": str(e)},
+        )
+        text = await call_prose_agent(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            api_key=api_key,
+            agent=agent,
+        )
+        on_token(text)
+        return text
+
+    _log_usage(_UsageHolder(usage), model, agent, started)
+
+    text = "".join(parts)
+    if not text.strip():
+        raise RuntimeError(f"empty streamed completion (model={model})")
+    return text

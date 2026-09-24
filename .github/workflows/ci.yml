@@ -1,0 +1,169 @@
+# Lint, type-check and test on every push and pull request.
+#
+# The Python job runs the offline suite: everything that needs no Docker
+# services (Postgres, Qdrant), no GPU, no Gemini keys, no Ollama and no
+# multi-GB model weights. Tests that need any of those are marked in pytest.ini
+# (`live`, `models`) and deselected here; run them locally.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+  # Retrieval eval (the `retrieval-eval` job) — manual, plus weekly so a slow
+  # drift in retrieval quality cannot go unnoticed for long.
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * 1"  # Mondays 04:00 UTC
+
+permissions:
+  contents: read
+
+concurrency:
+  # Event name in the group so a push does not cancel an in-flight eval run.
+  group: ci-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python (ruff + pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PYTHONUNBUFFERED: "1"
+      # No keys in CI: every LLM path in the offline suite is mocked, and an
+      # accidental real call should fail rather than spend quota.
+      GEMINI_API_KEYS: ""
+      GEMINI_API_KEY: ""
+      # Never load the embedding/reranker weights at API startup in tests.
+      WARM_MODELS: "0"
+      # The Streamlit UI tests run with the API deliberately down; point them at
+      # a port that refuses immediately instead of relying on localhost:8000.
+      API_URL: "http://127.0.0.1:9"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      TOKENIZERS_PARALLELISM: "false"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"  # matches Dockerfile / Dockerfile.hf
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      # Small Hugging Face artefacts (e.g. the bge-m3 tokenizer used by the
+      # chunkers) are cached between runs. Full model weights are never
+      # downloaded here: tests that need them are marked `models` and deselected.
+      - name: Cache Hugging Face hub
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-${{ runner.os }}-v1
+
+      # CPU torch first, from the CPU index, so sentence-transformers sees the
+      # requirement satisfied and does not pull ~2.5GB of CUDA wheels.
+      - name: Install CPU torch
+        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Ruff
+        run: ruff check . --output-format=github
+
+      - name: Pytest (offline suite)
+        run: pytest -m "not live and not models" -ra
+
+  web:
+    name: Web (typecheck + lint + build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      # Inlined at build time; any URL will do for a build check.
+      NEXT_PUBLIC_API_URL: "http://localhost:8000"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+  # Retrieval eval over the golden QA set with the real models (bge-m3,
+  # bge-reranker-v2-m3, BM25) against an in-memory Qdrant built from
+  # data/sample_deal. No Docker services and no Gemini quota: Agent 1's
+  # sub-questions are read from the committed eval/sub_questions.json, so the
+  # run makes zero LLM calls. Fails if a gated metric drops below
+  # eval/baseline.json by more than the tolerance.
+  #
+  # Runs on CPU here while the baseline is recorded on a GPU. Measured locally,
+  # a CPU run reproduced the GPU metrics and rankings exactly (reranker scores
+  # within 1e-4), but a different CPU/BLAS could reorder a near-tie, and on 35
+  # questions one fact moving in or out of one context is ~0.6-1pp — hence a 3pp
+  # tolerance in CI against the 2pp default used locally.
+  retrieval-eval:
+    name: Retrieval eval (golden set, CPU)
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    # CPU cross-encoding is the long pole: ~100 rerank passes of up to 25 pairs.
+    timeout-minutes: 180
+    env:
+      PYTHONUNBUFFERED: "1"
+      GEMINI_API_KEYS: ""
+      GEMINI_API_KEY: ""
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      TOKENIZERS_PARALLELISM: "false"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      # bge-m3 and bge-reranker-v2-m3 weights (~4.5GB) — cached so only the
+      # first run downloads them.
+      - name: Cache Hugging Face models
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-eval-${{ runner.os }}-bge-m3-bge-reranker-v2-m3-v1
+
+      - name: Install CPU torch
+        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run retrieval eval against the baseline
+        run: python -m eval.run_retrieval_eval --baseline eval/baseline.json --tolerance 0.03
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retrieval-eval-results
+          path: eval/results/
+          if-no-files-found: ignore

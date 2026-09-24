@@ -13,6 +13,7 @@ they cannot be verified against source text, only against their citation_chain.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Literal
 
 import pandas as pd
@@ -23,6 +24,139 @@ from src.utils.logger import setup_logger
 logger = setup_logger(__name__)
 
 RepresentationType = Literal["narrative", "row_by_row", "metrics_summary", "markdown"]
+
+# Plain amounts only: "1,234", "(8.2)", "$452.8", "-3". Percentages, multiples
+# ("2.4x") and share counts ("12.0M") stay strings on purpose — scaling them by
+# the table's "in millions" factor would turn 60.0% into 60,000,000.
+_PLAIN_AMOUNT = re.compile(r"^\(?-?[$€£¥₹]?\s*-?[\d,]*\.?\d+\)?$")
+
+
+def _fmt_number(value: float) -> str:
+    """
+    Formats an amount with thousands separators and no invented rounding.
+
+    `:,.0f` turned 387.1 into "387" in the narrative and row_by_row text, so a
+    figure reported to one decimal could never be quoted — or verified —
+    exactly. Up to four decimals are kept and trailing zeros dropped.
+
+    Args:
+        value: Numeric value.
+
+    Returns:
+        Formatted string, e.g. "452,800,000", "387.1", "-8.2".
+    """
+    text = f"{value:,.4f}".rstrip("0").rstrip(".")
+    return "0" if text in ("-0", "") else text
+
+
+def representation_content_type(representation: str) -> str:
+    """
+    Maps a table representation to the payload content_type.
+
+    metrics_summary maps to "computed_metric" because the synthesizer and the
+    financial verifier key on that value to label derived (non-verbatim)
+    numbers; the others are "table_<representation>".
+
+    Args:
+        representation: narrative | row_by_row | metrics_summary | markdown.
+
+    Returns:
+        content_type string for the Qdrant payload.
+    """
+    if representation == "metrics_summary":
+        return "computed_metric"
+    return f"table_{representation}"
+
+
+def _coerce_cell(value: Any) -> Any:
+    """
+    Converts a plain numeric cell to float; leaves everything else as text.
+
+    Args:
+        value: Raw cell value.
+
+    Returns:
+        float, stripped string, or None for empty cells.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return str(value)
+    if isinstance(value, (int, float)):
+        return None if pd.isna(value) else float(value)
+    text = str(value).strip()
+    if not text or text.lower() in {"nan", "none", "-", "—", "–", "n/a"}:
+        return None
+    if _PLAIN_AMOUNT.match(text):
+        negative = text.startswith("(") and text.endswith(")")
+        cleaned = re.sub(r"[()$€£¥₹,\s]", "", text)
+        try:
+            number = float(cleaned)
+        except ValueError:
+            return text
+        return -abs(number) if negative else number
+    return text
+
+
+def _dedupe(labels: list[str]) -> list[str]:
+    """Suffixes repeated labels so DataFrame .loc lookups stay scalar."""
+    seen: dict[str, int] = {}
+    result = []
+    for label in labels:
+        count = seen.get(label, 0)
+        seen[label] = count + 1
+        result.append(label if count == 0 else f"{label} ({count + 1})")
+    return result
+
+
+def frame_from_rows(header: list[Any], rows: list[list[Any]]) -> pd.DataFrame | None:
+    """
+    Builds the DataFrame shape FinancialTableConverter expects from a header
+    row and data rows: row labels as the index, period labels as columns.
+
+    Returns None when the table cannot be interpreted that way (fewer than two
+    columns, no data rows, or no numeric cell at all) — the caller then indexes
+    the table as verbatim text instead of fabricating representations.
+
+    Args:
+        header: Header cells; the first cell labels the row-label column.
+        rows: Data rows.
+
+    Returns:
+        DataFrame with object dtype (floats for amounts, strings otherwise), or None.
+    """
+    if not header or len(header) < 2 or not rows:
+        return None
+
+    width = len(header)
+    columns = []
+    for j, cell in enumerate(header[1:], start=2):
+        name = "" if cell is None else str(cell).strip()
+        if not name or name.lower() == "nan" or name.startswith("Unnamed:"):
+            name = f"Column {j}"
+        columns.append(name)
+    columns = _dedupe(columns)
+
+    labels: list[str] = []
+    data: list[list[Any]] = []
+    for i, row in enumerate(rows, start=1):
+        cells = list(row)[:width] + [None] * max(0, width - len(row))
+        values = [_coerce_cell(c) for c in cells[1:]]
+        raw_label = cells[0]
+        label = "" if raw_label is None or (
+            isinstance(raw_label, float) and pd.isna(raw_label)
+        ) else str(raw_label).strip()
+        if not label and all(v is None for v in values):
+            continue
+        labels.append(label or f"Row {i}")
+        data.append(values)
+
+    if not data:
+        return None
+    if not any(isinstance(v, float) for row in data for v in row):
+        return None
+
+    return pd.DataFrame(data, index=_dedupe(labels), columns=columns, dtype=object)
 
 
 class FinancialTableConverter:
@@ -131,7 +265,7 @@ class FinancialTableConverter:
             for col, val in non_null.items():
                 try:
                     numeric_val = float(val) * meta.scale_factor
-                    values_parts.append(f"{col}: {numeric_val:,.0f}")
+                    values_parts.append(f"{col}: {_fmt_number(numeric_val)}")
                 except (ValueError, TypeError):
                     values_parts.append(f"{col}: {val}")
 
@@ -195,7 +329,7 @@ class FinancialTableConverter:
                         "currency": meta.currency,
                         "scale_factor": meta.scale_factor,
                     }
-                    row_text_parts.append(f"{col}={normalized:,.0f}")
+                    row_text_parts.append(f"{col}={_fmt_number(normalized)}")
                 except (ValueError, TypeError):
                     row_entry["values"][str(col)] = {"raw_value": str(raw_val)}
                     row_text_parts.append(f"{col}={raw_val}")
@@ -257,14 +391,14 @@ class FinancialTableConverter:
                         "value": round(cagr * 100, 2),
                         "unit": "%",
                         "citation_chain": (
-                            f"CAGR(Revenue[{years[0]}={first_val:,.0f} → "
-                            f"{years[-1]}={last_val:,.0f}], n={n})"
+                            f"CAGR(Revenue[{years[0]}={_fmt_number(first_val)} → "
+                            f"{years[-1]}={_fmt_number(last_val)}], n={n})"
                         ),
                         "content_type": "computed_metric",
                     }
                     text_parts.append(
                         f"Revenue CAGR: {cagr * 100:.2f}% "
-                        f"({years[0]}: {first_val:,.0f} → {years[-1]}: {last_val:,.0f})"
+                        f"({years[0]}: {_fmt_number(first_val)} → {years[-1]}: {_fmt_number(last_val)})"
                     )
 
                 # YoY Revenue growth
@@ -278,8 +412,8 @@ class FinancialTableConverter:
                             "value": round(yoy * 100, 2),
                             "unit": "%",
                             "citation_chain": (
-                                f"YoY(Revenue[{years[i - 1]}={prev_val:,.0f} → "
-                                f"{years[i]}={curr_val:,.0f}])"
+                                f"YoY(Revenue[{years[i - 1]}={_fmt_number(prev_val)} → "
+                                f"{years[i]}={_fmt_number(curr_val)}])"
                             ),
                             "content_type": "computed_metric",
                         }
@@ -382,8 +516,8 @@ class FinancialTableConverter:
                     "value": round(margin * 100, 2),
                     "unit": "%",
                     "citation_chain": (
-                        f"{metric_name}({numerator_label}[{col}]={num_val:,.0f} / "
-                        f"{denominator_label}[{col}]={den_val:,.0f})"
+                        f"{metric_name}({numerator_label}[{col}]={_fmt_number(num_val)} / "
+                        f"{denominator_label}[{col}]={_fmt_number(den_val)})"
                     ),
                     "content_type": "computed_metric",
                 }

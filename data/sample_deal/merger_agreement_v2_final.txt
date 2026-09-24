@@ -1,0 +1,169 @@
+AGREEMENT AND PLAN OF MERGER
+
+This Agreement and Plan of Merger (this "Agreement") is entered into as of
+March 15, 2024, by and among:
+
+  VERTEX CAPITAL PARTNERS LLC, a Delaware limited liability company ("Buyer"),
+  AURORA TECHNOLOGIES INC., a Delaware corporation (the "Company"), and
+  AURORA MERGER SUB INC., a Delaware corporation and wholly owned subsidiary
+  of Buyer ("Merger Sub").
+
+================================================================================
+ARTICLE I — THE MERGER
+================================================================================
+
+Section 1.1 — The Merger
+Upon the terms and subject to the conditions of this Agreement, at the Effective
+Time, Merger Sub shall be merged with and into the Company, with the Company
+surviving the Merger as a wholly owned subsidiary of Buyer.
+
+Section 1.2 — Consideration
+Each share of Company Common Stock issued and outstanding immediately prior to
+the Effective Time shall be converted into the right to receive $58.00 per share
+in cash (the "Per Share Merger Consideration"), without interest thereon. This
+represents a premium of approximately 42% to the Company's 90-day volume-weighted
+average closing price of $40.85 as of March 14, 2024.
+
+The aggregate Merger Consideration is approximately $696 million, subject to
+customary adjustments as set forth in Section 2.4.
+
+Section 1.3 — Treatment of Company Stock Options and RSUs
+All outstanding unvested Company stock options and restricted stock units shall
+fully vest and be cancelled at the Effective Time in exchange for a cash payment
+equal to the Per Share Merger Consideration less the applicable exercise price
+(for options) or the full Per Share Merger Consideration (for RSUs).
+
+================================================================================
+ARTICLE III — REPRESENTATIONS AND WARRANTIES OF THE COMPANY
+================================================================================
+
+Section 3.5 — Financial Statements
+The Company has delivered to Buyer (a) the audited consolidated financial
+statements for FY2022 and FY2023, (b) the unaudited quarterly financial
+statements for Q1 2024 ended March 31, 2024. Such financial statements:
+(i) were prepared in accordance with GAAP applied on a consistent basis,
+(ii) fairly present in all material respects the consolidated financial
+position and results of operations of the Company for the periods covered,
+and (iii) are consistent with the books and records of the Company.
+
+Section 3.8 — Material Contracts
+Schedule 3.8 sets forth a complete list of all Material Contracts. As used
+herein, "Material Contracts" means any contract involving annual consideration
+in excess of $5.0 million or having a term longer than three (3) years. The
+Company is not in breach or default under any Material Contract.
+
+Section 3.12 — Intellectual Property
+The Company owns or has valid licenses to all Intellectual Property necessary
+for the conduct of its business. No claims are pending or, to the Company's
+Knowledge, threatened alleging that the Company infringes any third-party
+Intellectual Property. The Company holds 47 issued U.S. patents and 23 pending
+patent applications.
+
+Section 3.15 — Litigation
+Except as set forth in Schedule 3.15:
+(a) There is no Action pending or, to the Company's Knowledge, threatened
+    against the Company that would reasonably be expected to result in
+    liability in excess of $2.0 million.
+(b) The Company is not subject to any outstanding order, decree, or judgment.
+(c) As of the date hereof, the Company is a defendant in the matter of
+    DataFlow Systems Inc. v. Aurora Technologies Inc. (Case No. 2023-CV-04821,
+    U.S. District Court, Northern District of California), alleging patent
+    infringement related to certain data processing algorithms. The Company
+    believes these claims are without merit and intends to vigorously defend.
+    The Company's outside counsel has assessed the probable exposure at
+    $3.5 million to $8.0 million.
+
+================================================================================
+ARTICLE V — COVENANTS
+================================================================================
+
+Section 5.1 — Conduct of Business Pending the Merger
+During the period from the date of this Agreement until the Effective Time, the
+Company shall conduct its business in the ordinary course and shall not, without
+the prior written consent of Buyer:
+
+(a) amend its certificate of incorporation or bylaws;
+(b) issue, sell, or grant any shares of capital stock or equity securities;
+(c) declare or pay any dividends;
+(d) incur any indebtedness in excess of $10.0 million;
+(e) make capital expenditures in excess of $5.0 million individually or
+    $15.0 million in the aggregate;
+(f) hire any employee with annual base compensation in excess of $250,000;
+(g) terminate or materially amend any Material Contract;
+(h) settle any litigation in excess of $1.0 million.
+
+Section 5.3 — No-Shop Provision
+From the date of this Agreement until the earlier of the Effective Time or
+termination of this Agreement, the Company shall not, and shall cause its
+representatives not to, directly or indirectly: (a) solicit, initiate, or
+knowingly facilitate any Acquisition Proposal; (b) enter into any agreement
+regarding an Acquisition Proposal; or (c) provide non-public information to
+any third party in connection with an Acquisition Proposal.
+
+Notwithstanding the foregoing, the Company may engage in discussions with a
+third party making an unsolicited Acquisition Proposal that the Board determines
+in good faith (after consultation with outside counsel and financial advisors)
+constitutes or could reasonably be expected to lead to a Superior Proposal.
+
+================================================================================
+ARTICLE VII — TERMINATION
+================================================================================
+
+Section 7.1 — Termination
+This Agreement may be terminated at any time prior to the Effective Time:
+
+(a) by mutual written consent of Buyer and the Company;
+(b) by either party if the Merger has not been consummated by September 15, 2024
+    (the "Outside Date");
+(c) by Buyer if there has been an uncured breach by the Company of any
+    representation, warranty, or covenant;
+(d) by the Company to accept a Superior Proposal, subject to the payment of
+    the Termination Fee.
+
+Section 7.2 — Termination Fee
+If this Agreement is terminated pursuant to Section 7.1(d) (Superior Proposal),
+the Company shall pay Buyer a termination fee of $20.88 million (representing
+3.0% of the aggregate Merger Consideration) (the "Termination Fee"). If this
+Agreement is terminated by Buyer pursuant to Section 7.1(c) (Company Breach),
+the Company shall pay Buyer a reverse termination fee of $13.92 million
+(representing 2.0% of the aggregate Merger Consideration).
+
+================================================================================
+ARTICLE VIII — INDEMNIFICATION
+================================================================================
+
+Section 8.1 — Survival of Representations
+The representations and warranties of the Company shall survive the Closing
+for a period of eighteen (18) months, except that Fundamental Representations
+(Sections 3.1, 3.2, 3.5, 3.12) shall survive for thirty-six (36) months.
+
+Section 8.2 — Indemnification Cap
+The aggregate liability of the Company's stockholders for indemnification
+claims under this Article VIII shall not exceed $69.6 million (representing
+10% of the aggregate Merger Consideration) (the "General Cap"). For
+Fundamental Representations, the cap shall be $174.0 million (25% of the
+aggregate Merger Consideration).
+
+Section 8.3 — Deductible
+The Company's stockholders shall not be liable for indemnification claims
+until the aggregate amount of Losses exceeds $3.48 million (representing
+0.5% of the aggregate Merger Consideration) (the "Deductible"), after which
+the Company's stockholders shall be liable for all Losses from the first dollar.
+
+================================================================================
+ARTICLE IX — CHANGE OF CONTROL PROVISIONS
+================================================================================
+
+Section 9.1 — Change of Control Definition
+For purposes of this Agreement, a "Change of Control" shall be deemed to have
+occurred upon consummation of the Merger.
+
+Section 9.2 — Effect on Material Contracts
+The Company has identified the following Material Contracts that contain change
+of control provisions requiring consent or providing termination rights:
+(a) Master Services Agreement with Northstar Defense Systems (annual value
+    $12.4M) — requires 60-day notice and consent.
+(b) Technology License Agreement with Pacific Data Corp (annual value $8.7M)
+    — counterparty has right to terminate within 90 days of Change of Control.
+(c) Cloud Infrastructure Agreement with Amazon Web Services (annual value
+    $6.2M) — no change of control provision.

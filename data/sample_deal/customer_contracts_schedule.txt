@@ -1,0 +1,122 @@
+AURORA TECHNOLOGIES INC.
+SCHEDULE OF MATERIAL CUSTOMER CONTRACTS
+Disclosure Schedule 3.14(a) to the Agreement and Plan of Merger
+As of March 15, 2024
+
+CONFIDENTIAL
+
+================================================================================
+SECTION 1: TOP TEN CUSTOMERS BY FY2023 REVENUE
+================================================================================
+
+Rank  Customer                      FY2023 Revenue   % of Total   Contract Ends
+----  ----------------------------  --------------   ----------   -------------
+ 1    Northstar Financial Group          $54.3M          12.0%     Dec 31, 2026
+ 2    Pacific Data Systems               $38.5M           8.5%     Jun 30, 2025
+ 3    Meridian Health Networks           $27.2M           6.0%     Mar 31, 2027
+ 4    Cascade Logistics Corp             $21.7M           4.8%     Sep 30, 2025
+ 5    Ironbridge Manufacturing           $18.1M           4.0%     Dec 31, 2025
+ 6    Summit Insurance Holdings          $15.4M           3.4%     Jun 30, 2026
+ 7    Delta Ridge Energy                 $12.2M           2.7%     Dec 31, 2024
+ 8    Continental Retail Group           $10.9M           2.4%     Mar 31, 2026
+ 9    Blue Harbor Shipping                $9.5M           2.1%     Dec 31, 2026
+10    Vanguard Media Partners             $8.6M           1.9%     Sep 30, 2027
+                                       -------         ------
+      Top Ten Total                     $216.4M          47.8%
+
+Customer concentration: the top ten customers represent 47.8% of FY2023 revenue.
+The single largest customer, Northstar Financial Group, represents 12.0% of
+total revenue. No other customer exceeds 10%.
+
+================================================================================
+SECTION 2: CHANGE OF CONTROL PROVISIONS
+================================================================================
+
+The following customer contracts contain provisions triggered by a change of
+control of the Company. Consent or notice requirements are summarized below.
+
+CONSENT REQUIRED (customer may terminate if consent is withheld):
+
+  Northstar Financial Group        $54.3M    Written consent required not less
+                                             than 30 days prior to closing.
+                                             Consent may not be unreasonably
+                                             withheld. NOT YET OBTAINED.
+
+  Pacific Data Systems             $38.5M    Written consent required. Customer
+                                             has an absolute right to withhold
+                                             consent in its sole discretion.
+                                             NOT YET OBTAINED.
+
+  Ironbridge Manufacturing         $18.1M    Consent required only if the
+                                             acquirer is a competitor of the
+                                             customer. Vertex Capital Partners
+                                             is a financial sponsor and is not
+                                             a competitor. NOT APPLICABLE.
+
+NOTICE ONLY (no termination right):
+
+  Meridian Health Networks         $27.2M    30 days' written notice.
+  Cascade Logistics Corp           $21.7M    60 days' written notice.
+  Summit Insurance Holdings        $15.4M    30 days' written notice.
+
+NO CHANGE OF CONTROL PROVISION:
+
+  Delta Ridge Energy               $12.2M
+  Continental Retail Group         $10.9M
+  Blue Harbor Shipping              $9.5M
+  Vanguard Media Partners           $8.6M
+
+Aggregate revenue subject to a consent-based termination right:
+  Northstar Financial Group + Pacific Data Systems = $92.8 million (20.5% of
+  FY2023 revenue).
+
+================================================================================
+SECTION 3: MOST FAVORED NATION AND PRICING PROVISIONS
+================================================================================
+
+Northstar Financial Group holds a most favored nation ("MFN") pricing clause
+entitling it to the lowest per-seat rate offered to any customer of comparable
+volume. Management represents the MFN has not been triggered. Buyer diligence
+identified one FY2023 arrangement (Continental Retail Group) priced 4% below the
+Northstar rate at a lower volume tier; counsel has advised that the volume tiers
+are not comparable and the MFN is therefore not triggered. This position has not
+been tested with the customer.
+
+Pacific Data Systems holds a price protection clause capping annual increases at
+3% through the contract term ending June 30, 2025.
+
+================================================================================
+SECTION 4: RENEWAL AND CHURN EXPOSURE
+================================================================================
+
+Contracts expiring within 18 months of the anticipated closing date:
+
+  Delta Ridge Energy               $12.2M    Expires Dec 31, 2024
+  Pacific Data Systems             $38.5M    Expires Jun 30, 2025
+  Cascade Logistics Corp           $21.7M    Expires Sep 30, 2025
+  Ironbridge Manufacturing         $18.1M    Expires Dec 31, 2025
+                                  -------
+  Total at renewal risk            $90.5M    (20.0% of FY2023 revenue)
+
+Historical renewal rate for contracts of this size is 91% by revenue over the
+last three fiscal years.
+
+Delta Ridge Energy has given verbal indication that it intends to issue a
+competitive RFP prior to renewal. No written notice of non-renewal has been
+received.
+
+================================================================================
+SECTION 5: SERVICE LEVEL COMMITMENTS AND PENALTIES
+================================================================================
+
+Northstar Financial Group and Meridian Health Networks contracts include
+uptime service level agreements of 99.95% measured monthly, with service
+credits of up to 15% of monthly fees for sustained breach.
+
+During FY2023 the Company recorded $0.6 million in service credits, all
+attributable to a single incident in August 2023 affecting the Meridian Health
+Networks environment. No customer exercised a termination right as a result.
+
+Meridian Health Networks is subject to HIPAA. The Company executed a Business
+Associate Agreement dated April 12, 2022. Buyer's regulatory counsel should
+confirm the BAA survives the transaction.

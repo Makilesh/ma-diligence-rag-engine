@@ -6,6 +6,7 @@ import { Check, ChevronDown, Clock, Database, Zap } from "lucide-react";
 
 import { BRAND } from "@/lib/brand";
 import type { BudgetStatus, Deal } from "@/lib/types";
+import { useActiveSandbox } from "@/lib/useSandbox";
 
 interface MastheadProps {
   deals: Deal[];
@@ -177,6 +178,14 @@ export default function Masthead({
   onSelectDeal,
   budget,
 }: MastheadProps) {
+  // `GET /deals` hides sandbox deals from public callers, so this tab's own
+  // sandbox is merged in from the client side — the only place its id is known.
+  const sandbox = useActiveSandbox();
+  const switchable =
+    sandbox && !deals.some((d) => d.deal_id === sandbox.deal_id)
+      ? [...deals, sandbox]
+      : deals;
+
   return (
     <header className="sticky top-0 z-30 border-b border-line/70 bg-ink-950/72 backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-[1400px] items-center justify-between gap-4 px-5">
@@ -202,7 +211,7 @@ export default function Masthead({
         <div className="flex items-center gap-3.5">
           <BudgetMeter budget={budget} />
           <DealSwitcher
-            deals={deals}
+            deals={switchable}
             activeDealId={activeDealId}
             onSelectDeal={onSelectDeal}
           />

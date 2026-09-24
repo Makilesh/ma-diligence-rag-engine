@@ -18,7 +18,7 @@ Qdrant payload for downstream use by the risk dashboard.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from src.utils.logger import setup_logger
 

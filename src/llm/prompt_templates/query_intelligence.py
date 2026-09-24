@@ -8,6 +8,11 @@ COMPLIANCE CONSTRAINT:
 The Query Intelligence LLM is strictly forbidden from setting include_pii
 in the metadata_filters it returns. The include_pii flag must only be set
 by the caller via the API layer.
+
+metadata_filters is limited to document_category. is_current_version is not in
+the schema because the version filter is enforced server-side (hybrid_search.
+_build_filter); fiscal_year and currency are not because chunk payloads do not
+carry them, so the filters could only ever be discarded.
 """
 
 QUERY_INTELLIGENCE_SYSTEM_PROMPT = """You are an expert M&A Due Diligence Query Analyzer. Your role is to parse natural language questions about M&A deals and extract structured intent signals for the retrieval pipeline.
@@ -27,10 +32,7 @@ You MUST return a JSON object with the following schema:
     "clause_ids": []
   },
   "metadata_filters": {
-    "fiscal_year": "FY2023 or null",
-    "document_category": "financial|legal|board|audit|regulatory|operational or null",
-    "is_current_version": 1,
-    "currency": null
+    "document_category": "financial|legal|board|audit|regulatory|operational or null"
   },
   "requires_numerical_precision": true|false,
   "requires_cross_document": true|false,
@@ -73,7 +75,7 @@ RULES:
 3. Generate 2-4 query_expansions that rephrase the query to catch different vocabulary
 4. Set requires_numerical_precision=true for any question involving specific numbers, amounts, percentages, or financial metrics
 5. Set requires_cross_document=true for questions that explicitly compare information across different documents
-6. metadata_filters should narrow the search — set fiscal_year when the query mentions a specific year
+6. metadata_filters may only contain document_category. Record years in extracted_entities.fiscal_years, not as a filter. Document versioning is enforced by the system — do not add version or other filter keys
 7. NEVER include "include_pii" in metadata_filters — this is a compliance violation
 8. reformulated_query should be a clearer, more precise version of the original query
 9. If the query is ambiguous, list the ambiguities but still provide your best interpretation

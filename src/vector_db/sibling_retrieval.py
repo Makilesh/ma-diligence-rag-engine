@@ -37,12 +37,19 @@ from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
+# Upper bound on sibling points fetched per table_id: the 4 representations,
+# plus headroom for a representation the semantic chunker had to split
+# (a long row_by_row on a large sheet) and for multi-chunk verbatim tables.
+MAX_SIBLINGS_PER_TABLE = 8
+
 
 async def fetch_table_siblings(
     chunks: list[dict],
     required_representations: list[str],
     client: AsyncQdrantClient,
     include_pii: bool = False,
+    deal_id: str | None = None,
+    collection_name: str = COLLECTION_NAME,
 ) -> list[dict]:
     """
     For any chunk with is_table=1, fetches all sibling representations
@@ -58,6 +65,10 @@ async def fetch_table_siblings(
         required_representations: Which representations to fetch (default: all 4).
         client: AsyncQdrantClient.
         include_pii: Compliance authorization override. If False, filters out PII content.
+        deal_id: Deal scope for the sibling lookup. table_ids already embed the
+                 deal, but the filter is applied anyway (defence in depth); when
+                 None it is taken from each chunk's own deal_id payload.
+        collection_name: Collection to scroll (default: main child collection).
     Returns:
         Input chunks with table chunks expanded to include all sibling representations.
     Raises:
@@ -73,8 +84,10 @@ async def fetch_table_siblings(
         },
     )
 
+    # table_id -> deal it belongs to (from the explicit scope, else the chunk)
     table_ids = {
-        c["table_id"] for c in chunks
+        c["table_id"]: (deal_id or c.get("deal_id"))
+        for c in chunks
         if c.get("is_table") == 1 and c.get("table_id")
     }
     if not table_ids:
@@ -93,9 +106,14 @@ async def fetch_table_siblings(
     # NOTE: scroll is acceptable here because we are doing deterministic lookup
     # by table_id (fetching known siblings), not relevance-based retrieval.
     # The "no scroll for retrieval" rule applies to the main search pipeline only.
-    async def _scroll_for_table(tid: str) -> list:
+    async def _scroll_for_table(tid: str, table_deal_id: str | None) -> list:
         """Scroll for siblings of a single table_id with exponential backoff retry."""
+        if not table_deal_id:
+            # Without a deal scope the lookup could cross deals; skip it.
+            logger.warning("Skipping sibling lookup without deal_id", extra={"table_id": tid})
+            return []
         must_conditions = [
+            FieldCondition(key="deal_id", match=MatchValue(value=table_deal_id)),
             FieldCondition(key="table_id", match=MatchValue(value=tid)),
             FieldCondition(key="is_current_version", match=MatchValue(value=1)),
         ]
@@ -108,10 +126,11 @@ async def fetch_table_siblings(
             try:
                 op_start = time.monotonic()
                 result = await client.scroll(
-                    collection_name=COLLECTION_NAME,
+                    collection_name=collection_name,
                     scroll_filter=Filter(must=must_conditions),
-                    limit=4,  # max 4 representations per table
+                    limit=MAX_SIBLINGS_PER_TABLE,
                     with_payload=True,
+                    with_vectors=False,
                 )
                 op_elapsed_ms = (time.monotonic() - op_start) * 1000
                 logger.info(
@@ -151,7 +170,7 @@ async def fetch_table_siblings(
         return []  # unreachable, but satisfies type checker
 
     # Launch all sibling scroll tasks concurrently
-    sibling_tasks = [_scroll_for_table(tid) for tid in table_ids]
+    sibling_tasks = [_scroll_for_table(tid, did) for tid, did in table_ids.items()]
     sibling_results = await asyncio.gather(*sibling_tasks, return_exceptions=True)
 
     # Merge siblings into result set, deduplicating by chunk_id

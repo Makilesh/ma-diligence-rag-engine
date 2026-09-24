@@ -117,8 +117,12 @@ class PPTXProcessor:
         Args:
             slides: List of SlideContent from process().
 
+        The slide number is also emitted as page_number: it is the only
+        locator a deck has, and citations read page_number.
+
         Returns:
-            List of dicts with text, slide_number, section_heading, content_type.
+            List of dicts with text, page_number, slide_number, section_heading,
+            content_type (tables also carry table_rows, header row first).
         """
         chunks = []
         for slide in slides:
@@ -132,6 +136,7 @@ class PPTXProcessor:
             if parts:
                 chunks.append({
                     "text": "\n\n".join(parts),
+                    "page_number": slide.slide_number,
                     "slide_number": slide.slide_number,
                     "section_heading": slide.title,
                     "content_type": "slide",
@@ -141,6 +146,7 @@ class PPTXProcessor:
             if slide.speaker_notes:
                 chunks.append({
                     "text": f"[Speaker Notes - Slide {slide.slide_number}]\n{slide.speaker_notes}",
+                    "page_number": slide.slide_number,
                     "slide_number": slide.slide_number,
                     "section_heading": f"{slide.title} (Notes)",
                     "content_type": "speaker_notes",
@@ -153,10 +159,12 @@ class PPTXProcessor:
                     table_lines.append(" | ".join(row))
                 chunks.append({
                     "text": "\n".join(table_lines),
+                    "page_number": slide.slide_number,
                     "slide_number": slide.slide_number,
-                    "section_heading": f"{slide.title} (Table)",
-                    "content_type": "table",
+                    "section_heading": f"{slide.title} (Table)" if slide.title else "Table",
+                    "content_type": "table_text",
                     "is_table": True,
+                    "table_rows": [list(r) for r in slide.table_data],
                 })
 
         return chunks

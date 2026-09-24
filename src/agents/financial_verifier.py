@@ -1,18 +1,33 @@
 """
 Agent 4 — Financial Verification Agent.
 
-Model: Qwen2.5:14b local via Ollama | Temp: 0.0 | Tokens: 1500
-JSON mode: response_format={"type": "json_object"}
-Only triggered when: query_type == "financial" OR requires_numerical_precision == True
+Deterministic: no LLM call. Only triggered when query_type == "financial" OR
+requires_numerical_precision == True.
+
+This agent used to hand up to ten table chunks to the verification LLM and
+return whatever "numerical_registry" and "inconsistencies" it produced. Three
+things were wrong with that:
+
+- The chunk filter `{k: v … if k != "text" or len(v) < 500}` dropped the text
+  of every table chunk of 500+ characters — which is most tables — so the model
+  was usually asked to cross-check figures it was never shown.
+- The `numerical_values` list it was given was always empty (retrieved chunks
+  carry no top-level `normalized_value`), and the NumericalRegistry built for
+  exactly this job was imported nowhere.
+- Whatever the model returned was passed to the synthesizer as "Inconsistencies
+  Found", i.e. presented as verified fact. A model inventing a discrepancy is
+  worse than one missing it: the answer then asserts it with a citation.
+
+Now the registry is built from the chunks themselves (structured table rows
+where ingestion wrote them, fixed-width tables in text otherwise) and a
+disagreement is reported only when two sources state the same labelled metric
+for the same period with values that differ beyond rounding. That is a
+measurement, so it can be shown as one — and it costs no quota.
 """
 
-import json
+import time
 
-from src.llm.litellm_wrapper import call_verification_agent, active_verification_model
-from src.llm.prompt_templates.financial_verifier import (
-    FINANCIAL_VERIFIER_SYSTEM_PROMPT,
-    FINANCIAL_VERIFIER_USER_TEMPLATE,
-)
+from src.utils.numerical_registry import NumericalRegistry
 from src.workflow.state_definitions import AgentState
 from src.utils.logger import setup_logger
 
@@ -21,97 +36,68 @@ logger = setup_logger(__name__)
 
 async def financial_verifier_node(state: AgentState) -> dict:
     """
-    LangGraph node — cross-checks financial data across chunks.
+    LangGraph node — cross-checks financial figures across retrieved documents.
     Populates: numerical_registry, inconsistencies, agent_trace.
 
-    Only runs for financial queries or when numerical precision is required.
-    Uses local Ollama model to avoid consuming API budget on verification.
-
     Args:
-        state: Current AgentState with reranked_results and current_query.
+        state: Current AgentState with expanded_context / reranked_results.
 
     Returns:
         Partial state dict with financial verification results.
     """
-    query = state["current_query"]
-    chunks = state.get("expanded_context", state.get("reranked_results", []))
+    start = time.monotonic()
+    chunks = state.get("expanded_context") or state.get("reranked_results") or []
 
     logger.info(
         "Agent 4: Financial Verifier starting",
         extra={"num_chunks": len(chunks)},
     )
 
-    # Extract financial chunks and numerical values
-    financial_chunks = []
-    numerical_values = []
+    registry = NumericalRegistry.from_chunks(chunks)
 
-    for chunk in chunks:
-        if chunk.get("is_table") or chunk.get("content_type") in (
-            "table_narrative",
-            "table_row_by_row",
-            "table_metrics_summary",
-            "table_markdown",
-            "computed_metric",
-        ):
-            financial_chunks.append(chunk)
-            # Extract any embedded numerical values
-            if "normalized_value" in chunk:
-                numerical_values.append({
-                    "metric": chunk.get("metric_name", "unknown"),
-                    "raw_value": chunk.get("raw_value"),
-                    "normalized_value": chunk.get("normalized_value"),
-                    "currency": chunk.get("currency", "USD"),
-                    "scale_factor": chunk.get("scale_factor", 1),
-                    "source": chunk.get("source_file", "unknown"),
-                    "fiscal_year": chunk.get("fiscal_year"),
-                })
-
-    if not financial_chunks:
-        logger.info("Agent 4: No financial chunks to verify, skipping")
+    if len(registry) == 0:
+        logger.info("Agent 4: No labelled figures found in context, skipping")
         return {
             "numerical_registry": {},
             "inconsistencies": [],
             "agent_trace": [
-                {"agent": "financial_verifier", "skipped": True, "reason": "no_financial_chunks"}
+                {
+                    "agent": "financial_verifier",
+                    "skipped": True,
+                    "reason": "no_labelled_figures",
+                    "method": "deterministic",
+                }
             ],
         }
 
-    user_prompt = FINANCIAL_VERIFIER_USER_TEMPLATE.format(
-        query=query,
-        financial_chunks=json.dumps(
-            [
-                {k: v for k, v in c.items() if k != "text" or len(str(v)) < 500}
-                for c in financial_chunks[:10]  # Limit context size
-            ],
-            indent=2,
-            default=str,
-        ),
-        numerical_values=json.dumps(numerical_values, indent=2, default=str),
-    )
-
-    result = await call_verification_agent(
-        system_prompt=FINANCIAL_VERIFIER_SYSTEM_PROMPT,
-        user_prompt=user_prompt,
-        temperature=0.0,
-        max_tokens=2000,
-    )
+    inconsistencies = registry.find_inconsistencies()
+    cross_checked = registry.cross_checked_count()
+    sources = sorted({c.get("source_file", "") for c in chunks if c.get("source_file")})
+    elapsed_ms = round((time.monotonic() - start) * 1000, 1)
 
     logger.info(
         "Agent 4: Financial Verifier complete",
         extra={
-            "inconsistencies_found": len(result.get("inconsistencies", [])),
-            "metrics_verified": len(result.get("computed_metrics_verified", [])),
+            "figures": len(registry),
+            "cross_checked": cross_checked,
+            "inconsistencies_found": len(inconsistencies),
+            "elapsed_ms": elapsed_ms,
         },
     )
 
     return {
-        "numerical_registry": result.get("numerical_registry", {}),
-        "inconsistencies": result.get("inconsistencies", []),
+        "numerical_registry": registry.to_dict(),
+        "inconsistencies": inconsistencies,
         "agent_trace": [
             {
                 "agent": "financial_verifier",
-                "model": active_verification_model(),
-                "inconsistencies": len(result.get("inconsistencies", [])),
+                "method": "deterministic",
+                "model": "none (deterministic registry)",
+                "figures": len(registry),
+                "cross_checked": cross_checked,
+                "inconsistencies": len(inconsistencies),
+                "sources": sources,
+                "elapsed_ms": elapsed_ms,
             }
         ],
     }

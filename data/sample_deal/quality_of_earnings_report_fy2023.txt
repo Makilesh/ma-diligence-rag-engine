@@ -1,0 +1,160 @@
+AURORA TECHNOLOGIES INC.
+QUALITY OF EARNINGS REPORT
+Prepared for: Vertex Capital Partners LLC
+Prepared by: Grant Thornton LLP, Transaction Advisory Services
+Date: February 28, 2024
+Period Under Review: FY2022 - FY2023
+
+CONFIDENTIAL - PREPARED SOLELY FOR THE BUYER
+
+================================================================================
+SECTION 1: SCOPE AND BASIS OF PRESENTATION
+================================================================================
+
+This report presents a quality of earnings analysis of Aurora Technologies Inc.
+(the "Company") for the fiscal years ended December 31, 2022 and December 31,
+2023. Our procedures included analysis of revenue recognition policies, review
+of accrual completeness, examination of non-recurring items, and normalization
+of reported EBITDA.
+
+This is not an audit. The Company's statutory financial statements were audited
+by Deloitte & Touche LLP, which issued an unqualified opinion for both periods.
+
+================================================================================
+SECTION 2: ADJUSTED EBITDA BRIDGE
+================================================================================
+
+(in millions of USD)
+
+                                                    FY2023          FY2022
+                                                    ------          ------
+Net Income (as reported)                             $46.4           $34.3
+
+  Add: Income Tax Expense                            $15.5           $11.5
+  Add: Interest Expense                               $8.2            $7.4
+  Less: Other Income                                 ($2.1)          ($1.8)
+  Add: Depreciation                                  $11.4           $10.2
+  Add: Amortization of Intangibles                   $13.4           $12.6
+                                                    ------          ------
+Reported EBITDA                                      $92.8           $74.2
+  EBITDA Margin (reported)                            20.5%           19.2%
+
+Normalization Adjustments:
+  Add: Restructuring Charges (Note 1)                  $4.5            $0.0
+  Add: Non-recurring Legal Fees (Note 2)               $2.8            $0.4
+  Add: One-time SOC 2 Remediation (Note 3)             $1.6            $0.0
+  Add: Founder Compensation Above Market (Note 4)      $1.9            $1.9
+  Less: Capitalized Software Adjustment (Note 5)      ($3.2)          ($2.7)
+  Less: Deferred Revenue Haircut Reversal (Note 6)    ($1.4)           $0.0
+                                                    ------          ------
+Total Normalization Adjustments                        $6.2            ($0.4)
+
+Adjusted EBITDA                                      $99.0           $73.8
+  Adjusted EBITDA Margin                              21.9%           19.1%
+
+Adjusted EBITDA Growth (FY2022 to FY2023)             34.1%
+
+================================================================================
+SECTION 3: NOTES TO NORMALIZATION ADJUSTMENTS
+================================================================================
+
+Note 1 - Restructuring Charges ($4.5M, FY2023)
+    Severance and facility exit costs associated with the closure of the Austin
+    development center in Q3 FY2023. 32 employees were affected. Management
+    represents this program is complete and no further charges are expected.
+    We consider this adjustment appropriate and non-recurring.
+
+Note 2 - Non-recurring Legal Fees ($2.8M, FY2023)
+    External counsel fees relating to the DataFlow Systems patent litigation
+    (Case No. 2023-CV-04821). We note that this matter remains unresolved and
+    that future periods may incur comparable fees. Buyer should treat this
+    add-back with caution: it is non-recurring only if the litigation concludes.
+    We have flagged this as a QUALIFIED ADJUSTMENT.
+
+Note 3 - SOC 2 Remediation ($1.6M, FY2023)
+    One-time external consulting and tooling spend to remediate control gaps
+    identified in the FY2022 SOC 2 Type II examination. The FY2023 examination
+    was issued with no exceptions. Adjustment accepted.
+
+Note 4 - Founder Compensation Above Market ($1.9M, both years)
+    CEO Elena Marsh and CTO Dr. James Wu receive aggregate cash compensation
+    approximately $1.9 million above the 75th percentile of the peer benchmark
+    set. Post-closing employment terms are addressed in the retention agreements
+    described in the employment agreement schedule. Adjustment accepted.
+
+Note 5 - Capitalized Software Adjustment (($3.2M), FY2023)
+    The Company capitalizes internally developed software over a 3-year life.
+    Peer practice in this segment is predominantly to expense. We have reduced
+    EBITDA by the amount capitalized in each period to present a comparable
+    figure. This is a DOWNWARD adjustment and reduces Adjusted EBITDA.
+
+Note 6 - Deferred Revenue Haircut Reversal (($1.4M), FY2023)
+    Purchase accounting will require a fair value haircut to acquired deferred
+    revenue, estimated at $1.4 million. This reduces post-closing recognized
+    revenue and is presented here so the Buyer models the correct run-rate.
+
+================================================================================
+SECTION 4: REVENUE QUALITY
+================================================================================
+
+Recurring vs Non-recurring Revenue (FY2023):
+
+  SaaS Subscriptions (recurring)              $189.6          41.9%
+  Software Licenses - term (recurring)         $142.1          31.4%
+  Software Licenses - perpetual (one-time)      $56.3          12.4%
+  Professional Services (non-recurring)         $64.8          14.3%
+                                              ------         ------
+  Total Revenue                               $452.8         100.0%
+
+  Total Recurring Revenue                     $331.7          73.3%
+
+Net Revenue Retention (NRR) was 118% in FY2023 and 114% in FY2022. Gross
+revenue retention was 94% in FY2023.
+
+We note that perpetual license revenue of $56.3 million declined from $61.2
+million in FY2022, consistent with the Company's stated migration to
+subscription pricing. Buyer should not model perpetual license revenue as
+sustainable.
+
+================================================================================
+SECTION 5: WORKING CAPITAL
+================================================================================
+
+Normalized Net Working Capital (excluding cash and debt):
+
+                                            FY2023          FY2022
+                                            ------          ------
+  Accounts Receivable                         $78.4           $69.1
+  Prepaid Expenses and Other                  $12.6           $11.3
+  Accounts Payable                           ($21.8)         ($19.4)
+  Accrued Liabilities                        ($34.2)         ($29.7)
+  Deferred Revenue (current)                 ($96.3)         ($81.5)
+                                            ------          ------
+  Net Working Capital                        ($61.3)         ($50.2)
+
+Twelve-month average NWC was ($55.8) million. We recommend a working capital
+peg of ($55.8) million at closing, with a dollar-for-dollar adjustment.
+
+Days Sales Outstanding (DSO) increased from 65 days in FY2022 to 63 days in
+FY2023. No material deterioration in collections was identified.
+
+================================================================================
+SECTION 6: KEY OBSERVATIONS FOR THE BUYER
+================================================================================
+
+1. Adjusted EBITDA of $99.0 million exceeds reported EBITDA of $92.8 million by
+   $6.2 million. A valuation struck on Adjusted EBITDA rather than reported
+   EBITDA produces a materially lower implied multiple.
+
+2. The DataFlow legal fee add-back ($2.8M) is qualified. If the litigation
+   continues into FY2024, Adjusted EBITDA is overstated by that amount.
+
+3. Perpetual license revenue is in structural decline and should be excluded
+   from run-rate assumptions.
+
+4. Founder compensation normalization assumes both founders remain. If either
+   departs, replacement cost at market may exceed the $1.9 million add-back.
+
+5. The capitalized software adjustment is the single largest downward
+   normalization and reflects a genuine accounting policy difference, not an
+   earnings quality concern.

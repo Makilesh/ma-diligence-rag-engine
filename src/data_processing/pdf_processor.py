@@ -28,6 +28,9 @@ class PDFSection:
     font_size: float = 0.0
     is_table: bool = False
     clause_id: str | None = None
+    # Header row first, then data rows — lets the ingestion pipeline build the
+    # FinancialTableConverter representations instead of indexing flat text.
+    table_rows: list[list[str]] | None = None
 
 
 class PDFProcessor:
@@ -76,6 +79,9 @@ class PDFProcessor:
 
         doc = fitz.open(pdf_path)
         sections: list[PDFSection] = []
+        # Read before close(): PyMuPDF raises ValueError("document closed") on
+        # any attribute access afterwards, which used to fail every PDF ingest.
+        total_pages = doc.page_count
 
         try:
             if self.legal_mode:
@@ -95,7 +101,7 @@ class PDFProcessor:
             extra={
                 "doc_id": doc_id,
                 "total_sections": len(sections),
-                "total_pages": doc.page_count,
+                "total_pages": total_pages,
             },
         )
 
@@ -117,6 +123,19 @@ class PDFProcessor:
         current_page = 1
 
         for page_num in range(len(doc)):
+            # Close the running section at every page break so each body
+            # section is cited with the page its text is actually on, not the
+            # page its heading started on.
+            if current_text_parts:
+                sections.append(PDFSection(
+                    text="\n".join(current_text_parts),
+                    page_number=current_page,
+                    section_heading=current_heading,
+                    section_type="body",
+                ))
+                current_text_parts = []
+            current_page = page_num + 1
+
             page = doc[page_num]
             blocks = page.get_text("dict", sort=True)["blocks"]
 
@@ -242,6 +261,10 @@ class PDFProcessor:
 
             text = "\n".join(rows_text)
             page_range = table.get("page_range", [1])
+            table_rows = (
+                [list(table["headers"])] + [list(r) for r in table.get("rows", [])]
+                if table.get("headers") else None
+            )
 
             sections.append(PDFSection(
                 text=text,
@@ -250,6 +273,7 @@ class PDFProcessor:
                 section_heading=table.get("sheet_name_equivalent", "Table"),
                 section_type="table",
                 is_table=True,
+                table_rows=table_rows,
             ))
 
         return sections

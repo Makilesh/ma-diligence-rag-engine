@@ -6,7 +6,7 @@ import streamlit as st
 import requests
 
 
-SUPPORTED_TYPES = ["pdf", "docx", "pptx", "xlsx", "xls"]
+SUPPORTED_TYPES = ["pdf", "docx", "pptx", "xlsx", "txt"]
 CATEGORIES = [
     "auto-detect",
     "financial",

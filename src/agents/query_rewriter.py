@@ -13,6 +13,7 @@ This node MUST map these correctly when returning state.
 
 import json
 
+from src.agents.retrieval_strategy import apply_config_overrides, apply_filter_overrides
 from src.llm.litellm_wrapper import call_structured_agent
 from src.llm.budget_tracker import BudgetTracker
 from src.llm.prompt_templates.query_rewriter import (
@@ -71,16 +72,21 @@ async def query_rewriter_node(state: AgentState) -> dict:
 
     rewritten_query = result.get("rewritten_query", state["current_query"])
 
-    # Map JSON output keys → AgentState keys
-    updated_config = state.get("retrieval_config", {}).copy()
-    if result.get("updated_retrieval_config"):
-        updated_config.update(result["updated_retrieval_config"])
+    if not isinstance(rewritten_query, str) or not rewritten_query.strip():
+        rewritten_query = state["current_query"]
 
-    updated_filters = state.get("extracted_filters", {}).copy()
-    if result.get("updated_metadata_filters"):
-        updated_filters.update(result["updated_metadata_filters"])
-        # Compliance: never allow rewriter to set include_pii
-        updated_filters.pop("include_pii", None)
+    # Map JSON output keys → AgentState keys. Both are whitelisted and clamped:
+    # this is LLM output feeding straight into retrieval cost (top-k values)
+    # and into Qdrant filters, so nothing it proposes is taken on trust.
+    # include_pii and is_current_version are never accepted (compliance).
+    updated_config = apply_config_overrides(
+        state.get("retrieval_config", {}),
+        result.get("updated_retrieval_config"),
+    )
+    updated_filters = apply_filter_overrides(
+        state.get("extracted_filters", {}),
+        result.get("updated_metadata_filters"),
+    )
 
     logger.info(
         "Agent 6: Query Rewriter complete",

@@ -121,12 +121,59 @@ export function purgeDeal(dealId: string, unloading = false): void {
   });
 }
 
-/** Server-Sent Event names emitted by `/query/stream`. */
+/**
+ * Server-Sent Event names emitted by `/query/stream`.
+ *
+ * `token` frames carry the answer as the model writes it — an unverified
+ * draft; `answer_reset` tells the client to discard that draft (the model
+ * stream broke and another model is taking over, or a failed validation is
+ * being revised). The checked answer always arrives in `result`.
+ */
 export type StreamEvent =
   | { event: "start"; data: { session_id: string; planned_stages: unknown[] } }
   | { event: "stage"; data: Record<string, unknown> }
+  | { event: "token"; data: { text: string } }
+  | { event: "answer_reset"; data: { reason: string } }
   | { event: "result"; data: QueryResponse }
   | { event: "error"; data: { detail: string } };
+
+/**
+ * Turns a failed query response into a message a visitor can act on.
+ *
+ * 429 is the per-visitor rate limit or the daily cap; 503 with Retry-After is
+ * the server's concurrency cap. Both are "wait and retry", not a fault, so they
+ * say how long to wait instead of surfacing a bare status code. The request id
+ * is kept for anything else, so a report can be matched to server logs.
+ */
+async function describeQueryFailure(res: Response): Promise<string> {
+  const retryAfter = Number(res.headers.get("Retry-After"));
+  const wait =
+    Number.isFinite(retryAfter) && retryAfter > 0
+      ? `in about ${Math.ceil(retryAfter)} second${Math.ceil(retryAfter) === 1 ? "" : "s"}`
+      : "in a little while";
+
+  if (res.status === 429) {
+    return `You've reached the query limit for now. Please try again ${wait}.`;
+  }
+  if (res.status === 503) {
+    return `The engine is busy answering other questions. Please try again ${wait}.`;
+  }
+
+  let detail = "";
+  try {
+    const body = await res.json();
+    if (body && typeof body.detail === "string") detail = body.detail;
+  } catch {
+    // Non-JSON error body — the status line is all there is.
+  }
+  const requestId = res.headers.get("X-Request-ID");
+  return [
+    `Query failed (${res.status})${detail ? `: ${detail}` : ""}`,
+    requestId ? `Request ID ${requestId}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
 
 export interface StreamQueryArgs {
   query: string;
@@ -165,7 +212,9 @@ export async function streamQuery({
   });
 
   if (!res.ok || !res.body) {
-    throw new Error(`Query failed (${res.status})`);
+    throw new Error(
+      res.ok ? "The engine returned an empty stream." : await describeQueryFailure(res),
+    );
   }
 
   const reader = res.body.getReader();
@@ -221,6 +270,6 @@ export async function runQuery(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ query, deal_id: dealId, include_pii: includePii }),
   });
-  if (!res.ok) throw new Error(`Query failed (${res.status})`);
+  if (!res.ok) throw new Error(await describeQueryFailure(res));
   return res.json();
 }

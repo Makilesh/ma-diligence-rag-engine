@@ -83,32 +83,112 @@ def compute_sparse_bm25(text: str) -> SparseVector:
     )
 
 
+def compute_sparse_bm25_batch(texts: list[str], batch_size: int = 64) -> list[SparseVector]:
+    """
+    Computes BM25 sparse vectors for many texts in one model call.
+
+    Ingestion used to call compute_sparse_bm25 once per chunk, each call a
+    separate executor round-trip; FastEmbed batches internally, so one call
+    for the whole document is both simpler and faster.
+
+    NOTE: Synchronous CPU work — call from a worker thread in async code.
+
+    Args:
+        texts: Non-empty texts to encode.
+        batch_size: FastEmbed batch size.
+
+    Returns:
+        SparseVectors in the same order as texts.
+
+    Raises:
+        ValueError: If any text is empty.
+    """
+    if any(not t for t in texts):
+        raise ValueError("Cannot compute BM25 for empty text")
+    if not texts:
+        return []
+
+    model = _get_bm25_model()
+    return [
+        SparseVector(indices=e.indices.tolist(), values=e.values.tolist())
+        for e in model.embed(texts, batch_size=batch_size)
+    ]
+
+
 # ==============================================================================
 # Filter Building
 # ==============================================================================
 
 
-def _build_filter(deal_id: str, metadata_filters: dict) -> Filter:
+VALID_DOCUMENT_CATEGORIES = frozenset({
+    "financial", "legal", "board", "audit", "regulatory", "operational", "other",
+})
+
+# Payload fields a query may narrow on. Everything else in metadata_filters is
+# dropped: the dict is largely LLM-authored (Agent 1 / Agent 6), and a key that
+# is not on the payload (fiscal_year, currency) would silently match nothing.
+ALLOWED_FILTER_KEYS = frozenset({
+    "document_category",
+    "is_table",
+    "content_type",
+    "doc_id",
+})
+
+
+def _valid_filter_value(key: str, value) -> bool:
+    """
+    Checks a whitelisted filter value has a type/value the payload can match.
+
+    Args:
+        key: Filter key (already whitelisted).
+        value: Scalar or list value.
+
+    Returns:
+        True if the value should become a filter condition.
+    """
+    values = value if isinstance(value, list) else [value]
+    if not values:
+        return False
+    if key == "document_category":
+        return all(v in VALID_DOCUMENT_CATEGORIES for v in values)
+    if key == "is_table":
+        return all(v in (0, 1) and not isinstance(v, float) for v in values)
+    return all(isinstance(v, str) and v for v in values)
+
+
+def _build_filter(
+    deal_id: str,
+    metadata_filters: dict,
+    include_superseded: bool = False,
+) -> Filter:
     """
     Builds a Qdrant Filter from deal_id (always applied) and optional metadata.
     deal_id is mandatory — never execute a search without it.
 
     Default exclusions applied automatically:
-    - is_current_version=1 (unless explicitly overridden in metadata_filters)
+    - is_current_version=1 — ALWAYS, unless the trusted `include_superseded`
+      argument is set. metadata_filters cannot turn it off: that dict comes
+      from the LLM, and Agent 1's schema used to echo "is_current_version": 1,
+      whose mere presence skipped this condition while the whitelist then
+      discarded it — superseded documents were searchable on every query.
     - contains_pii=0 (PII-flagged content excluded by default per compliance policy;
-      pass include_pii=True in metadata_filters to override for authorized users)
+      pass include_pii=True in metadata_filters to override for authorized users.
+      The retrieval executor sets that key from the authenticated request after
+      discarding any LLM-supplied value.)
 
     Args:
         deal_id: Mandatory deal isolation filter.
-        metadata_filters: Dict of payload fields to filter on.
+        metadata_filters: Dict of payload fields to filter on (untrusted keys
+                          are dropped; see ALLOWED_FILTER_KEYS).
+        include_superseded: Trusted, non-LLM override to search superseded
+                            versions too (e.g. an explicit version-history view).
 
     Returns:
         Qdrant Filter with all conditions applied.
     """
     conditions = [FieldCondition(key="deal_id", match=MatchValue(value=deal_id))]
 
-    # Always filter to current versions unless explicitly overridden
-    if "is_current_version" not in metadata_filters:
+    if not include_superseded:
         conditions.append(
             FieldCondition(key="is_current_version", match=MatchValue(value=1))
         )
@@ -124,23 +204,27 @@ def _build_filter(deal_id: str, metadata_filters: dict) -> Filter:
             FieldCondition(key="contains_pii", match=MatchValue(value=0))
         )
 
-    ALLOWED_FILTER_KEYS = {
-        "document_category",
-        "is_table",
-        "content_type",
-        "doc_id",
-    }
-
+    dropped = []
     for key, value in local_filters.items():
-        if key in ALLOWED_FILTER_KEYS and value is not None:
-            if isinstance(value, list):
-                conditions.append(
-                    FieldCondition(key=key, match=MatchAny(any=value))
-                )
-            else:
-                conditions.append(
-                    FieldCondition(key=key, match=MatchValue(value=value))
-                )
+        if value is None:
+            continue
+        if key not in ALLOWED_FILTER_KEYS or not _valid_filter_value(key, value):
+            dropped.append(key)
+            continue
+        if key == "is_table":
+            # Stored as integer 0/1; a JSON `true` would never match it.
+            value = [int(v) for v in value] if isinstance(value, list) else int(value)
+        if isinstance(value, list):
+            conditions.append(
+                FieldCondition(key=key, match=MatchAny(any=value))
+            )
+        else:
+            conditions.append(
+                FieldCondition(key=key, match=MatchValue(value=value))
+            )
+
+    if dropped:
+        logger.debug("Ignored filter keys", extra={"dropped_filter_keys": dropped})
 
     return Filter(must=conditions)
 
@@ -159,6 +243,7 @@ async def hybrid_search(
     top_k_dense: int = 40,
     top_k_sparse: int = 40,
     client: AsyncQdrantClient | None = None,
+    include_superseded: bool = False,
 ) -> tuple[list[ScoredPoint], list[ScoredPoint]]:
     """
     Executes dense and sparse searches in parallel with metadata constraints
@@ -170,10 +255,13 @@ async def hybrid_search(
         query_sparse: BM25 sparse vector of the query.
         deal_id: Mandatory deal isolation filter.
         metadata_filters: Dict of payload fields to filter on
-                          (e.g., {"fiscal_year": "FY2023", "is_current_version": 1}).
+                          (e.g., {"document_category": "financial"}). Version
+                          filtering is not controlled here — see include_superseded.
         top_k_dense: Number of candidates from dense search.
         top_k_sparse: Number of candidates from sparse search.
         client: AsyncQdrantClient instance.
+        include_superseded: Trusted override to also search superseded
+                            document versions. Never derived from LLM output.
 
     Returns:
         Tuple of (dense_results, sparse_results) as ScoredPoint lists.
@@ -184,7 +272,9 @@ async def hybrid_search(
     if client is None:
         client = get_qdrant_client()
 
-    qdrant_filter = _build_filter(deal_id, metadata_filters)
+    qdrant_filter = _build_filter(
+        deal_id, metadata_filters, include_superseded=include_superseded
+    )
 
     start = time.monotonic()
 

@@ -89,6 +89,9 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [highlighted, setHighlighted] = useState<number | null>(null);
+  // Answer text streamed while synthesis runs — an unverified draft, dropped
+  // when the validated `result` arrives or the server sends `answer_reset`.
+  const [draft, setDraft] = useState("");
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -164,6 +167,7 @@ export default function Home() {
       setStages([]);
       setElapsed(0);
       setHighlighted(null);
+      setDraft("");
 
       try {
         await streamQuery({
@@ -192,7 +196,12 @@ export default function Home() {
               setStages((prev) =>
                 applyStage(prev, evt.data as unknown as Omit<PipelineStage, "status">),
               );
+            } else if (evt.event === "token") {
+              setDraft((prev) => prev + evt.data.text);
+            } else if (evt.event === "answer_reset") {
+              setDraft("");
             } else if (evt.event === "result") {
+              setDraft("");
               setResult(evt.data);
               setStages((prev) =>
                 prev.map((s) =>
@@ -245,7 +254,11 @@ export default function Home() {
   );
 
   const isLanding = phase === "idle" && !result;
-  const activeDeal = deals.find((d) => d.deal_id === activeDealId) ?? null;
+  // The public deal list no longer includes sandboxes, so this tab's own
+  // sandbox has to be matched separately or its landing hint never shows.
+  const activeDeal =
+    deals.find((d) => d.deal_id === activeDealId) ??
+    (sandbox.sandboxDeal?.deal_id === activeDealId ? sandbox.sandboxDeal : null);
 
   return (
     <div className="min-h-screen">
@@ -342,6 +355,10 @@ export default function Home() {
                         {error}
                       </p>
                     </div>
+                  )}
+
+                  {!result && draft && phase === "running" && (
+                    <AnswerPanel result={null} draft={draft} />
                   )}
 
                   {result &&

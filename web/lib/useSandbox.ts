@@ -1,12 +1,43 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { createDeal, ingestDocument, purgeDeal } from "./api";
 import type { Deal } from "./types";
 
 /** Where the active sandbox deal id is parked so a reload can still clean it up. */
 const STORAGE_KEY = "redline.sandbox.deal";
+
+/*
+ * The server no longer lists sandbox deals publicly — listing them let any
+ * visitor open another visitor's uploads — so this tab's own sandbox has to
+ * reach the deal switcher from here instead of from `GET /deals`. A tiny module
+ * store rather than prop threading: the switcher lives in the masthead, far from
+ * the upload panel that owns the sandbox.
+ */
+let activeSandbox: Deal | null = null;
+const listeners = new Set<() => void>();
+
+function publishSandbox(deal: Deal | null) {
+  activeSandbox = deal;
+  listeners.forEach((notify) => notify());
+}
+
+function subscribeSandbox(notify: () => void) {
+  listeners.add(notify);
+  return () => {
+    listeners.delete(notify);
+  };
+}
+
+/** This tab's live sandbox deal, or null. Safe to call from any component. */
+export function useActiveSandbox(): Deal | null {
+  return useSyncExternalStore(
+    subscribeSandbox,
+    () => activeSandbox,
+    () => null,
+  );
+}
 
 /**
  * Manages the lifetime of a visitor's temporary deal.
@@ -39,6 +70,11 @@ export function useSandbox(
   // always sees the current deal instead of the one captured at mount.
   const dealRef = useRef<Deal | null>(null);
   dealRef.current = sandboxDeal;
+
+  useEffect(() => {
+    publishSandbox(sandboxDeal);
+  }, [sandboxDeal]);
+  useEffect(() => () => publishSandbox(null), []);
 
   // Trigger 2: clean up whatever the previous page left behind.
   useEffect(() => {
@@ -81,6 +117,11 @@ export function useSandbox(
         }
 
         await ingestDocument(deal.deal_id, file);
+        // The deal list no longer carries the sandbox, so its server-side
+        // document count never arrives; keep the local copy current instead.
+        deal = { ...deal, document_count: deal.document_count + 1 };
+        setSandboxDeal(deal);
+        dealRef.current = deal;
         return deal;
       } catch (e) {
         setError(e instanceof Error ? e.message : "Upload failed");

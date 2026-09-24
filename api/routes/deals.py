@@ -4,13 +4,16 @@ Deal management routes.
 
 import asyncio
 import os
+import re
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
-from api.models.request_models import DealCreateRequest
+from api.models.request_models import DealCreateRequest, DealIdPath
 from api.models.response_models import DealResponse, DocumentRecord, RiskSignal
+from api.security import get_request_id, is_admin, public_error_detail
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -45,15 +48,31 @@ _RISK_SEVERITY: dict[str, str] = {
 
 
 @router.post("/deals", response_model=DealResponse)
-async def create_deal(request: DealCreateRequest):
-    """Creates a new deal."""
-    deal_id = str(uuid.uuid4())
+async def create_deal(request: DealCreateRequest, http_request: Request):
+    """
+    Creates a new deal.
+
+    Anyone may create a sandbox deal — that is how a visitor uploads. A
+    permanent deal is an owner operation and needs the admin key.
+
+    Args:
+        request: Deal name, description and sandbox flag.
+        http_request: Raw request, for the admin check.
+
+    Returns:
+        The created deal.
+    """
+    if not request.is_sandbox and not is_admin(http_request):
+        raise HTTPException(
+            status_code=403, detail="Only sandbox deals can be created without the admin key."
+        )
+
     now = datetime.now(timezone.utc)
-    expires_at = (
-        (now + timedelta(seconds=SANDBOX_TTL_SECONDS)).isoformat()
-        if request.is_sandbox
-        else ""
-    )
+    deal_id = new_sandbox_id(now) if request.is_sandbox else str(uuid.uuid4())
+    # Derived from the id rather than `now` so the advertised deadline is exactly
+    # the one the sweeper will apply, including after a restart.
+    sandbox_deadline = sandbox_expires_at(deal_id)
+    expires_at = sandbox_deadline.isoformat() if sandbox_deadline else ""
     _deals[deal_id] = {
         "deal_id": deal_id,
         "deal_name": request.deal_name,
@@ -73,7 +92,59 @@ async def create_deal(request: DealCreateRequest):
     return DealResponse(**_deals[deal_id])
 
 
-async def _discover_indexed_deals() -> dict[str, int]:
+async def _facet_deal_ids() -> list[str]:
+    """
+    Lists every deal_id present in the vector store.
+
+    Returns:
+        Deal ids. Empty on any failure.
+    """
+    from src.vector_db.qdrant_client import get_qdrant_client
+    from src.vector_db.constants import COLLECTION_NAME
+
+    client = get_qdrant_client()
+    try:
+        deal_facet = await client.facet(
+            collection_name=COLLECTION_NAME, key="deal_id", limit=1000
+        )
+    except Exception as e:
+        logger.warning(f"Could not enumerate deals from the vector store: {e}")
+        return []
+    return [str(hit.value) for hit in deal_facet.hits]
+
+
+async def _indexed_document_count(deal_id: str) -> int:
+    """
+    Counts distinct source files indexed under one deal.
+
+    Args:
+        deal_id: Deal to count.
+
+    Returns:
+        Number of distinct documents; 0 when the deal has nothing indexed or
+        the store cannot be read.
+    """
+    from qdrant_client.models import FieldCondition, Filter, MatchValue
+
+    from src.vector_db.qdrant_client import get_qdrant_client
+    from src.vector_db.constants import COLLECTION_NAME
+
+    try:
+        file_facet = await get_qdrant_client().facet(
+            collection_name=COLLECTION_NAME,
+            key="source_file",
+            facet_filter=Filter(
+                must=[FieldCondition(key="deal_id", match=MatchValue(value=deal_id))]
+            ),
+            limit=1000,
+        )
+    except Exception as e:
+        logger.warning(f"Could not count documents for {deal_id}: {e}")
+        return 0
+    return len(file_facet.hits)
+
+
+async def _discover_indexed_deals(include_sandboxes: bool = True) -> dict[str, int]:
     """
     Finds deals that exist in the vector store, with their document counts.
 
@@ -86,80 +157,95 @@ async def _discover_indexed_deals() -> dict[str, int]:
 
     Qdrant is the source of truth for what is actually searchable, so ask it.
 
+    Args:
+        include_sandboxes: False skips sandbox ids before the per-deal count,
+            which is one Qdrant round-trip each.
+
     Returns:
         Mapping of deal_id to distinct document count. Empty on any failure —
         the endpoint still returns the in-memory deals.
     """
-    from src.vector_db.qdrant_client import get_qdrant_client
-    from src.vector_db.constants import COLLECTION_NAME
-
-    client = get_qdrant_client()
-    try:
-        deal_facet = await client.facet(
-            collection_name=COLLECTION_NAME, key="deal_id", limit=1000
-        )
-    except Exception as e:
-        logger.warning(f"Could not enumerate deals from the vector store: {e}")
-        return {}
-
     discovered: dict[str, int] = {}
-    for hit in deal_facet.hits:
-        deal_id = str(hit.value)
-        try:
-            from qdrant_client.models import FieldCondition, Filter, MatchValue
-
-            file_facet = await client.facet(
-                collection_name=COLLECTION_NAME,
-                key="source_file",
-                facet_filter=Filter(
-                    must=[FieldCondition(key="deal_id", match=MatchValue(value=deal_id))]
-                ),
-                limit=1000,
-            )
-            discovered[deal_id] = len(file_facet.hits)
-        except Exception:
-            # Chunk count is a poor stand-in for document count, but a deal that
-            # is listed with the wrong count is far better than one that is
-            # missing entirely.
-            discovered[deal_id] = 0
+    for deal_id in await _facet_deal_ids():
+        if not include_sandboxes and is_sandbox_id(deal_id):
+            continue
+        # A deal listed with a zero count is far better than one that is
+        # missing entirely, so a failed count does not drop the deal.
+        discovered[deal_id] = await _indexed_document_count(deal_id)
     return discovered
 
 
+def _discovered_deal_record(deal_id: str, doc_count: int) -> dict:
+    """Builds the listing record for a deal known only from the vector store."""
+    expires_at = sandbox_expires_at(deal_id)
+    return {
+        "deal_id": deal_id,
+        "deal_name": deal_id,
+        "description": "Discovered in the vector store",
+        "document_count": doc_count,
+        "status": "active",
+        "is_sandbox": expires_at is not None,
+        "expires_at": expires_at.isoformat() if expires_at else "",
+    }
+
+
 @router.get("/deals", response_model=list[DealResponse])
-async def list_deals():
+async def list_deals(http_request: Request):
     """
     Lists every deal that is queryable — registered in this process or indexed.
 
     Deals created via `POST /deals` keep their name and description; deals found
     only in the vector store are listed under their deal_id so they can still be
     selected.
-    """
-    deals = {d["deal_id"]: dict(d) for d in _deals.values()}
 
-    for deal_id, doc_count in (await _discover_indexed_deals()).items():
+    Sandbox deals are omitted for public callers. Listing them let any visitor
+    open, and query, what another visitor had uploaded; a visitor's own sandbox
+    id is already known to its browser, which is the only place it is needed.
+    Admin callers see everything, which is how orphaned sandboxes are found.
+    """
+    include_sandboxes = is_admin(http_request)
+    deals = {
+        d["deal_id"]: dict(d)
+        for d in _deals.values()
+        if include_sandboxes or not (d.get("is_sandbox") or is_sandbox_id(d["deal_id"]))
+    }
+
+    for deal_id, doc_count in (
+        await _discover_indexed_deals(include_sandboxes=include_sandboxes)
+    ).items():
         if deal_id in deals:
             # Prefer the live index count over the registry's, which drifts on
             # restart while the vector store does not.
             if doc_count:
                 deals[deal_id]["document_count"] = doc_count
             continue
-        deals[deal_id] = {
-            "deal_id": deal_id,
-            "deal_name": deal_id,
-            "description": "Discovered in the vector store",
-            "document_count": doc_count,
-            "status": "active",
-        }
+        deals[deal_id] = _discovered_deal_record(deal_id, doc_count)
 
     return [DealResponse(**d) for d in deals.values()]
 
 
 @router.get("/deals/{deal_id}", response_model=DealResponse)
-async def get_deal(deal_id: str):
-    """Gets a specific deal by ID."""
-    if deal_id not in _deals:
-        raise HTTPException(status_code=404, detail=f"Deal not found: {deal_id}")
-    return DealResponse(**_deals[deal_id])
+async def get_deal(deal_id: DealIdPath):
+    """
+    Gets a specific deal by ID.
+
+    Resolves against the same two sources `GET /deals` merges — the in-memory
+    registry, then the vector store — so a deal the listing shows is never a
+    404 here, which it used to be after every restart.
+
+    Args:
+        deal_id: Deal to fetch.
+
+    Returns:
+        The deal.
+    """
+    if deal_id in _deals:
+        return DealResponse(**_deals[deal_id])
+
+    doc_count = await _indexed_document_count(deal_id)
+    if not doc_count:
+        raise HTTPException(status_code=404, detail="Deal not found.")
+    return DealResponse(**_discovered_deal_record(deal_id, doc_count))
 
 
 # ==============================================================================
@@ -196,6 +282,11 @@ def register_document(
         risk_signals: Risk signal dicts detected during ingestion.
     """
     records = _documents.setdefault(deal_id, [])
+
+    # doc_id is derived from the file's content, so re-uploading identical bytes
+    # yields the same id and ingestion replaces the points in place. The registry
+    # must do the same, or the deal lists the document twice.
+    records[:] = [r for r in records if r["doc_id"] != doc_id]
 
     records.append(
         {
@@ -361,7 +452,7 @@ async def _deal_documents(deal_id: str) -> list[dict]:
 
 
 @router.get("/deals/{deal_id}/documents", response_model=list[DocumentRecord])
-async def list_deal_documents(deal_id: str):
+async def list_deal_documents(deal_id: DealIdPath):
     """
     Lists ingested documents for a deal, newest first.
 
@@ -392,7 +483,7 @@ async def list_deal_documents(deal_id: str):
 
 
 @router.get("/deals/{deal_id}/risk-signals", response_model=list[RiskSignal])
-async def list_deal_risk_signals(deal_id: str):
+async def list_deal_risk_signals(deal_id: DealIdPath):
     """
     Returns risk signals detected across all documents in a deal.
 
@@ -451,6 +542,15 @@ async def list_deal_risk_signals(deal_id: str):
 #
 # Deletion is by `deal_id` payload filter, which is an indexed KEYWORD field, so
 # it is a single cheap operation rather than a scroll-and-delete.
+#
+# The sweeper must survive a restart, and `_deals` does not: a Space that sleeps
+# or redeploys forgets every sandbox it created, and their vectors would then sit
+# in Qdrant Cloud forever. So the sandbox marker and its creation time live in
+# the deal_id itself — `sbx-<created unix time, hex>-<128 random bits>` — and the
+# sweeper also scans the ids Qdrant holds. Nothing extra has to be written to
+# the chunk payloads, the ingest path needs no change to stay sweepable, and the
+# random part keeps the id unguessable, which is what scopes one visitor's
+# uploads away from another's.
 
 # Sandbox lifetime. Long enough that a visitor reading a long answer does not
 # have their upload swept mid-session, short enough that an abandoned upload does
@@ -465,6 +565,68 @@ SANDBOX_SWEEP_INTERVAL_SECONDS: int = int(
 )
 
 _sweeper_task: asyncio.Task | None = None
+
+SANDBOX_ID_PREFIX = "sbx-"
+_SANDBOX_ID_RE = re.compile(r"^sbx-([0-9a-f]{8})-[0-9a-f]{32}$")
+
+# A creation time further in the future than this is treated as already
+# expired. The id is client-visible and anyone can mint one in the right shape,
+# so a forged far-future timestamp must not buy an upload a longer life.
+_SANDBOX_CLOCK_SKEW = timedelta(minutes=5)
+
+
+def new_sandbox_id(now: datetime) -> str:
+    """
+    Mints a sandbox deal id carrying its own creation time.
+
+    Args:
+        now: Creation time (UTC).
+
+    Returns:
+        An id of the form `sbx-<8 hex>-<32 hex>`.
+    """
+    return f"{SANDBOX_ID_PREFIX}{int(now.timestamp()):08x}-{secrets.token_hex(16)}"
+
+
+def is_sandbox_id(deal_id: str) -> bool:
+    """True if `deal_id` has the sandbox shape."""
+    return bool(_SANDBOX_ID_RE.fullmatch(deal_id or ""))
+
+
+def sandbox_expires_at(deal_id: str) -> datetime | None:
+    """
+    Derives a sandbox's TTL deadline from its id.
+
+    Args:
+        deal_id: Deal id.
+
+    Returns:
+        The expiry time, or None if `deal_id` is not a sandbox id.
+    """
+    match = _SANDBOX_ID_RE.fullmatch(deal_id or "")
+    if not match:
+        return None
+    created = datetime.fromtimestamp(int(match.group(1), 16), tz=timezone.utc)
+    return created + timedelta(seconds=SANDBOX_TTL_SECONDS)
+
+
+def sandbox_is_expired(deal_id: str, now: datetime | None = None) -> bool:
+    """
+    Whether a sandbox deal is past its TTL (or claims an impossible future birth).
+
+    Args:
+        deal_id: Deal id. Non-sandbox ids never expire.
+        now: Reference time; defaults to the current UTC time.
+
+    Returns:
+        True if the deal should be purged.
+    """
+    expires_at = sandbox_expires_at(deal_id)
+    if expires_at is None:
+        return False
+    now = now or datetime.now(timezone.utc)
+    created = expires_at - timedelta(seconds=SANDBOX_TTL_SECONDS)
+    return expires_at <= now or created > now + _SANDBOX_CLOCK_SKEW
 
 
 async def _delete_deal_vectors(deal_id: str) -> None:
@@ -529,26 +691,57 @@ async def purge_deal(deal_id: str) -> dict:
     return {"deal_id": deal_id, "documents_dropped": documents_dropped, "status": "purged"}
 
 
+def _authorize_purge(deal_id: str, http_request: Request) -> None:
+    """
+    Lets anyone purge a sandbox deal, and only admin purge anything else.
+
+    Sandbox purges must stay open: the tab-close beacon cannot carry a header,
+    and the visitor who owns the sandbox has no credentials anyway. Knowing a
+    sandbox id is the capability — it is 128 random bits, never listed publicly.
+    Everything else, the demo corpus above all, needs the admin key; before this
+    check a single anonymous DELETE could wipe the demo data room.
+
+    Args:
+        deal_id: Deal to purge.
+        http_request: Raw request, for the admin check.
+
+    Raises:
+        HTTPException: 403 for a non-sandbox deal without the admin key.
+    """
+    if is_sandbox_id(deal_id) or is_admin(http_request):
+        return
+    logger.warning("Rejected non-admin purge of a non-sandbox deal", extra={"deal_id": deal_id})
+    raise HTTPException(
+        status_code=403, detail="Only sandbox deals can be deleted without the admin key."
+    )
+
+
 @router.delete("/deals/{deal_id}")
-async def delete_deal(deal_id: str):
+async def delete_deal(deal_id: DealIdPath, http_request: Request):
     """
     Deletes a deal and everything indexed under it.
 
     Args:
         deal_id: Deal to delete.
+        http_request: Raw request, for the admin check.
 
     Returns:
         Purge summary.
     """
+    _authorize_purge(deal_id, http_request)
     try:
         return await purge_deal(deal_id)
     except Exception as e:
-        logger.error("Deal purge failed", extra={"deal_id": deal_id, "error": str(e)})
-        raise HTTPException(status_code=500, detail=f"Purge failed: {str(e)}")
+        request_id = get_request_id(http_request)
+        logger.error(
+            "Deal purge failed",
+            extra={"deal_id": deal_id, "error": str(e), "request_id": request_id},
+        )
+        raise HTTPException(status_code=500, detail=public_error_detail("Purge", request_id))
 
 
 @router.post("/deals/{deal_id}/purge")
-async def purge_deal_endpoint(deal_id: str):
+async def purge_deal_endpoint(deal_id: DealIdPath, http_request: Request):
     """
     POST-shaped alias of DELETE, for `navigator.sendBeacon`.
 
@@ -558,15 +751,18 @@ async def purge_deal_endpoint(deal_id: str):
     request whenever the browser tears the page down first, which is most of the
     time and is exactly the case the endpoint is for.
 
-    Always reports success: the caller is a beacon whose response nothing will
-    ever read, and a failure here is recovered by the TTL sweeper anyway.
+    A permitted purge always reports success: the caller is a beacon whose
+    response nothing will ever read, and a failure here is recovered by the TTL
+    sweeper anyway. An unpermitted one is still a 403.
 
     Args:
         deal_id: Deal to purge.
+        http_request: Raw request, for the admin check.
 
     Returns:
         Purge summary, or a status of "deferred" if the delete failed.
     """
+    _authorize_purge(deal_id, http_request)
     try:
         return await purge_deal(deal_id)
     except Exception as e:
@@ -581,6 +777,10 @@ async def _sweep_expired_sandboxes() -> int:
     """
     Purges every sandbox deal past its TTL.
 
+    Candidates come from both the in-memory registry and the vector store, so
+    sandboxes created before a restart — which the registry no longer knows
+    about — are still reclaimed.
+
     Returns:
         Number of deals purged on this pass.
     """
@@ -588,13 +788,9 @@ async def _sweep_expired_sandboxes() -> int:
 
     # Materialise the candidate list before awaiting anything: `purge_deal`
     # mutates `_deals`, and mutating a dict while iterating it raises.
-    expired = [
-        deal_id
-        for deal_id, deal in list(_deals.items())
-        if deal.get("is_sandbox")
-        and deal.get("expires_at")
-        and datetime.fromisoformat(deal["expires_at"]) <= now
-    ]
+    candidates = {deal_id for deal_id, deal in list(_deals.items()) if deal.get("is_sandbox")}
+    candidates.update(d for d in await _facet_deal_ids() if is_sandbox_id(d))
+    expired = sorted(d for d in candidates if sandbox_is_expired(d, now))
 
     purged = 0
     for deal_id in expired:
@@ -614,10 +810,14 @@ async def _sweep_expired_sandboxes() -> int:
 
 
 async def _sweeper_loop() -> None:
-    """Runs `_sweep_expired_sandboxes` forever, on the configured interval."""
+    """
+    Runs `_sweep_expired_sandboxes` forever, on the configured interval.
+
+    Sweeps once immediately: a Space that slept through a sandbox's TTL should
+    reclaim it on wake, not one interval later.
+    """
     while True:
         try:
-            await asyncio.sleep(SANDBOX_SWEEP_INTERVAL_SECONDS)
             await _sweep_expired_sandboxes()
         except asyncio.CancelledError:
             raise
@@ -625,6 +825,9 @@ async def _sweeper_loop() -> None:
             # A sweep that raises must not kill the loop — that would silently
             # disable the guarantee the sweeper exists to provide.
             logger.error("Sandbox sweeper iteration failed", extra={"error": str(e)})
+        # Outside the try, so a sweep that fails every time still waits between
+        # attempts instead of spinning.
+        await asyncio.sleep(SANDBOX_SWEEP_INTERVAL_SECONDS)
 
 
 async def start_sandbox_sweeper() -> None:
