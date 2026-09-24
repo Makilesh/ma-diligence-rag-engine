@@ -26,6 +26,11 @@ qdrant-client[async]>=1.17.0,<1.20.0
 sentence-transformers>=2.7.0,<3.0.0
 fastembed>=0.3.0,<0.4.0
 transformers>=4.40.0,<5.0.0
+# Local decision model (src/decisions): typed yes/no and choice judgments with
+# probabilities, no text generation. Pinned exactly — the package is weeks old
+# and its Router API is what src/decisions/laya_client.py is written against.
+# The ~1.7GB checkpoint downloads on first use (baked into Dockerfile.hf).
+laya==0.3.20
 # NOTE: PyTorch is intentionally EXCLUDED from this file, because the right
 # wheel depends on the machine's GPU and CUDA toolkit. Install it separately:
 #
