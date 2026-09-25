@@ -1,0 +1,99 @@
+# Production override for a single public Linux VM (e.g. Oracle Cloud's
+# Always Free ARM instance). Layered on the local compose file:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# What it changes, and why:
+#   * api is built from Dockerfile.hf — CPU-only torch, non-root user, and the
+#     embedding / reranker / NLI weights baked into the image. The local
+#     Dockerfile pulls the CUDA build of torch, ~2.5GB of wheels a CPU VM
+#     cannot use.
+#   * Nothing but Caddy publishes a port. Postgres and Qdrant are reachable only
+#     on the compose network. Docker's published ports bypass the host's
+#     iptables INPUT chain, so "the firewall blocks it" is not a defence.
+#   * Caddy terminates TLS for $DOMAIN with an automatically issued
+#     certificate. The Vercel frontend is served over HTTPS, and browsers block
+#     an HTTPS page from calling a plain-HTTP API.
+#   * Streamlit is local-only and does not start here.
+#   * Secrets are required, not defaulted: an unset POSTGRES_PASSWORD or
+#     ADMIN_API_KEY fails `up` instead of starting with "password" or no admin.
+#
+# Needs Docker Compose 2.24+ for `!reset`.
+
+x-logging: &logging
+  # The json-file driver keeps every line forever by default; on a small boot
+  # volume that is a slow-motion outage.
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    ports: !reset []
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    restart: unless-stopped
+    logging: *logging
+
+  qdrant:
+    ports: !reset []
+    restart: unless-stopped
+    logging: *logging
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.hf
+    ports: !reset []
+    volumes: !reset []
+    env_file: .env
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - POSTGRES_URL=postgresql://manda_user:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/manda_rag
+      - ENVIRONMENT=production
+      - ADMIN_API_KEY=${ADMIN_API_KEY:?set ADMIN_API_KEY in .env}
+      # Caddy replaces any client-supplied X-Forwarded-For with the address it
+      # actually saw, so the first hop is the visitor and is safe to trust.
+      - TRUST_PROXY_HEADERS=1
+      - CORS_ORIGINS=${CORS_ORIGINS:?set CORS_ORIGINS to the Vercel URL}
+      - WARM_MODELS=1
+      # The Laya answerability gate measured 6.6 s per facet on 2 CPU threads —
+      # up to ~30 s added per query. Off here by default; set LAYA_GATE=1 in .env
+      # on a host with a GPU or more cores. The query guard (~1.3 s) stays on.
+      - LAYA_GATE=${LAYA_GATE:-0}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:7860/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      # Loading bge-m3, the reranker and the NLI model on 2 ARM cores takes
+      # minutes; without a start period Caddy would wait on an "unhealthy" api.
+      start_period: 600s
+    logging: *logging
+
+  streamlit:
+    profiles: ["local-ui"]
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: manda-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"  # HTTP/3
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN, e.g. redline-dd.duckdns.org}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data      # certificates — losing this re-issues and can hit rate limits
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  caddy_data:
+  caddy_config:

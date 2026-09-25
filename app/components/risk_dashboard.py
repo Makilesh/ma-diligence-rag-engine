@@ -16,7 +16,7 @@ SIGNAL_CATEGORIES: dict[str, dict] = {
     "regulatory_risk": {"icon": "🏛️", "label": "Regulatory Risk"},
     "financial_distress": {"icon": "📉", "label": "Financial Distress"},
     "environmental_liability": {"icon": "🌱", "label": "Environmental Liability"},
-    "key_person": {"icon": "👤", "label": "Key Person Dependency"},
+    "key_person_dependency": {"icon": "👤", "label": "Key Person Dependency"},
     "ip_risk": {"icon": "💡", "label": "IP Risk"},
     "customer_concentration": {"icon": "🎯", "label": "Customer Concentration"},
     "indemnification": {"icon": "🛡️", "label": "Indemnification"},

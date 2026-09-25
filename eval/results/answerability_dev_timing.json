@@ -1,0 +1,250 @@
+{
+ "generated_at": "2026-09-25T07:12:04+00:00",
+ "command": "python -m eval.run_answerability_eval --threads 2 --limit 8",
+ "dev_set": "eval\\answerability_dev.json",
+ "config": {
+  "instruction": "Does `passage` state the information needed to answer `question`?",
+  "top_k_passages": 3,
+  "veto_threshold": 0.35,
+  "threads": 2
+ },
+ "environment": {
+  "laya_device": "cpu"
+ },
+ "labels": {
+  "answerable": 2,
+  "unanswerable": 5,
+  "retrieval_miss": 1,
+  "excluded": 0
+ },
+ "gates": {
+  "heuristic": {
+   "answerable": {
+    "admitted": 2,
+    "llm_fallback": 0,
+    "refused": 0
+   },
+   "unanswerable": {
+    "admitted": 4,
+    "llm_fallback": 1,
+    "refused": 0
+   },
+   "retrieval_miss": {
+    "admitted": 1,
+    "llm_fallback": 0,
+    "refused": 0
+   },
+   "excluded": {
+    "admitted": 0,
+    "llm_fallback": 0,
+    "refused": 0
+   }
+  },
+  "laya": {
+   "answerable": {
+    "admitted": 2,
+    "llm_fallback": 0,
+    "refused": 0
+   },
+   "unanswerable": {
+    "admitted": 2,
+    "llm_fallback": 0,
+    "refused": 3
+   },
+   "retrieval_miss": {
+    "admitted": 1,
+    "llm_fallback": 0,
+    "refused": 0
+   },
+   "excluded": {
+    "admitted": 0,
+    "llm_fallback": 0,
+    "refused": 0
+   }
+  }
+ },
+ "phrasings": {
+  "P1": {
+   "instruction": "Does `passage` state the information needed to answer `question`?",
+   "auc": 1.0,
+   "sweep": [
+    {
+     "threshold": 0.25,
+     "false_vetoes": 0,
+     "answerable": 2,
+     "caught": 3,
+     "caught_heuristic_admitted": 2,
+     "caught_ambiguous": 1,
+     "unanswerable": 5,
+     "unanswerable_heuristic_admitted": 4,
+     "retrieval_miss_vetoed": 0
+    },
+    {
+     "threshold": 0.3,
+     "false_vetoes": 0,
+     "answerable": 2,
+     "caught": 3,
+     "caught_heuristic_admitted": 2,
+     "caught_ambiguous": 1,
+     "unanswerable": 5,
+     "unanswerable_heuristic_admitted": 4,
+     "retrieval_miss_vetoed": 0
+    },
+    {
+     "threshold": 0.325,
+     "false_vetoes": 0,
+     "answerable": 2,
+     "caught": 3,
+     "caught_heuristic_admitted": 2,
+     "caught_ambiguous": 1,
+     "unanswerable": 5,
+     "unanswerable_heuristic_admitted": 4,
+     "retrieval_miss_vetoed": 0
+    },
+    {
+     "threshold": 0.35,
+     "false_vetoes": 0,
+     "answerable": 2,
+     "caught": 3,
+     "caught_heuristic_admitted": 2,
+     "caught_ambiguous": 1,
+     "unanswerable": 5,
+     "unanswerable_heuristic_admitted": 4,
+     "retrieval_miss_vetoed": 0
+    },
+    {
+     "threshold": 0.375,
+     "false_vetoes": 0,
+     "answerable": 2,
+     "caught": 3,
+     "caught_heuristic_admitted": 2,
+     "caught_ambiguous": 1,
+     "unanswerable": 5,
+     "unanswerable_heuristic_admitted": 4,
+     "retrieval_miss_vetoed": 0
+    },
+    {
+     "threshold": 0.4,
+     "false_vetoes": 0,
+     "answerable": 2,
+     "caught": 3,
+     "caught_heuristic_admitted": 2,
+     "caught_ambiguous": 1,
+     "unanswerable": 5,
+     "unanswerable_heuristic_admitted": 4,
+     "retrieval_miss_vetoed": 0
+    },
+    {
+     "threshold": 0.425,
+     "false_vetoes": 0,
+     "answerable": 2,
+     "caught": 4,
+     "caught_heuristic_admitted": 3,
+     "caught_ambiguous": 1,
+     "unanswerable": 5,
+     "unanswerable_heuristic_admitted": 4,
+     "retrieval_miss_vetoed": 0
+    },
+    {
+     "threshold": 0.45,
+     "false_vetoes": 0,
+     "answerable": 2,
+     "caught": 4,
+     "caught_heuristic_admitted": 3,
+     "caught_ambiguous": 1,
+     "unanswerable": 5,
+     "unanswerable_heuristic_admitted": 4,
+     "retrieval_miss_vetoed": 0
+    }
+   ]
+  }
+ },
+ "laya_latency_ms": {
+  "p50": 6633.65,
+  "p95": 8185.91,
+  "n": 8
+ },
+ "questions": [
+  {
+   "id": "dev_u01",
+   "query": "How much did Aurora spend on capital expenditures in FY2024?",
+   "label": "unanswerable",
+   "heuristic": "admitted",
+   "max_reranker_score": 0.3215,
+   "laya": "admitted",
+   "answerability": 0.4763,
+   "laya_ms": 8220.0
+  },
+  {
+   "id": "dev_a01",
+   "query": "How much did Aurora spend on capital expenditures in FY2023?",
+   "label": "retrieval_miss",
+   "heuristic": "admitted",
+   "max_reranker_score": 0.4209,
+   "laya": "admitted",
+   "answerability": 0.5338,
+   "laya_ms": 8122.6
+  },
+  {
+   "id": "dev_u02",
+   "query": "What was Aurora's EBITDA in the third quarter of FY2023?",
+   "label": "unanswerable",
+   "heuristic": "admitted",
+   "max_reranker_score": 0.9903,
+   "laya": "admitted",
+   "answerability": 0.4095,
+   "laya_ms": 6763.5
+  },
+  {
+   "id": "dev_u03",
+   "query": "How many employees does Aurora have in Germany?",
+   "label": "unanswerable",
+   "heuristic": "admitted",
+   "max_reranker_score": 0.3009,
+   "laya": "refused",
+   "answerability": 0.2189,
+   "laya_ms": 4114.8
+  },
+  {
+   "id": "dev_a03",
+   "query": "What is Aurora's German turnover and does it trigger a German merger control filing?",
+   "label": "answerable",
+   "heuristic": "admitted",
+   "max_reranker_score": 0.9909,
+   "laya": "admitted",
+   "answerability": 0.6002,
+   "laya_ms": 3977.4
+  },
+  {
+   "id": "dev_u04",
+   "query": "How much revenue did Aurora generate in the Asia-Pacific region?",
+   "label": "unanswerable",
+   "heuristic": "llm_fallback",
+   "max_reranker_score": 0.1776,
+   "laya": "refused",
+   "answerability": 0.2081,
+   "laya_ms": 6503.8
+  },
+  {
+   "id": "dev_u05",
+   "query": "What was Aurora's total revenue in FY2021?",
+   "label": "unanswerable",
+   "heuristic": "admitted",
+   "max_reranker_score": 0.7913,
+   "laya": "refused",
+   "answerability": 0.2209,
+   "laya_ms": 6371.3
+  },
+  {
+   "id": "dev_a05",
+   "query": "How much SaaS subscription revenue did Aurora book in FY2022?",
+   "label": "answerable",
+   "heuristic": "admitted",
+   "max_reranker_score": 0.995,
+   "laya": "admitted",
+   "answerability": 0.5162,
+   "laya_ms": 6823.4
+  }
+ ],
+ "total_seconds": 74.0
+}

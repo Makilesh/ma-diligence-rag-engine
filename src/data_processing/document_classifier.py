@@ -6,6 +6,10 @@ Classifies documents into one of 7 categories based on filename patterns,
 content keywords, and structural heuristics:
     financial | legal | board | audit | regulatory | operational | other
 
+classify() is the rule path. classify_with_source() — what ingestion calls —
+asks the Laya decision model first (LAYA_CATEGORY) and falls back to the rules
+when Laya is off, unavailable, or there is no text sample.
+
 The classification is stored as document_category in the Qdrant payload
 and used as a filter parameter during retrieval.
 """
@@ -15,6 +19,8 @@ from __future__ import annotations
 import re
 from typing import Literal
 
+from src.decisions import ingest_signals
+from src.decisions.laya_client import LayaUnavailable, laya_enabled
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -24,42 +30,49 @@ DocumentCategory = Literal[
 ]
 
 # ─── Filename-based classification patterns ──────────────────────────────────
+# Matched against the filename with underscores turned into spaces (see
+# _classify_by_filename). Every alternative starts at a word boundary, and short
+# acronyms end at one too: unanchored, `it` matched inside "quality" and
+# "credit", and `p\s*&?\s*l` inside "employment", which filed a quality of
+# earnings report as operational and an employment schedule as financial.
 FILENAME_PATTERNS: dict[DocumentCategory, list[str]] = {
     "financial": [
-        r'(?i)(income.?statement|balance.?sheet|cash.?flow|p\s*&?\s*l|profit.?loss)',
-        r'(?i)(financial.?statement|cap.?table|capitalization|revenue|budget)',
-        r'(?i)(forecast|projection|valuation|dcf|model|ebitda)',
-        r'(?i)(10-?[kq]|annual.?report|quarterly.?report)',
+        r'(?i)\b(income.?statement|balance.?sheet|cash.?flow|p\s*&\s*l\b|pnl\b|profit.?loss)',
+        r'(?i)\b(financials?\b|financial.?statement|cap.?table|capitalization|revenue|budget)',
+        r'(?i)\b(forecast|projection|valuation|dcf\b|model|ebitda)',
+        r'(?i)\b(10-?[kq]\b|annual.?report|quarterly.?report)',
+        r'(?i)\b(quality.?of.?earnings|qoe\b|earnings)',
     ],
     "legal": [
-        r'(?i)(contract|agreement|amendment|addendum|mou|memorandum)',
-        r'(?i)(merger|acquisition|purchase|sale|asset.?purchase)',
-        r'(?i)(nda|non.?disclosure|confidential|indemnif)',
-        r'(?i)(term.?sheet|loi|letter.?of.?intent|definitive)',
-        r'(?i)(license|lease|employment.?agreement|ip.?assign)',
-        r'(?i)(representation|warrant|covenant|escrow)',
+        r'(?i)\b(contract|agreement|amendment|addendum|mou\b|memorandum)',
+        r'(?i)\b(merger|acquisition|purchase|sale\b|asset.?purchase)',
+        r'(?i)\b(nda\b|non.?disclosure|confidential|indemnif)',
+        r'(?i)\b(term.?sheet|loi\b|letter.?of.?intent|definitive)',
+        r'(?i)\b(license|lease|employment.?agreement|ip.?assign)',
+        r'(?i)\b(representation|warrant|covenant|escrow)',
+        r'(?i)\b(litigation|patent|trademark|intellectual.?property|ip\b)',
     ],
     "board": [
-        r'(?i)(board|director|presentation|deck|slide|pptx)',
-        r'(?i)(committee|governance|meeting.?minute|resolution)',
-        r'(?i)(strategy|overview|executive.?summary)',
+        r'(?i)\b(board|director|presentation|deck\b|slides?\b|pptx\b)',
+        r'(?i)\b(committee|governance|meeting.?minute|minutes\b|resolution)',
+        r'(?i)\b(strategy|overview|executive.?summary)',
     ],
     "audit": [
-        r'(?i)(audit|auditor|sox|internal.?control)',
-        r'(?i)(compliance|accounting|gaap|ifrs)',
-        r'(?i)(review|assessment|finding|observation)',
+        r'(?i)\b(audit|auditor|sox\b|internal.?control)',
+        r'(?i)\b(compliance|accounting|gaap\b|ifrs\b)',
+        r'(?i)\b(review|assessment|finding|observation)',
     ],
     "regulatory": [
-        r'(?i)(regulatory|regulation|filing|permit|license)',
-        r'(?i)(sec|fda|epa|osha|ftc|doj|antitrust|hsr)',
-        r'(?i)(compliance.?report|consent|decree|enforcement)',
+        r'(?i)\b(regulatory|regulation|filing|permit|license)',
+        r'(?i)\b(sec|fda|epa|osha|ftc|doj|hsr)\b|\bantitrust',
+        r'(?i)\b(compliance.?report|consent|decree|enforcement)',
     ],
     "operational": [
-        r'(?i)(operational|operation|process|procedure|workflow)',
-        r'(?i)(hr|human.?resource|employee|headcount|org.?chart)',
-        r'(?i)(it|technology|system|infrastructure|cybersecurity)',
-        r'(?i)(supply.?chain|vendor|customer|inventory)',
-        r'(?i)(insurance|real.?estate|property|facility)',
+        r'(?i)\b(operational|operation|process|procedure|workflow)',
+        r'(?i)\b(hr\b|human.?resource|employee|headcount|org.?chart)',
+        r'(?i)\b(it\b|technology|system|infrastructure|cybersecurity)',
+        r'(?i)\b(supply.?chain|vendor|customer|inventory)',
+        r'(?i)\b(insurance|real.?estate|property|facility)',
     ],
 }
 
@@ -172,6 +185,46 @@ class DocumentClassifier:
         )
         return category
 
+    def classify_with_source(
+        self,
+        file_name: str,
+        file_type: str,
+        content_sample: str = "",
+    ) -> tuple[DocumentCategory, str, float | None]:
+        """
+        Classifies with Laya when enabled, falling back to classify()'s rules.
+
+        Laya reads the filename and the opening text, so a generically named
+        upload ("doc_0147.pdf") is filed by what it says rather than by an
+        extension guess. On the evaluation set it beat the (fixed) rules on
+        TEST, 0.955 vs 0.773 — see eval/decisions/results.md.
+
+        Args:
+            file_name: Original filename.
+            file_type: File extension without dot.
+            content_sample: First ~2000 chars of content.
+
+        Returns:
+            (category, source, confidence): source is "laya" or "rules";
+            confidence is Laya's probability for its choice, None for rules.
+        """
+        # laya_enabled() first: with Laya off globally the attempt would only
+        # log an "unavailable" warning per upload.
+        if laya_enabled() and ingest_signals.laya_category_enabled() and content_sample.strip():
+            try:
+                category, confidence = ingest_signals.classify_document(file_name, content_sample)
+                logger.info(
+                    "Classified by Laya",
+                    extra={"file_name": file_name, "category": category, "confidence": confidence},
+                )
+                return category, "laya", confidence  # type: ignore[return-value]
+            except LayaUnavailable as e:
+                logger.warning(
+                    "Laya classification unavailable; using rules",
+                    extra={"file_name": file_name, "error": str(e)},
+                )
+        return self.classify(file_name, file_type, content_sample), "rules", None
+
     def _classify_by_filename(self, file_name: str) -> DocumentCategory:
         """
         Classify by matching filename against known patterns.
@@ -183,9 +236,12 @@ class DocumentClassifier:
             Matched category or "other".
         """
         scores: dict[DocumentCategory, int] = {}
+        # "_" is a word character, so without this \b never fires inside
+        # "quality_of_earnings_report" and every pattern would need its own guard.
+        name = file_name.replace("_", " ")
 
         for category, patterns in self._filename_patterns.items():
-            score = sum(1 for p in patterns if p.search(file_name))
+            score = sum(1 for p in patterns if p.search(name))
             if score > 0:
                 scores[category] = score
 

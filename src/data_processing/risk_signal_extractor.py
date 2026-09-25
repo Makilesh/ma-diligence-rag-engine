@@ -18,8 +18,9 @@ Qdrant payload for downstream use by the risk dashboard.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
+from src.decisions import ingest_signals
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -37,7 +38,8 @@ RISK_PATTERNS: dict[str, list[re.Pattern]] = {
     ],
     "material_adverse_change": [
         re.compile(r'(?i)\bmaterial\s+adverse\s+(?:change|effect|event|impact)\b'),
-        re.compile(r'(?i)\b(?:MAC|MAE)\b'),
+        # Case-sensitive on purpose: (?i) made "Mac" laptops and "Mac Duffie" MAC clauses.
+        re.compile(r'\b(?:MAC|MAE)\b'),
         re.compile(r'(?i)\bmaterial(?:ly)?\s+adverse\b'),
         re.compile(r'(?i)\badverse(?:ly)?\s+affect(?:s|ed|ing)?\s+(?:the\s+)?(?:business|operations|financial\s+condition)\b'),
     ],
@@ -58,7 +60,12 @@ RISK_PATTERNS: dict[str, list[re.Pattern]] = {
     "financial_distress": [
         re.compile(r'(?i)\bgoing\s+concern\b'),
         re.compile(r'(?i)\b(?:bankruptcy|insolvency|liquidation|receivership)\b'),
-        re.compile(r'(?i)\b(?:default|covenant\s+(?:violation|breach))\b'),
+        # A bare "default" matched "by default" and "default settings"; only
+        # credit-default phrasings are distress.
+        re.compile(
+            r'(?i)\b(?:(?:event|notice)\s+of\s+default|payment\s+default|in\s+default|defaulted'
+            r'|covenant\s+(?:violation|breach))\b'
+        ),
         re.compile(r'(?i)\b(?:debt\s+restructuring|forbearance|workout)\b'),
         re.compile(r'(?i)\b(?:qualified|adverse)\s+(?:audit\s+)?opinion\b'),
         re.compile(r'(?i)\bmaterial\s+weakness\b'),
@@ -75,14 +82,20 @@ RISK_PATTERNS: dict[str, list[re.Pattern]] = {
         re.compile(r'(?i)\b(?:critical|essential)\s+(?:personnel|talent|employee)\b'),
     ],
     "ip_risk": [
-        re.compile(r'(?i)\b(?:patent|trademark|copyright)\s+(?:infringement|challenge|dispute|expir)\b'),
+        # `expir\b` could never match ("expiry", "expires" continue the word).
+        re.compile(r'(?i)\b(?:patent|trademark|copyright)s?\s+(?:infringement|challenge|dispute|expir\w*)'),
         re.compile(r'(?i)\b(?:intellectual\s+property|ip)\s+(?:risk|challenge|litigation|dispute)\b'),
         re.compile(r'(?i)\b(?:trade\s+secret|proprietary)\s+(?:misappropriation|theft|disclosure)\b'),
     ],
     "customer_concentration": [
         re.compile(r'(?i)\b(?:customer|client|revenue)\s+concentration\b'),
-        re.compile(r'(?i)\b(?:single|major|largest)\s+customer\s+(?:represent|account|compris)\b'),
-        re.compile(r'(?i)\b(?:top\s+\d+|largest\s+\d+)\s+customer\b'),
+        # `represent\b` never matched "represents"; the verb stem needs \w*.
+        re.compile(r'(?i)\b(?:single|major|largest)\s+customer\s+(?:represent|account|compris)\w*'),
+        # A customer (or top-N customers) tied to a share of revenue in the same
+        # sentence: "the largest customer, Northstar, represents 12.0% of revenue".
+        # This replaces a bare "top N customer" match, which also fired on
+        # "the top 5 customer contracts were renegotiated".
+        re.compile(r'(?i)\bcustomers?\b[^.]{0,80}?\b\d{1,3}(?:\.\d+)?%\s+of\s+(?:total\s+|annual\s+)?(?:\w+\s+)?(?:revenue|sales)\b'),
     ],
     "indemnification": [
         re.compile(r'(?i)\bindemnif(?:y|ication|ied|ies)\b'),
@@ -94,10 +107,18 @@ RISK_PATTERNS: dict[str, list[re.Pattern]] = {
 
 @dataclass
 class RiskSignalResult:
-    """Result of risk signal extraction."""
+    """
+    Result of risk signal extraction.
+
+    Each signal_details entry carries signal_type, match_count, sample_matches,
+    source ("regex", "laya" or "regex+laya") and confidence (Laya's P(true), or
+    None when Laya did not judge it). `rejected` lists regex matches Laya
+    overruled, kept for audit rather than silently dropped.
+    """
     signals: list[str]
     signal_details: list[dict]
     signal_count: int
+    rejected: list[dict] = field(default_factory=list)
 
 
 class RiskSignalExtractor:
@@ -129,6 +150,7 @@ class RiskSignalExtractor:
         text: str,
         file_name: str = "",
         document_category: str = "",
+        laya_scores: dict[str, float] | None = None,
     ) -> RiskSignalResult:
         """
         Extract risk signals from document text.
@@ -137,6 +159,8 @@ class RiskSignalExtractor:
             text: Document or chunk text to scan.
             file_name: Original filename for context.
             document_category: Document category for context-aware detection.
+            laya_scores: Laya P(true) per category for this text (see
+                ingest_signals.score_chunks). None runs the regex alone.
 
         Returns:
             RiskSignalResult with detected signals and details.
@@ -173,6 +197,8 @@ class RiskSignalExtractor:
                     "signal_type": signal_type,
                     "match_count": len(matches_found),
                     "sample_matches": matches_found[:3],  # First 3 matches as samples
+                    "source": "regex",
+                    "confidence": None,
                 })
 
         result = RiskSignalResult(
@@ -180,14 +206,17 @@ class RiskSignalExtractor:
             signal_details=signal_details,
             signal_count=len(signals),
         )
+        if laya_scores is not None:
+            result = self.apply_laya(result, laya_scores)
 
-        if signals:
+        if result.signals:
             logger.info(
                 "Risk signals detected",
                 extra={
                     "file_name": file_name,
-                    "signals": signals,
-                    "signal_count": len(signals),
+                    "signals": result.signals,
+                    "signal_count": result.signal_count,
+                    "rejected": [r["signal_type"] for r in result.rejected],
                 },
             )
         else:
@@ -197,6 +226,69 @@ class RiskSignalExtractor:
             )
 
         return result
+
+    def apply_laya(
+        self,
+        regex_result: RiskSignalResult,
+        laya_scores: dict[str, float],
+    ) -> RiskSignalResult:
+        """
+        Combines a regex result with Laya's per-category probabilities.
+
+        A category is flagged when Laya alone is confident (P >= RISK_THRESHOLD),
+        or when the regex matched and Laya does not disagree (P >=
+        RISK_CONFIRM_THRESHOLD). The regex keeps recall on phrasings Laya scores
+        timidly; Laya removes the keyword hits that mean the opposite ("no
+        pending litigation", "Mac laptops"). A regex match with no Laya score
+        (the category was not asked) is kept as a plain regex signal.
+
+        Args:
+            regex_result: Output of extract() without laya_scores.
+            laya_scores: {category: P(true)} — all categories in "union" mode,
+                only the regex-matched ones in "confirm" mode.
+
+        Returns:
+            New RiskSignalResult; overruled regex matches go to `rejected`.
+        """
+        regex_details = {d["signal_type"]: d for d in regex_result.signal_details}
+        signals: list[str] = []
+        details: list[dict] = []
+        rejected: list[dict] = []
+
+        for signal_type in self._patterns:
+            p = laya_scores.get(signal_type)
+            regex_detail = regex_details.get(signal_type)
+            if p is None:
+                if regex_detail:
+                    signals.append(signal_type)
+                    details.append(dict(regex_detail))
+                continue
+            confidence = round(p, 4)
+            if regex_detail and p >= ingest_signals.RISK_CONFIRM_THRESHOLD:
+                signals.append(signal_type)
+                details.append({**regex_detail, "source": "regex+laya", "confidence": confidence})
+            elif p >= ingest_signals.RISK_THRESHOLD:
+                signals.append(signal_type)
+                details.append({
+                    "signal_type": signal_type,
+                    "match_count": 1,  # one chunk judged; Laya gives no match spans
+                    "sample_matches": [],
+                    "source": "laya",
+                    "confidence": confidence,
+                })
+            elif regex_detail:
+                rejected.append({
+                    "signal_type": signal_type,
+                    "confidence": confidence,
+                    "sample_matches": regex_detail["sample_matches"],
+                })
+
+        return RiskSignalResult(
+            signals=signals,
+            signal_details=details,
+            signal_count=len(signals),
+            rejected=rejected,
+        )
 
     def extract_from_chunks(
         self,

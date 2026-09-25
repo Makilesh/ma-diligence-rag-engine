@@ -1,29 +1,40 @@
 # Deployment
 
-A permanently free, end-to-end deployment: Next.js frontend on Vercel, FastAPI
-backend on a Hugging Face Space, Qdrant Cloud for vectors, Neon for Postgres,
-and the existing Gemini free-tier key rotation for inference.
+A free, end-to-end public deployment: the Next.js frontend on Vercel, and the
+FastAPI backend, Qdrant and Postgres together on one Linux VM behind Caddy,
+which provides HTTPS automatically.
 
-Nothing here is a trial or a credit that expires.
+```
+Vercel (web/, free)  ──HTTPS──▶  https://<name>.duckdns.org
+                                        │
+                           Linux VM (≥ 2 cores / 8GB RAM)
+                     Caddy :443 → api:7860 → qdrant, postgres
+                          (docker-compose.prod.yml)
+```
 
-| Layer | Host | Free tier | Expires? |
-|---|---|---|---|
-| Frontend | Vercel Hobby | Unlimited static + edge | No — but non-commercial use only |
-| Backend | Hugging Face Spaces (Docker, CPU basic) | 2 vCPU · 16GB RAM · 50GB disk | No — sleeps after 48h idle |
-| Vectors | Qdrant Cloud | 1GB cluster, no card required | No |
-| Postgres | Neon | 0.5GB, autosuspends when idle | No |
-| LLM | Gemini API | Per-key daily quota, multiplied by key count | No |
+| Layer | Host | Cost |
+|---|---|---|
+| Frontend | Vercel Hobby | Free (non-commercial use) |
+| Backend + Qdrant + Postgres | Oracle Cloud Always Free ARM (2 OCPU / 12GB), or any VM with ≥ 8GB RAM | Free on Oracle; card verification required at sign-up |
+| Hostname + HTTPS | DuckDNS + Caddy (Let's Encrypt) | Free |
+| LLM | Gemini API free tier | Per-key daily quota, multiplied by key count |
+
+Oracle only reclaims an Always Free VM as idle when CPU, network *and* memory
+all stay under 20% for a week; with the models loaded, memory alone sits well
+above that.
 
 ---
 
 ## Why this shape, and not a smaller one
 
 The backend is the constraint, and it is not close. `bge-m3` alone is 2.27GB
-resident. The 512MB free tiers at Render, Fly and Koyeb are not near-misses —
-they are an order of magnitude short. Hugging Face Spaces is the only free host
-that fits the workload, and it fits it comfortably.
+resident and the whole API holds about 5–6GB once the reranker and NLI model are
+loaded. The 512MB free tiers at Render, Fly and Koyeb are not near-misses — they
+are an order of magnitude short. What fits is a VM with at least 8GB of RAM:
+Oracle Cloud's Always Free ARM instance (2 OCPU / 12GB) is the free option, and
+co-locating Qdrant and Postgres on it removes two external accounts.
 
-**The reranker had to change.** Measured on 2 vCPU, which is what the free tier
+**The reranker had to change.** Measured on 2 vCPU, which is what a free VM
 provides:
 
 | Reranker | `max_length` | 40 passages | ×4 passes (a decomposed query) |
@@ -51,123 +62,139 @@ That is why no re-indexing is needed when moving between profiles.
 
 ---
 
-## 1 · Qdrant Cloud
+## 1 · A server with a public IP
 
-1. Create a free cluster at <https://cloud.qdrant.io>. No card required.
-2. From **Connect**, copy the cluster URL and create an API key.
+Any Ubuntu 22.04/24.04 VM with a public IPv4 address, at least 2 cores, 8GB RAM
+and 40GB of disk. On Oracle Cloud: Compute → Instances → Create instance →
+Canonical Ubuntu 24.04, shape **VM.Standard.A1.Flex** at 2 OCPU / 12GB (it shows
+"Always Free-eligible"), assign a public IPv4 address, and paste your SSH public
+key. "Out of host capacity" is common — retry later or in another availability
+domain.
 
-The API key does double duty: `src/vector_db/qdrant_client.py` treats its
-presence as the signal that this is a managed cluster and switches the transport
-from gRPC to REST. Managed clusters terminate TLS on the REST port and do not
-expose plain gRPC on 6334, so a client that prefers gRPC there constructs
-successfully and then fails on first use.
+A home connection does not work as the server. Mobile and most residential
+broadband sit behind carrier-grade NAT and change address, so nothing on the
+internet can reach a port on them.
 
-## 2 · Seed the index
+## 2 · Open ports 80 and 443 — in both firewalls
 
-The corpus is ingested once, from your machine, directly into Qdrant Cloud. The
-Space never needs the documents — it only queries the vectors.
+- **Cloud firewall.** On Oracle: Networking → Virtual cloud networks → your VCN →
+  Security Lists → Default → Add Ingress Rules: source `0.0.0.0/0`, TCP,
+  destination port `80`; repeat for `443`.
+- **Host firewall.** Oracle's Ubuntu image rejects everything but SSH in
+  iptables, and skipping this is the usual reason a site is unreachable with no
+  error anywhere:
 
-Point your local `.env` at the cloud cluster:
+  ```bash
+  sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
+  sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
+  sudo netfilter-persistent save
+  ```
 
-```bash
-QDRANT_URL=https://<cluster>.cloud.qdrant.io:6333
-QDRANT_API_KEY=<your key>
-```
+Do not open 5432, 6333 or 6334. The production compose file publishes nothing
+but Caddy's ports.
 
-Then start the API locally and push the sample data room through the existing
-ingest endpoint:
+## 3 · A hostname
 
-```bash
-python run_api.py
-```
-
-```bash
-for f in data/sample_deal/*.txt; do curl -sS -F "deal_id=aurora_vertex_2024" -F "file=@$f" http://localhost:8000/api/v1/ingest; echo; done
-```
-
-Writing to a non-sandbox deal is an admin operation. A local API started with
-`ENVIRONMENT=development` and no `ADMIN_API_KEY` allows it; if you have set a
-key, add `-H "X-Admin-Key: $ADMIN_API_KEY"` to the curl above. Re-running the
-loop is safe — document and point IDs are derived from content, so identical
-files replace themselves instead of duplicating.
-
-Confirm it landed:
+Create a subdomain at <https://www.duckdns.org> and set its IP to the **server's**
+public IP. DuckDNS pre-fills the address you are browsing from, which is your
+own connection, not the server — overwrite it. Check with:
 
 ```bash
-curl -s http://localhost:8000/api/v1/deals
+nslookup <name>.duckdns.org   # must print the VM's public IP
 ```
 
-Nine documents, roughly 150 chunks — well inside the 1GB tier.
+Caddy cannot obtain a certificate until this resolves to the server.
 
-## 3 · Neon Postgres
+## 4 · Docker and the code
 
-Create a free project at <https://neon.tech> and copy the pooled connection
-string. This backs the daily budget tracker and LangGraph checkpoints.
+```bash
+ssh -i ~/.ssh/<key> ubuntu@<server-ip>
+curl -fsSL https://get.docker.com | sudo sh && sudo usermod -aG docker ubuntu
+exit   # log back in so the docker group applies
+git clone https://github.com/Makilesh/redline-diligence.git && cd redline-diligence
+```
 
-It is optional. Without it both degrade to in-memory: the pipeline stays fully
-functional, but daily quota accounting resets on every restart — which on a
-sleeping Space is often.
+## 5 · Configure
 
-## 4 · Hugging Face Space
+Copy the backend block of `.env.deploy.example` to `.env` in the repository root
+and fill in the secrets:
 
-1. Create a new Space → **Docker** → **Blank**, hardware **CPU basic (free)**.
-2. Add this to the Space's `README.md` so it builds the right file on port 7860:
+```bash
+cp .env.deploy.example .env
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"   # run twice: POSTGRES_PASSWORD, ADMIN_API_KEY
+nano .env   # DOMAIN, POSTGRES_PASSWORD, GEMINI_API_KEYS, ADMIN_API_KEY, CORS_ORIGINS
+```
 
-   ```yaml
-   ---
-   title: M&A Due Diligence Intelligence Engine
-   sdk: docker
-   app_port: 7860
-   dockerfile_path: Dockerfile.hf
-   ---
-   ```
+`docker compose` refuses to start while `DOMAIN`, `POSTGRES_PASSWORD`,
+`ADMIN_API_KEY` or `CORS_ORIGINS` is unset, rather than falling back to a
+default password or an unauthenticated admin.
 
-3. Push this repository to the Space's git remote.
-4. Under **Settings → Variables and secrets**, add everything from
-   `.env.deploy.example`. Credentials go in **Secrets**; the rest in
-   **Variables**.
-5. Set the public-demo guardrails (`api/security.py`): a long random
-   `ADMIN_API_KEY` as a **Secret**, and `TRUST_PROXY_HEADERS=1` as a Variable so
-   per-IP rate limits see the visitor's address rather than the Space's proxy.
-   Without an admin key the Space runs in public mode: visitors can query and
-   use their own sandbox, but cannot write to or delete the demo deal.
+## 6 · Start the stack
 
-The first build takes a while — it bakes the model weights into the image on
-purpose. The free tier's disk is ephemeral, so a runtime download would be paid
-again after every sleep-wake cycle, in front of whoever opened the link.
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f api caddy
+```
 
-## 5 · Vercel
+The first build downloads CPU PyTorch and bakes the embedding, reranker and NLI
+weights into the image — 20–30 minutes on 2 ARM cores. The API then needs a few
+more minutes to load the models; Caddy waits for its health check. When it is
+up:
 
-1. Import the repository at <https://vercel.com/new>.
-2. Set **Root Directory** to `web`. Everything else is auto-detected.
-3. Set `NEXT_PUBLIC_API_URL` to your Space URL
-   (`https://<user>-<space>.hf.space`, no trailing slash).
+```bash
+curl https://<name>.duckdns.org/health
+curl https://<name>.duckdns.org/ready    # 200 once Qdrant and the graph are ready
+```
 
-`NEXT_PUBLIC_*` is inlined at build time, so changing it requires a redeploy —
-not a restart.
+## 7 · Seed the demo data room
 
-## 6 · Close the CORS loop
+Writing to the demo deal is an admin operation. From the server:
 
-Set `CORS_ORIGINS` on the Space to the Vercel URL and restart it.
+```bash
+export ADMIN_API_KEY=$(grep ^ADMIN_API_KEY .env | cut -d= -f2-)
+for f in data/sample_deal/*.txt; do
+  curl -sS -H "X-Admin-Key: $ADMIN_API_KEY" \
+       -F "deal_id=aurora_vertex_2024" -F "file=@$f" \
+       https://<name>.duckdns.org/api/v1/ingest; echo
+done
+curl -s https://<name>.duckdns.org/api/v1/deals
+```
 
-Get this wrong and the failure is silent on the server: the browser blocks every
-request, the UI shows an empty deal list, and the Space's logs show nothing at
-all, because the requests never arrive.
+Nine documents, roughly 110 chunks. Re-running the loop is safe: document and
+point IDs are derived from content, so identical files replace themselves
+instead of duplicating.
 
-## 7 · Keep the Space awake
+## 8 · Frontend on Vercel, and close the CORS loop
 
-`.github/workflows/keepalive.yml` pings `/health` every 6 hours, well inside the
-48-hour sleep window.
+1. Import the repository at <https://vercel.com/new> and set **Root Directory**
+   to `web`.
+2. Set `NEXT_PUBLIC_API_URL` to `https://<name>.duckdns.org` (no trailing
+   slash). It is inlined at **build** time: set it, then redeploy — a build made
+   without it calls `http://localhost:8000` from every visitor's browser.
+3. Vercel deploys the default branch. Set Settings → Git → Production Branch, or
+   merge your work into `main`.
+4. Put the Vercel URL in `CORS_ORIGINS` in the server's `.env` and recreate the
+   API container:
+   `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d api`.
+   Get CORS wrong and the failure is silent on the server — the browser blocks
+   every request and the UI shows an empty deal list.
 
-Set a repository **variable** (not a secret — a Space URL is public) named
-`SPACE_URL` under *Settings → Secrets and variables → Actions → Variables*, then
-run the workflow once manually to confirm it resolves.
+Finally, set the repository variable `BACKEND_URL` (Settings → Secrets and
+variables → Actions → Variables) to `https://<name>.duckdns.org`; the uptime
+workflow in `.github/workflows/keepalive.yml` then checks `/health` every 6
+hours.
 
-**This needs occasional attention.** GitHub disables scheduled workflows in a
-repository with no activity for 60 days. When that happens the ping stops
-silently and the Space starts sleeping again. Any commit resets the clock.
+### Updating
 
-## 8 · Re-run the eval against the deployed profile
+```bash
+git pull
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+The named volumes keep the index, the quota counters and the TLS certificates
+across rebuilds.
+
+## 9 · Re-run the eval against the deployed profile
 
 The last step, and the one that keeps the project's headline claims honest.
 
@@ -235,8 +262,8 @@ visitor actually exercises.
 
 The Quality Assessor's relevance floors in `src/agents/quality_assessor.py`
 (`RELEVANCE_FLOOR`, `CONFIDENT_REFUSAL_CEILING`, `CONFIDENT_PASS_FLOOR`) were
-calibrated against `bge-reranker-v2-m3`'s sigmoid output. The Space runs the
-MiniLM cross-encoder, whose scores are on a comparable but not identical scale,
+calibrated against `bge-reranker-v2-m3`'s sigmoid output. The deployment runs
+the MiniLM cross-encoder, whose scores are on a comparable but not identical scale,
 so if the eval shows more refusals than expected, those floors are the first
 place to look — `python -m eval.run_retrieval_eval` reports the gate's decision
 per question and runs with `RERANKER_MODEL` set to either model.
@@ -245,10 +272,10 @@ per question and runs with `RERANKER_MODEL` set to either model.
 
 ## What the deployment does not have
 
-**The local Ollama fallback is gone.** The model ladder's last rung is a local
+**The local Ollama fallback.** The model ladder's last rung is a local
 Qwen2.5-14B served by Ollama, which exists to answer when every cloud key is
-spent. A free Space has no Ollama server, and 14B weights would not fit
-alongside the retrieval models even if it did.
+spent. A 2-core VM cannot run 14B weights alongside the retrieval models at a
+usable speed.
 
 The practical effect: on the deployed instance, exhausting the Gemini daily
 quota is terminal for that day rather than a quiet downgrade. Since keys
@@ -258,8 +285,8 @@ different host.
 
 ## Not yet verified
 
-- **The `Dockerfile.hf` build has not been run.** Docker was unavailable on the
-  machine this was written on, so the file is written against the platform's
-  documented requirements (port 7860, uid 1000, `HF_HOME` under the user's home)
-  but has not been built. Expect to iterate on the first Space build.
-- **Reranker threshold recalibration** — see step 8.
+- **The image has not been built on ARM.** Every dependency publishes aarch64
+  wheels (PyTorch CPU, PyMuPDF, onnxruntime for FastEmbed, psycopg2-binary), but
+  `Dockerfile.hf` has not yet been built on an ARM host. The merged compose file
+  and the Caddyfile were validated (`docker compose config`, `caddy validate`).
+- **Quality Assessor floor recalibration** for the MiniLM reranker — see step 9.

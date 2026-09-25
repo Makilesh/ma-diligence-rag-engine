@@ -76,9 +76,11 @@ async def lifespan(app: FastAPI):
     if os.getenv("WARM_MODELS", "1") != "0":
         from src.vector_db.reranker import warm_models
         from src.verification.nli import warm_nli_model
+        from src.decisions.laya_client import warm_laya
 
         await warm_models()
         await warm_nli_model()
+        await warm_laya()
 
     from api.routes.deals import start_sandbox_sweeper, stop_sandbox_sweeper
 

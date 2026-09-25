@@ -97,29 +97,86 @@ def _node_state(question: dict, sub_questions: list[str]) -> dict:
     }
 
 
-def _gate_decision(state: dict, reranked: list[dict]) -> dict:
+def _decision(verdict: dict | None) -> str:
+    """admitted / refused / llm_fallback for an assessment (None = ambiguous band)."""
+    if verdict is None:
+        return "llm_fallback"
+    return "refused" if verdict.get("force_refusal") else "admitted"
+
+
+async def gate_decision(state: dict, reranked: list[dict], laya: bool = True) -> dict:
     """
-    What the Quality Assessor's heuristic would do with this context.
+    What the Quality Assessor would do with this context, without any LLM.
 
     Calls _heuristic_assessment exactly as quality_assessor_node does before it
     ever considers the LLM. None from the heuristic means the ambiguous band,
-    where the node would ask an LLM — reported as such, not guessed.
+    where the node would ask an LLM — reported as such, not guessed. With `laya`,
+    it also runs the node's answerability check (see add_laya_gate).
     """
     from src.agents.quality_assessor import _heuristic_assessment
 
     verdict = _heuristic_assessment({**state, "reranked_results": reranked})
     scores = [float(c.get("reranker_score", 0.0)) for c in reranked]
-    if verdict is None:
-        decision = "llm_fallback"
-    elif verdict.get("force_refusal"):
-        decision = "refused"
-    else:
-        decision = "admitted"
-    return {
-        "decision": decision,
+    out = {
+        "decision": _decision(verdict),
         "max_reranker_score": round(max(scores), 4) if scores else None,
         "context_quality_score": None if verdict is None else verdict["context_quality_score"],
     }
+    if laya:
+        await add_laya_gate(out, state, reranked)
+    return out
+
+
+async def add_laya_gate(gate: dict, state: dict, reranked: list[dict]) -> None:
+    """
+    Adds gate["laya"]: the node's combine_with_answerability decision.
+
+    Runs regardless of LAYA_GATE, so the heuristic and the Laya-augmented gate
+    are measured on the same context. Separate from gate_decision so a run can
+    finish retrieval, release the retrieval models, and only then load Laya —
+    on a memory-tight host the three models together do not fit.
+    """
+    from src.agents.quality_assessor import _heuristic_assessment, combine_with_answerability
+    from src.decisions.answerability import assess_answerability
+    from src.decisions.laya_client import LayaUnavailable
+
+    full_state = {**state, "reranked_results": reranked}
+    verdict = _heuristic_assessment(full_state)
+    if verdict is not None and verdict.get("force_refusal"):
+        # The node never consults Laya on a heuristic refusal.
+        gate["laya"] = {"decision": "refused", "consulted": False}
+        return
+    try:
+        answerability = await assess_answerability(
+            state["original_query"], state.get("sub_questions") or [], reranked)
+    except LayaUnavailable as e:
+        gate["laya"] = {"decision": None, "unavailable": str(e)}
+        return
+    combined = combine_with_answerability(full_state, verdict, answerability)
+    gate["laya"] = {
+        "decision": _decision(combined),
+        "consulted": True,
+        "vetoed": bool(answerability and answerability.vetoed),
+        "answerability": None if answerability is None else round(answerability.score, 4),
+        "facets": {} if answerability is None else {
+            f: round(p, 4) for f, p in answerability.facet_scores.items()},
+        "latency_ms": None if answerability is None else answerability.latency_ms,
+    }
+
+
+def release_retrieval_models() -> None:
+    """Drops the embedding and reranker models so Laya can load in their place."""
+    import gc
+
+    import torch
+
+    from src.vector_db import reranker
+
+    reranker._embedding_model = None
+    reranker._reranker_model = None
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
 
 async def _candidate_runs(question: dict, config: dict) -> dict:
@@ -173,7 +230,7 @@ async def _candidate_runs(question: dict, config: dict) -> dict:
 
 
 async def _node_run(question: dict, sub_questions: list[str]) -> dict:
-    """One call of the real retrieval_executor_node, plus the refusal gate."""
+    """One call of the real retrieval_executor_node, plus the heuristic refusal gate."""
     from src.agents.retrieval_executor import retrieval_executor_node
 
     state = _node_state(question, sub_questions)
@@ -184,7 +241,8 @@ async def _node_run(question: dict, sub_questions: list[str]) -> dict:
         "ranking": out["reranked_results"],
         "context": out["expanded_context"],
         "latency_ms": latency_ms,
-        "gate": _gate_decision(state, out["reranked_results"]),
+        "gate": await gate_decision(state, out["reranked_results"], laya=False),
+        "state": state,
         "sub_questions": list(sub_questions),
     }
 
@@ -329,6 +387,24 @@ def aggregate(questions: list[dict], ablation: str, ks: list[int]) -> dict:
             }
             for group, is_control in (("controls", True), ("answerable", False))
         }
+        laya_runs = [q for q in questions if ablation in q["runs"]
+                     and (q["runs"][ablation]["gate"].get("laya") or {}).get("decision")]
+        if laya_runs:
+            result["laya_gate"] = {
+                group: {
+                    decision: sum(
+                        1 for q in laya_runs if q["is_control"] == is_control
+                        and q["runs"][ablation]["gate"]["laya"]["decision"] == decision
+                    )
+                    for decision in ("admitted", "llm_fallback", "refused")
+                }
+                for group, is_control in (("controls", True), ("answerable", False))
+            }
+            laya_ms = [q["runs"][ablation]["gate"]["laya"]["latency_ms"] for q in laya_runs
+                       if q["runs"][ablation]["gate"]["laya"].get("latency_ms") is not None]
+            result["laya_gate"]["latency_ms"] = {
+                "p50": m.percentile(laya_ms, 50), "p95": m.percentile(laya_ms, 95),
+                "n": len(laya_ms)}
     return result
 
 
@@ -493,6 +569,7 @@ def render_markdown(report: dict) -> str:
             for q in controls
         ))
         lines.append("")
+    lines += render_laya_gate(report)
 
     gate = report.get("baseline_check")
     if gate:
@@ -503,6 +580,50 @@ def render_markdown(report: dict) -> str:
         if gate["failures"]:
             lines.append("")
     return "\n".join(lines)
+
+
+def render_laya_gate(report: dict) -> list[str]:
+    """Heuristic gate vs the Laya-augmented gate, side by side, per node ablation."""
+    aggs = report["aggregates"]
+    measured = [a for a in NODE_ABLATIONS if a in aggs and "laya_gate" in aggs[a]]
+    if not measured:
+        return ["Laya answerability gate NOT measured (--no-laya, or Laya unavailable).", ""]
+    lines = ["## Refusal gate — heuristic vs heuristic + Laya answerability", "",
+             "Laya can only take admission away (veto an admitted context, or refuse in "
+             "the ambiguous band without the LLM); see src/decisions/answerability.py. "
+             "Thresholds were chosen on eval/answerability_dev.json, not on this set.", "",
+             "| ablation | group | gate | admitted | ambiguous → LLM | refused |",
+             "|---|---|---|---|---|---|"]
+    for ablation in measured:
+        for group in ("controls", "answerable"):
+            for label, counts in (("heuristic", aggs[ablation]["gate"][group]),
+                                  ("+ Laya", aggs[ablation]["laya_gate"][group])):
+                lines.append(f"| {ABLATION_LABELS[ablation]} | {group} | {label} | "
+                             f"{counts['admitted']} | {counts['llm_fallback']} | "
+                             f"{counts['refused']} |")
+    lines.append("")
+    for ablation in measured:
+        lat = aggs[ablation]["laya_gate"]["latency_ms"]
+        lines.append(f"Laya latency ({ABLATION_LABELS[ablation]}, device "
+                     f"{report['environment'].get('laya_device', '?')}): p50 {_ms(lat['p50'])} ms, "
+                     f"p95 {_ms(lat['p95'])} ms over {lat['n']} assessments.")
+    lines.append("")
+    changed = []
+    for q in report["questions"]:
+        for ablation in measured:
+            gate = q["runs"].get(ablation, {}).get("gate") or {}
+            laya = gate.get("laya") or {}
+            if laya.get("decision") and laya["decision"] != gate["decision"]:
+                changed.append(f"{q['id']} ({ablation}) {gate['decision']}→{laya['decision']} "
+                               f"P={laya.get('answerability')}")
+    lines.append("Changed by Laya: " + (", ".join(changed) if changed else "none"))
+    lines.append("")
+    controls = [q for q in report["questions"] if q["is_control"] and "production" in q["runs"]]
+    lines.append("Controls, Laya answerability (production): " + ", ".join(
+        f"{q['id']} P={(q['runs']['production']['gate'].get('laya') or {}).get('answerability')}"
+        for q in controls))
+    lines.append("")
+    return lines
 
 
 def baseline_metrics(report: dict) -> dict:
@@ -521,6 +642,20 @@ def baseline_metrics(report: dict) -> dict:
 # ==============================================================================
 # Main
 # ==============================================================================
+
+
+def laya_model_in_use() -> str | None:
+    """Laya checkpoint loaded during the run, None if it never loaded."""
+    from src.decisions.laya_client import loaded_model
+
+    return loaded_model()
+
+
+def laya_device() -> str | None:
+    """LAYA_DEVICE, or where laya_client would put the model by default."""
+    import os
+
+    return os.getenv("LAYA_DEVICE") or ("cuda" if _device().startswith("cuda") else "cpu")
 
 
 def _device() -> str:
@@ -567,6 +702,7 @@ async def run(args: argparse.Namespace) -> dict:
     retrievable = [c for c in chunks if is_retrievable(c)]
 
     report_questions = []
+    pending_laya: list[dict] = []
     with use_client(client):
         await warm_models()
         for n, question in enumerate(pairs, start=1):
@@ -595,6 +731,11 @@ async def run(args: argparse.Namespace) -> dict:
                         else production
                     )
 
+            if args.laya:
+                # Scored after retrieval ends; see add_laya_gate. Identity check:
+                # an undecomposed question shares its production run.
+                for run_ in {id(r): r for a, r in runs.items() if a in NODE_ABLATIONS}.values():
+                    pending_laya.append(run_)
             report_questions.append({
                 "id": question["id"],
                 "query": question["query"],
@@ -610,6 +751,13 @@ async def run(args: argparse.Namespace) -> dict:
                 "runs": {a: score_run(r, question, qrels, args.k) for a, r in runs.items()},
             })
             print(f"[eval] {n}/{len(pairs)} {question['id']}", file=sys.stderr)
+
+    if pending_laya:
+        print(f"[eval] Laya answerability gate on {len(pending_laya)} contexts ...",
+              file=sys.stderr)
+        release_retrieval_models()
+        for run_ in pending_laya:
+            await add_laya_gate(run_["gate"], run_["state"], run_["ranking"])
 
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -628,6 +776,8 @@ async def run(args: argparse.Namespace) -> dict:
             "vector_store": "qdrant-client local mode (:memory:) — exact search, "
                             "no HNSW/int8 quantization",
             "python": sys.version.split()[0],
+            "laya_model": laya_model_in_use(),
+            "laya_device": laya_device(),
         },
         "config": {
             "k": args.k,
@@ -678,6 +828,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--update-baseline", action="store_true",
                         help=f"write this run's gated metrics to {DEFAULT_BASELINE.name}")
     parser.add_argument("--output-dir", default=str(RESULTS_DIR))
+    parser.add_argument("--no-laya", dest="laya", action="store_false",
+                        help="skip the Laya answerability gate measurement")
     parser.add_argument("--verbose", action="store_true", help="keep INFO logs from src.*")
     args = parser.parse_args(argv)
     args.k = sorted(set(args.k))

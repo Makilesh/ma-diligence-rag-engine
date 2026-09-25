@@ -1,4 +1,4 @@
-# Retrieval eval — 2026-09-23
+# Retrieval eval — 2026-09-25
 
 Golden set: 35 answerable + 6 control questions · corpus: 9 documents, 112 chunks (112 retrievable) · device: cuda (NVIDIA GeForce RTX 5070 Ti Laptop GPU) · LLM calls: 0 · fact-coverage ceiling (facts present in any retrievable chunk): 99.0%
 
@@ -9,8 +9,8 @@ Percentages. fact_cov = share of expected facts present in the top-k chunk texts
 | dense-only | 72.7 | 85.6 | — | 49.7 | 68.5 | 58.2 | 56.6 | 94.3 | 98.6 | 21 | 23 |
 | sparse-only (BM25) | 68.3 | 73.1 | — | 41.8 | 46.6 | 52.0 | 45.5 | 80.0 | 82.9 | 21 | 23 |
 | hybrid RRF (no rerank) | 73.8 | 85.3 | — | 47.1 | 61.5 | 60.4 | 54.5 | 82.9 | 91.4 | 22 | 24 |
-| production (hybrid + rerank) | 87.8 | 90.7 | 91.6 | 69.6 | 76.4 | 78.7 | 71.3 | 95.7 | 95.7 | 788 | 1057 |
-| production + decomposition | 87.4 | 91.6 | 92.6 | 69.3 | 77.2 | 77.2 | 72.3 | 95.7 | 95.7 | 832 | 3949 |
+| production (hybrid + rerank) | 87.8 | 90.7 | 91.6 | 69.6 | 76.4 | 78.7 | 71.3 | 95.7 | 95.7 | 790 | 1050 |
+| production + decomposition | 87.4 | 91.6 | 92.6 | 69.3 | 77.2 | 77.2 | 72.3 | 95.7 | 95.7 | 830 | 3933 |
 
 ## production (hybrid + rerank) — by query type
 
@@ -48,4 +48,26 @@ Changed: mh_05 66.7→100.0
 | production + decomposition | answerable | 34 | 1 | 0 |
 
 Controls (production): ctrl_01 max=0.0261 refused, ctrl_02 max=0.956 admitted, ctrl_03 max=0.0525 llm_fallback, ctrl_04 max=0.3459 admitted, ctrl_05 max=0.8807 admitted, ctrl_06 max=0.0378 refused
+
+## Refusal gate — heuristic vs heuristic + Laya answerability
+
+Laya can only take admission away (veto an admitted context, or refuse in the ambiguous band without the LLM); see src/decisions/answerability.py. Thresholds were chosen on eval/answerability_dev.json, not on this set.
+
+| ablation | group | gate | admitted | ambiguous → LLM | refused |
+|---|---|---|---|---|---|
+| production (hybrid + rerank) | controls | heuristic | 3 | 1 | 2 |
+| production (hybrid + rerank) | controls | + Laya | 2 | 0 | 4 |
+| production (hybrid + rerank) | answerable | heuristic | 33 | 1 | 1 |
+| production (hybrid + rerank) | answerable | + Laya | 33 | 1 | 1 |
+| production + decomposition | controls | heuristic | 3 | 1 | 2 |
+| production + decomposition | controls | + Laya | 2 | 0 | 4 |
+| production + decomposition | answerable | heuristic | 34 | 1 | 0 |
+| production + decomposition | answerable | + Laya | 34 | 1 | 0 |
+
+Laya latency (production (hybrid + rerank), device cuda): p50 57 ms, p95 75 ms over 38 assessments.
+Laya latency (production + decomposition, device cuda): p50 68 ms, p95 271 ms over 39 assessments.
+
+Changed by Laya: ctrl_02 (production) admitted→refused P=0.2654, ctrl_02 (production_decomp) admitted→refused P=0.2654, ctrl_03 (production) llm_fallback→refused P=0.1986, ctrl_03 (production_decomp) llm_fallback→refused P=0.1986
+
+Controls, Laya answerability (production): ctrl_01 P=None, ctrl_02 P=0.2654, ctrl_03 P=0.1986, ctrl_04 P=0.5206, ctrl_05 P=0.4631, ctrl_06 P=None
 

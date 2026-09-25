@@ -26,3 +26,16 @@ The run writes `eval/results/retrieval_<date>.json` with full per-question detai
 **Zero LLM calls.** Sub-questions are read from `eval/sub_questions.json`. That file was produced once by `python -m eval.generate_sub_questions`, which runs the real Agent 1 node on the lite agent ladder, one call per question, and records its provenance. Regenerate it only when Agent 1's prompt or the golden set changes. Entries whose query text no longer matches are ignored. Without the file, decomposition is reported as not measured.
 
 **Baseline.** `eval/baseline.json` holds the overall gated metrics for `production` and `production_decomp`. With `--baseline`, a drop larger than the tolerance (default 2pp, `--tolerance` to override) exits 1. After an intentional retrieval change, rerun with `--update-baseline` and commit the new file alongside the change. The CI job (`retrieval-eval` in `.github/workflows/ci.yml`: manual and weekly) runs on CPU against a baseline recorded on a GPU, so it uses a 3pp tolerance.
+
+## Laya decisions on the query path
+
+Two local Laya checks (see `src/decisions/`) are measured here, both LLM-free and deterministic.
+
+**Answerability gate** (`src/decisions/answerability.py`, used by the Quality Assessor). The reranker heuristic measures relevance, so an on-topic question whose figure is absent (FY2024 capex when only FY2023 is in the data room) passes it. Laya asks, for the question and each sub-question against the top 3 reranked chunks, "Does `passage` state the information needed to answer `question`?", and vetoes admission only when no facet scores 0.35 or more.
+
+- The phrasing, the top-3 cut and the threshold come from the **dev set** `eval/answerability_dev.json`: 29 answerable and 29 unanswerable questions, mostly minimal pairs, written for this purpose with different wording from the golden set. Each answerable entry carries a verbatim corpus excerpt. Each unanswerable entry carries regexes that must match nowhere in the corpus. `tests/test_decisions_query.py` re-checks both on every CI run. `python -m eval.run_answerability_eval --compare-phrasings` writes `results/answerability_dev.md` with the threshold sweep. An answerable question whose evidence retrieval failed to surface is reported as `retrieval_miss`, not held against the gate.
+- The **golden set is the held-out test set**. `run_retrieval_eval.py` reports the heuristic gate and the Laya-augmented gate side by side on the same context, per ablation (`--no-laya` skips it). The decision reported is the node's own `combine_with_answerability`, so the harness measures production logic.
+
+**Public query guard** (`src/decisions/query_guard.py`, used by `/query` and `/query/stream` for non-admin callers). `python -m eval.run_query_guard_eval` scores `eval/query_guard_set.json`: 124 genuine questions (the golden and dev sets plus 25 casual on-topic variants) against 27 junk prompts (off-topic, jailbreak, injection, and injections appended to a real question). It reports precision/recall at the configured thresholds and a sweep of each one. `results/query_guard.md` has the numbers.
+
+Latency on a small CPU host: set `LAYA_DEVICE=cpu` and pass `--threads 2` to either script. The timing run writes `*_timing.md`.

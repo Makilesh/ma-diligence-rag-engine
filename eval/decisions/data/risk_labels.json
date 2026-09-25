@@ -1,0 +1,1703 @@
+{
+ "_meta": {
+  "task": "chunk x risk-category multi-label",
+  "categories": [
+   "change_of_control",
+   "material_adverse_change",
+   "litigation",
+   "regulatory_risk",
+   "financial_distress",
+   "environmental_liability",
+   "key_person_dependency",
+   "ip_risk",
+   "customer_concentration",
+   "indemnification"
+  ],
+  "provenance": "Corpus chunks are produced by src.data_processing.ingest_pipeline.extract_and_chunk over data/sample_deal/*.txt; each row pins the chunk text by sha1 so the runner refuses to score stale labels after a chunking change. Labelled by hand by Claude (the implementing agent) reading every chunk; synthetic rows were written by the same agent, are marked syn-*, and use obviously fake people and numbers. Rows marked borderline are excluded from scoring for that label (counted separately). Split: corpus by document (dev = board deck, credit agreement, customer contracts, QoE report; test = the other five documents) so no document contributes to both; synthetic rows alternate dev/test. Single annotator - no inter-annotator agreement was measured.",
+  "guideline": "A category is positive when the chunk discloses an actual exposure, open issue or operative provision of that kind affecting the company or the transaction (a pending or threatened claim, a change-of-control consent, termination right or payment, a MAC definition or condition, an indemnity cap, a required antitrust approval, a going-concern doubt or covenant breach, a dependency on one person, a revenue share held by few customers). A statement that no such issue exists (no pending litigation, no MAE has occurred, no change of control provision) is negative, as is an incidental keyword (Mac, by default, basket). Patent-infringement suits are both litigation and ip_risk.",
+  "category_notes": "The ten categories of RISK_PATTERNS are kept: none is fully redundant. litigation and ip_risk overlap on patent suits but ip_risk also covers open-source and assignment gaps. The corpus has no material_adverse_change, financial_distress or environmental_liability positives; those are covered only by synthetic rows."
+ },
+ "corpus": [
+  {
+   "id": "aurora_financials_fy2023#0",
+   "file": "aurora_financials_fy2023.txt",
+   "chunk_index": 0,
+   "sha1": "8942c36f979aeffa97c876c392ce963a1befae78",
+   "preview": "AURORA TECHNOLOGIES INC. CONSOLIDATED FINANCIAL STATEMENTS For the Fiscal Years Ended Dece",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "aurora_financials_fy2023#1",
+   "file": "aurora_financials_fy2023.txt",
+   "chunk_index": 1,
+   "sha1": "d9c67fa9d97b1c90fcb6c3e1f58ce8f70d5d4f2a",
+   "preview": "CONSOLIDATED INCOME STATEMENT (in millions of USD) FY2023 FY2022 ------ ------ Revenue $45",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "aurora_financials_fy2023#2",
+   "file": "aurora_financials_fy2023.txt",
+   "chunk_index": 2,
+   "sha1": "5bc5369a506751d21c0d2850209481964d051990",
+   "preview": "CONSOLIDATED BALANCE SHEET (in millions of USD, as of December 31) ASSETS FY2023 FY2022 --",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "aurora_financials_fy2023#3",
+   "file": "aurora_financials_fy2023.txt",
+   "chunk_index": 3,
+   "sha1": "233aa808e5a5d616887c61353ecb22841bd98faa",
+   "preview": "KEY FINANCIAL METRICS AND NOTES EBITDA Reconciliation:",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "aurora_financials_fy2023#4",
+   "file": "aurora_financials_fy2023.txt",
+   "chunk_index": 4,
+   "sha1": "e211a9895b54c15143d5645af808defbaa8db721",
+   "preview": "KEY FINANCIAL METRICS AND NOTES Operating Income (EBIT) $68.0 $51.4 Depreciation & Amortiz",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "aurora_financials_fy2023#5",
+   "file": "aurora_financials_fy2023.txt",
+   "chunk_index": 5,
+   "sha1": "398955a66a9a84a79fd361c686c062d6060e02ad",
+   "preview": "Revenue Growth: 17.0% YoY SaaS ARR Growth: 27.9% YoY (SaaS ARR as of Dec 31, 2023: $210.5M",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "board_deck_strategic_review_mar2024#0",
+   "file": "board_deck_strategic_review_mar2024.txt",
+   "chunk_index": 0,
+   "sha1": "562ab0745351b85bee72ada479f418ea08dfc352",
+   "preview": "AURORA TECHNOLOGIES INC. BOARD OF DIRECTORS — SPECIAL MEETING MARCH 10, 2024 PRIVILEGED AN",
+   "split": "dev",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "board_deck_strategic_review_mar2024#1",
+   "file": "board_deck_strategic_review_mar2024.txt",
+   "chunk_index": 1,
+   "sha1": "c2f5aea802b6a4ddd1730ce4a1e10e9eb1fef683",
+   "preview": "SLIDE 2: MARKET CONTEXT Industry Trends: - Enterprise software M&A activity up 34% YoY in ",
+   "split": "dev",
+   "labels": [
+    "customer_concentration",
+    "key_person_dependency"
+   ],
+   "borderline": []
+  },
+  {
+   "id": "board_deck_strategic_review_mar2024#2",
+   "file": "board_deck_strategic_review_mar2024.txt",
+   "chunk_index": 2,
+   "sha1": "c7771638058a6d21bd142ec2819493ae57acee80",
+   "preview": "SLIDE 3: PRELIMINARY INDICATIONS OF INTEREST Three parties submitted non-binding indicatio",
+   "split": "dev",
+   "labels": [
+    "regulatory_risk"
+   ],
+   "borderline": [],
+   "note": "Meridian bid: antitrust MODERATE RISK"
+  },
+  {
+   "id": "board_deck_strategic_review_mar2024#3",
+   "file": "board_deck_strategic_review_mar2024.txt",
+   "chunk_index": 3,
+   "sha1": "bfbfebe0e713d46d90c72549b8639e6da701d3fa",
+   "preview": "SLIDE 3: PRELIMINARY INDICATIONS OF INTEREST ----------- --- --- ---- Comparable Companies",
+   "split": "dev",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "board_deck_strategic_review_mar2024#4",
+   "file": "board_deck_strategic_review_mar2024.txt",
+   "chunk_index": 4,
+   "sha1": "df26e09d962130a7c22a01f96d1cd6207b76168f",
+   "preview": "SLIDE 5: MANAGEMENT RECOMMENDATION The Management Team and Goldman Sachs recommend: 1. PRO",
+   "split": "dev",
+   "labels": [],
+   "borderline": [
+    "regulatory_risk"
+   ],
+   "note": "'if antitrust resolved' - passing reference"
+  },
+  {
+   "id": "board_deck_strategic_review_mar2024#5",
+   "file": "board_deck_strategic_review_mar2024.txt",
+   "chunk_index": 5,
+   "sha1": "89800319d66a03012ae81ecede3f407d88125efb",
+   "preview": "SLIDE 6: TIMELINE AND NEXT STEPS Week 1-2 (Mar 11-22): Grant Vertex exclusivity, open data",
+   "split": "dev",
+   "labels": [
+    "litigation",
+    "ip_risk",
+    "change_of_control",
+    "key_person_dependency",
+    "regulatory_risk"
+   ],
+   "borderline": [],
+   "note": "Key risk factors slide: DataFlow patent suit, customer consents, CTO retention, HSR"
+  },
+  {
+   "id": "board_deck_strategic_review_mar2024#6",
+   "file": "board_deck_strategic_review_mar2024.txt",
+   "chunk_index": 6,
+   "sha1": "cae703c3150a8a567441375b018e60647595b89b",
+   "preview": "BOARD RESOLUTION RESOLVED, that the Board of Directors hereby authorizes the Company to: (",
+   "split": "dev",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "board_deck_strategic_review_mar2024#7",
+   "file": "board_deck_strategic_review_mar2024.txt",
+   "chunk_index": 7,
+   "sha1": "820bbde5b62f568402a63724e09d8046dd7a113f",
+   "preview": "SPEAKER NOTES: - CFO Sarah Chen noted that the $4.5M restructuring charge in FY2023 was re",
+   "split": "dev",
+   "labels": [
+    "customer_concentration",
+    "litigation"
+   ],
+   "borderline": [
+    "ip_risk"
+   ],
+   "note": "DataFlow litigation reserve; customer concentration concern"
+  },
+  {
+   "id": "credit_agreement_summary#0",
+   "file": "credit_agreement_summary.txt",
+   "chunk_index": 0,
+   "sha1": "c789c605f5c0d28346b5a7006f44756c551c38f1",
+   "preview": "AURORA TECHNOLOGIES INC. SUMMARY OF INDEBTEDNESS AND CREDIT FACILITIES Disclosure Schedule",
+   "split": "dev",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "credit_agreement_summary#1",
+   "file": "credit_agreement_summary.txt",
+   "chunk_index": 1,
+   "sha1": "f1ed90ee7ba256461a631640024696ee18032a53",
+   "preview": "SECTION 1: OUTSTANDING INDEBTEDNESS (in millions of USD, as of December 31, 2023) Revolvin",
+   "split": "dev",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "credit_agreement_summary#2",
+   "file": "credit_agreement_summary.txt",
+   "chunk_index": 2,
+   "sha1": "c9c4aa0ade0a2aa08b8f8be0092db454b2777e5c",
+   "preview": "The Company deleveraged materially during FY2023, driven by $52.1 million of operating cas",
+   "split": "dev",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "credit_agreement_summary#3",
+   "file": "credit_agreement_summary.txt",
+   "chunk_index": 3,
+   "sha1": "3dde134a6862d086c8122c0e6daecc8dd6ce36c1",
+   "preview": "SECTION 2: REVOLVING CREDIT FACILITY Agreement: Amended and Restated Credit Agreement date",
+   "split": "dev",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "credit_agreement_summary#4",
+   "file": "credit_agreement_summary.txt",
+   "chunk_index": 4,
+   "sha1": "8a264c7f6b0e31d09d03d0dcd7640b1821e8cd1c",
+   "preview": "Administrative Agent: JPMorgan Chase Bank, N.A. Syndicate: JPMorgan Chase Bank, N.A. (Lead",
+   "split": "dev",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "credit_agreement_summary#5",
+   "file": "credit_agreement_summary.txt",
+   "chunk_index": 5,
+   "sha1": "1fc6640fb953fecced77046da72a04610d71fb11",
+   "preview": "SECTION 2: REVOLVING CREDIT FACILITY Commitment: $150 million Drawn: $85 million as of Dec",
+   "split": "dev",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "credit_agreement_summary#6",
+   "file": "credit_agreement_summary.txt",
+   "chunk_index": 6,
+   "sha1": "875a9a635d00baf0a7db65bb9d3a8e656e8cb59f",
+   "preview": "The Company is currently billed at 225 basis points. Management has not requested a re-gri",
+   "split": "dev",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "credit_agreement_summary#7",
+   "file": "credit_agreement_summary.txt",
+   "chunk_index": 7,
+   "sha1": "ffd8f83fefa8a6d0dce276d0eaebf3dbb31459a6",
+   "preview": "SECTION 3: FINANCIAL COVENANTS Tested quarterly on a trailing twelve month basis:",
+   "split": "dev",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "credit_agreement_summary#8",
+   "file": "credit_agreement_summary.txt",
+   "chunk_index": 8,
+   "sha1": "bcc9897d8688bef4a8bb86f96e295709f432711d",
+   "preview": "SECTION 3: FINANCIAL COVENANTS Maximum Total Net Leverage Ratio 3.50x Actual at December 3",
+   "split": "dev",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "credit_agreement_summary#9",
+   "file": "credit_agreement_summary.txt",
+   "chunk_index": 9,
+   "sha1": "c7f7196365f3d322ffc12a627365b1a7f07ba22f",
+   "preview": "The Company was in compliance with all financial covenants at each quarterly test date dur",
+   "split": "dev",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "credit_agreement_summary#10",
+   "file": "credit_agreement_summary.txt",
+   "chunk_index": 10,
+   "sha1": "3ce4f8bc73db5f44e94e5fc6286c350b85b89fee",
+   "preview": "SECTION 4: CHANGE OF CONTROL AND THE TRANSACTION Section 8.1(k) of the Credit Agreement de",
+   "split": "dev",
+   "labels": [
+    "change_of_control"
+   ],
+   "borderline": [
+    "financial_distress",
+    "indemnification"
+   ],
+   "note": "CoC is an Event of Default -> acceleration at closing; company is not distressed; 'breakage indemnity' is a loan term"
+  },
+  {
+   "id": "credit_agreement_summary#11",
+   "file": "credit_agreement_summary.txt",
+   "chunk_index": 11,
+   "sha1": "476b86338220adc766c622f90de6f5fb0b864a0a",
+   "preview": "SECTION 5: NEGATIVE COVENANTS OF NOTE While the facility remains outstanding, the Company ",
+   "split": "dev",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "credit_agreement_summary#12",
+   "file": "credit_agreement_summary.txt",
+   "chunk_index": 12,
+   "sha1": "465777b10b42ef3da6d8fbd11ba8e170f890f5da",
+   "preview": "SECTION 6: CAPITAL LEASES AND OTHER OBLIGATIONS Capital lease obligations of $6.4 million ",
+   "split": "dev",
+   "labels": [
+    "change_of_control"
+   ],
+   "borderline": [],
+   "note": "lease schedules require lessor consent on CoC"
+  },
+  {
+   "id": "customer_contracts_schedule#0",
+   "file": "customer_contracts_schedule.txt",
+   "chunk_index": 0,
+   "sha1": "39f0c9ebb7a20217947e32b8c88f586288446513",
+   "preview": "AURORA TECHNOLOGIES INC. SCHEDULE OF MATERIAL CUSTOMER CONTRACTS Disclosure Schedule 3.14(",
+   "split": "dev",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "customer_contracts_schedule#1",
+   "file": "customer_contracts_schedule.txt",
+   "chunk_index": 1,
+   "sha1": "968457f528cd0734035b6c21680bae3d718443e5",
+   "preview": "SECTION 1: TOP TEN CUSTOMERS BY FY2023 REVENUE Rank Customer FY2023 Revenue % of Total Con",
+   "split": "dev",
+   "labels": [
+    "customer_concentration"
+   ],
+   "borderline": [],
+   "note": "top-ten table, 47.8% of revenue"
+  },
+  {
+   "id": "customer_contracts_schedule#2",
+   "file": "customer_contracts_schedule.txt",
+   "chunk_index": 2,
+   "sha1": "9432915ef808fab101fe327e8de410c47ab6542f",
+   "preview": "Customer concentration: the top ten customers represent 47.8% of FY2023 revenue. The singl",
+   "split": "dev",
+   "labels": [
+    "customer_concentration"
+   ],
+   "borderline": []
+  },
+  {
+   "id": "customer_contracts_schedule#3",
+   "file": "customer_contracts_schedule.txt",
+   "chunk_index": 3,
+   "sha1": "89439f25bd845025c501b3abc68e463c71d8e800",
+   "preview": "SECTION 2: CHANGE OF CONTROL PROVISIONS The following customer contracts contain provision",
+   "split": "dev",
+   "labels": [
+    "change_of_control"
+   ],
+   "borderline": []
+  },
+  {
+   "id": "customer_contracts_schedule#4",
+   "file": "customer_contracts_schedule.txt",
+   "chunk_index": 4,
+   "sha1": "5efe71ca8cbd85321d913ad378506f36a38593c8",
+   "preview": "SECTION 2: CHANGE OF CONTROL PROVISIONS Northstar Financial Group $54.3M Written consent r",
+   "split": "dev",
+   "labels": [
+    "change_of_control"
+   ],
+   "borderline": []
+  },
+  {
+   "id": "customer_contracts_schedule#5",
+   "file": "customer_contracts_schedule.txt",
+   "chunk_index": 5,
+   "sha1": "a16b7ac30bb5e39fdd31ffa7faa57fae01fb84a4",
+   "preview": "NO CHANGE OF CONTROL PROVISION: Delta Ridge Energy $12.2M Continental Retail Group $10.9M ",
+   "split": "dev",
+   "labels": [],
+   "borderline": [],
+   "note": "HARD NEGATIVE: list of contracts with NO change of control provision"
+  },
+  {
+   "id": "customer_contracts_schedule#6",
+   "file": "customer_contracts_schedule.txt",
+   "chunk_index": 6,
+   "sha1": "f1863fa29f1b1c6cde943665173b9d71ef72afc9",
+   "preview": "Aggregate revenue subject to a consent-based termination right: Northstar Financial Group ",
+   "split": "dev",
+   "labels": [
+    "change_of_control",
+    "customer_concentration"
+   ],
+   "borderline": [],
+   "note": "20.5% of revenue subject to consent-based (CoC) termination"
+  },
+  {
+   "id": "customer_contracts_schedule#7",
+   "file": "customer_contracts_schedule.txt",
+   "chunk_index": 7,
+   "sha1": "0920bc09938fac2d797c1ac3ce318c842a177c8e",
+   "preview": "SECTION 3: MOST FAVORED NATION AND PRICING PROVISIONS Northstar Financial Group holds a mo",
+   "split": "dev",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "customer_contracts_schedule#8",
+   "file": "customer_contracts_schedule.txt",
+   "chunk_index": 8,
+   "sha1": "246c2aec471b4e4fe6084544f39a6f4bfaea5962",
+   "preview": "SECTION 4: RENEWAL AND CHURN EXPOSURE Contracts expiring within 18 months of the anticipat",
+   "split": "dev",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "customer_contracts_schedule#9",
+   "file": "customer_contracts_schedule.txt",
+   "chunk_index": 9,
+   "sha1": "0a294dac1e3aefd251cb36b586f57ec73dad3229",
+   "preview": "SECTION 4: RENEWAL AND CHURN EXPOSURE Delta Ridge Energy $12.2M Expires Dec 31, 2024 Pacif",
+   "split": "dev",
+   "labels": [],
+   "borderline": [
+    "customer_concentration"
+   ],
+   "note": "renewal exposure, not concentration"
+  },
+  {
+   "id": "customer_contracts_schedule#10",
+   "file": "customer_contracts_schedule.txt",
+   "chunk_index": 10,
+   "sha1": "8f5e6dfa4cf39a64fa2ce89652ddaa808f62c3fc",
+   "preview": "Historical renewal rate for contracts of this size is 91% by revenue over the last three f",
+   "split": "dev",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "customer_contracts_schedule#11",
+   "file": "customer_contracts_schedule.txt",
+   "chunk_index": 11,
+   "sha1": "f83793f44e0e65cc2ba360f1146437deb73aeb5f",
+   "preview": "SECTION 5: SERVICE LEVEL COMMITMENTS AND PENALTIES Northstar Financial Group and Meridian ",
+   "split": "dev",
+   "labels": [],
+   "borderline": [
+    "regulatory_risk",
+    "change_of_control"
+   ],
+   "note": "HIPAA BAA should be confirmed to survive the transaction"
+  },
+  {
+   "id": "employment_and_retention_agreements#0",
+   "file": "employment_and_retention_agreements.txt",
+   "chunk_index": 0,
+   "sha1": "d7738a9381c1108f349070cb396b2ac42229de79",
+   "preview": "AURORA TECHNOLOGIES INC. SCHEDULE OF EXECUTIVE EMPLOYMENT AND RETENTION ARRANGEMENTS Discl",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "employment_and_retention_agreements#1",
+   "file": "employment_and_retention_agreements.txt",
+   "chunk_index": 1,
+   "sha1": "8c49886e34da4274e609f79e84f30c10a7f995d5",
+   "preview": "CONFIDENTIAL - CONTAINS COMPENSATION INFORMATION SECTION 1: EXECUTIVE COMPENSATION SUMMARY",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "employment_and_retention_agreements#2",
+   "file": "employment_and_retention_agreements.txt",
+   "chunk_index": 2,
+   "sha1": "3d521c7a9cc84a512440e7aa51a017647ed4406d",
+   "preview": "SECTION 1: EXECUTIVE COMPENSATION SUMMARY (FY2023) ------------------ --------------------",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "employment_and_retention_agreements#3",
+   "file": "employment_and_retention_agreements.txt",
+   "chunk_index": 3,
+   "sha1": "40f12f03e237e496f1f796fb095904bbf6425a69",
+   "preview": "Equity value is calculated at the merger consideration of $58.00 per share and includes bo",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "employment_and_retention_agreements#4",
+   "file": "employment_and_retention_agreements.txt",
+   "chunk_index": 4,
+   "sha1": "1582599fd5cf43b04f7702c0eb94ead11f046897",
+   "preview": "SECTION 2: CHANGE OF CONTROL SEVERANCE (\"GOLDEN PARACHUTE\") Each named executive officer i",
+   "split": "test",
+   "labels": [
+    "change_of_control"
+   ],
+   "borderline": []
+  },
+  {
+   "id": "employment_and_retention_agreements#5",
+   "file": "employment_and_retention_agreements.txt",
+   "chunk_index": 5,
+   "sha1": "5af9e76740e35d39974ef01e4d93041158ae4777",
+   "preview": "SECTION 2: CHANGE OF CONTROL SEVERANCE (\"GOLDEN PARACHUTE\") ------------------ --------- -",
+   "split": "test",
+   "labels": [
+    "change_of_control"
+   ],
+   "borderline": [],
+   "note": "golden-parachute table"
+  },
+  {
+   "id": "employment_and_retention_agreements#6",
+   "file": "employment_and_retention_agreements.txt",
+   "chunk_index": 6,
+   "sha1": "f2be9009483b790d24b1d5c134ef153d377ff9ba",
+   "preview": "The multiple is applied to the sum of base salary and target cash bonus. Section 280G: Mar",
+   "split": "test",
+   "labels": [
+    "change_of_control"
+   ],
+   "borderline": [],
+   "note": "Section 280G excise on CoC payments"
+  },
+  {
+   "id": "employment_and_retention_agreements#7",
+   "file": "employment_and_retention_agreements.txt",
+   "chunk_index": 7,
+   "sha1": "b97cf428ea4a2d8161a0159281af5342690f4ed3",
+   "preview": "SECTION 3: RETENTION POOL The Board approved a retention pool of $6,500,000 on March 1, 20",
+   "split": "test",
+   "labels": [],
+   "borderline": [
+    "key_person_dependency"
+   ],
+   "note": "retention pool for employees critical to continuity"
+  },
+  {
+   "id": "employment_and_retention_agreements#8",
+   "file": "employment_and_retention_agreements.txt",
+   "chunk_index": 8,
+   "sha1": "2aa947d80984e0eba9bb3d9303ce18b6369b58ce",
+   "preview": "SECTION 3: RETENTION POOL Engineering (41 employees) $3,900,000 Customer Success (18 emplo",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "employment_and_retention_agreements#9",
+   "file": "employment_and_retention_agreements.txt",
+   "chunk_index": 9,
+   "sha1": "b65d8212bbb8ed09bfd9f41cffb135c50b06e319",
+   "preview": "Retention payments vest 50% at 12 months post-closing and 50% at 24 months post-closing, s",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "employment_and_retention_agreements#10",
+   "file": "employment_and_retention_agreements.txt",
+   "chunk_index": 10,
+   "sha1": "a7d30b2339fe6022d05e5f6eed4a8d6cd2aaeddf",
+   "preview": "SECTION 4: KEY PERSON DEPENDENCY Dr. James Wu, Chief Technology Officer, is named as sole ",
+   "split": "test",
+   "labels": [
+    "key_person_dependency",
+    "litigation",
+    "ip_risk"
+   ],
+   "borderline": [
+    "change_of_control"
+   ],
+   "note": "CTO key person; patents subject of DataFlow suit; CEO severance triggered at closing"
+  },
+  {
+   "id": "employment_and_retention_agreements#11",
+   "file": "employment_and_retention_agreements.txt",
+   "chunk_index": 11,
+   "sha1": "7bd876acd512ea465637432fcf039d75d5043a94",
+   "preview": "SECTION 5: EQUITY PLAN TREATMENT At the effective time, each outstanding option and restri",
+   "split": "test",
+   "labels": [],
+   "borderline": [
+    "change_of_control"
+   ],
+   "note": "option acceleration at the effective time"
+  },
+  {
+   "id": "employment_and_retention_agreements#12",
+   "file": "employment_and_retention_agreements.txt",
+   "chunk_index": 12,
+   "sha1": "5ce265ae7dc9d67a2fca725456d4b73603e46527",
+   "preview": "SECTION 5: EQUITY PLAN TREATMENT Restricted stock units Accelerated in full and settled in",
+   "split": "test",
+   "labels": [],
+   "borderline": [
+    "change_of_control"
+   ],
+   "note": "RSU acceleration at the effective time"
+  },
+  {
+   "id": "employment_and_retention_agreements#13",
+   "file": "employment_and_retention_agreements.txt",
+   "chunk_index": 13,
+   "sha1": "5818c73639e1206f5df66114915a0854108c2b3b",
+   "preview": "Total equity plan cost at closing across all holders: $15,725,000.",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "employment_and_retention_agreements#14",
+   "file": "employment_and_retention_agreements.txt",
+   "chunk_index": 14,
+   "sha1": "872db6a9b7b64d3d0ac9bb6314d2855038ee42e9",
+   "preview": "SECTION 6: WORKFORCE SUMMARY Headcount as of December 31, 2023:",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "employment_and_retention_agreements#15",
+   "file": "employment_and_retention_agreements.txt",
+   "chunk_index": 15,
+   "sha1": "06fe133149a8a8ad6805af135cf295ea2775908e",
+   "preview": "SECTION 6: WORKFORCE SUMMARY Engineering and Product 312 Sales and Marketing 186 Customer ",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "employment_and_retention_agreements#16",
+   "file": "employment_and_retention_agreements.txt",
+   "chunk_index": 16,
+   "sha1": "7256042e067b2f08b4601b1b1fe486284de515b5",
+   "preview": "The Austin development center closed in Q3 FY2023, affecting 32 employees. The associated ",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "ip_portfolio_and_litigation_schedule#0",
+   "file": "ip_portfolio_and_litigation_schedule.txt",
+   "chunk_index": 0,
+   "sha1": "315ff683f16cf2d99e5509e619cdc6df471293bb",
+   "preview": "AURORA TECHNOLOGIES INC. INTELLECTUAL PROPERTY PORTFOLIO AND LITIGATION SCHEDULE Disclosur",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "ip_portfolio_and_litigation_schedule#1",
+   "file": "ip_portfolio_and_litigation_schedule.txt",
+   "chunk_index": 1,
+   "sha1": "bd9eb2b83873a8d09b2247416cb80f3da1553158",
+   "preview": "SECTION 1: PATENT PORTFOLIO Issued U.S. Patents 47 Pending U.S. Applications 23 Issued For",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "ip_portfolio_and_litigation_schedule#2",
+   "file": "ip_portfolio_and_litigation_schedule.txt",
+   "chunk_index": 2,
+   "sha1": "f3b2de28c09d65e84051277b36a8ffc4b9ccbd2b",
+   "preview": "Dr. James Wu is named as sole or first inventor on 12 issued patents, all within the real-",
+   "split": "test",
+   "labels": [],
+   "borderline": [
+    "key_person_dependency"
+   ],
+   "note": "one inventor on 12 patents, not framed as a dependency"
+  },
+  {
+   "id": "ip_portfolio_and_litigation_schedule#3",
+   "file": "ip_portfolio_and_litigation_schedule.txt",
+   "chunk_index": 3,
+   "sha1": "0c6ba33e4947acb0e1d8d054c04e5415727c9562",
+   "preview": "SECTION 2: THE DATAFLOW SYSTEMS LITIGATION Caption: DataFlow Systems Inc. v. Aurora Techno",
+   "split": "test",
+   "labels": [
+    "litigation",
+    "ip_risk"
+   ],
+   "borderline": []
+  },
+  {
+   "id": "ip_portfolio_and_litigation_schedule#4",
+   "file": "ip_portfolio_and_litigation_schedule.txt",
+   "chunk_index": 4,
+   "sha1": "b72c30fb7920085e10f72baaf7ae68ecb2dc1f21",
+   "preview": "SECTION 2: THE DATAFLOW SYSTEMS LITIGATION Case Number: 2023-CV-04821 Court: U.S. District",
+   "split": "test",
+   "labels": [
+    "litigation",
+    "ip_risk"
+   ],
+   "borderline": []
+  },
+  {
+   "id": "ip_portfolio_and_litigation_schedule#5",
+   "file": "ip_portfolio_and_litigation_schedule.txt",
+   "chunk_index": 5,
+   "sha1": "7ddb2f9d15e1a9fe5f1d5887822807ba915c13b9",
+   "preview": "DataFlow Systems Inc. alleges that Aurora's real-time data reconciliation engine infringes",
+   "split": "test",
+   "labels": [
+    "litigation",
+    "ip_risk"
+   ],
+   "borderline": [
+    "key_person_dependency"
+   ]
+  },
+  {
+   "id": "ip_portfolio_and_litigation_schedule#6",
+   "file": "ip_portfolio_and_litigation_schedule.txt",
+   "chunk_index": 6,
+   "sha1": "3fe913da3bd2540b9ad8672b9a203ac74b5017da",
+   "preview": "SECTION 3: OTHER LITIGATION AND CLAIMS There is no other pending or, to the Company's know",
+   "split": "test",
+   "labels": [
+    "litigation"
+   ],
+   "borderline": [],
+   "note": "opens with 'no other pending ... litigation' but then lists two claims"
+  },
+  {
+   "id": "ip_portfolio_and_litigation_schedule#7",
+   "file": "ip_portfolio_and_litigation_schedule.txt",
+   "chunk_index": 7,
+   "sha1": "73091ccb0a7ecde7d3f37893ec718dec657aeecf",
+   "preview": "SECTION 4: OPEN SOURCE SOFTWARE The Company's software incorporates open source components",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "ip_portfolio_and_litigation_schedule#8",
+   "file": "ip_portfolio_and_litigation_schedule.txt",
+   "chunk_index": 8,
+   "sha1": "388b079c50bce66c2203392944e15292b976659a",
+   "preview": "SECTION 4: OPEN SOURCE SOFTWARE Components identified 1,847 Permissive licences (MIT, Apac",
+   "split": "test",
+   "labels": [],
+   "borderline": [
+    "ip_risk"
+   ],
+   "note": "copyleft component counts, finding is in the next chunk"
+  },
+  {
+   "id": "ip_portfolio_and_litigation_schedule#9",
+   "file": "ip_portfolio_and_litigation_schedule.txt",
+   "chunk_index": 9,
+   "sha1": "68f9410b419b6114d3aeb72ea0fee74a67750eb6",
+   "preview": "1. A GPL-licensed database driver used only in an internal build tool. Not distributed to ",
+   "split": "test",
+   "labels": [
+    "ip_risk"
+   ],
+   "borderline": [],
+   "note": "AGPL material finding"
+  },
+  {
+   "id": "ip_portfolio_and_litigation_schedule#10",
+   "file": "ip_portfolio_and_litigation_schedule.txt",
+   "chunk_index": 10,
+   "sha1": "3217051c01b5426db225e66e0841a13393734793",
+   "preview": "SECTION 5: TRADEMARKS AND DOMAINS Registered U.S. trademarks 6 Registered foreign trademar",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "ip_portfolio_and_litigation_schedule#11",
+   "file": "ip_portfolio_and_litigation_schedule.txt",
+   "chunk_index": 11,
+   "sha1": "5b927a821f4dd64b6575ea61de539f46a0fa47d7",
+   "preview": "The mark \"AURORA\" is registered in Class 9 and Class 42 in the United States. An oppositio",
+   "split": "test",
+   "labels": [
+    "ip_risk"
+   ],
+   "borderline": [
+    "litigation"
+   ],
+   "note": "EU trademark opposition, low risk"
+  },
+  {
+   "id": "ip_portfolio_and_litigation_schedule#12",
+   "file": "ip_portfolio_and_litigation_schedule.txt",
+   "chunk_index": 12,
+   "sha1": "fa2e8831f84e8762867e1720f823a8be6afc26f6",
+   "preview": "SECTION 6: IP ASSIGNMENT COVERAGE All current employees have executed proprietary informat",
+   "split": "test",
+   "labels": [
+    "ip_risk"
+   ],
+   "borderline": [],
+   "note": "missing invention assignments"
+  },
+  {
+   "id": "merger_agreement_v2_final#0",
+   "file": "merger_agreement_v2_final.txt",
+   "chunk_index": 0,
+   "sha1": "a9a1c064afe297eb6348c732c083259204768a98",
+   "preview": "AGREEMENT AND PLAN OF MERGER This Agreement and Plan of Merger (this \"Agreement\") is enter",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "merger_agreement_v2_final#1",
+   "file": "merger_agreement_v2_final.txt",
+   "chunk_index": 1,
+   "sha1": "c2272091c89eeb95170c60c6d6ab1ac5c864a87d",
+   "preview": "ARTICLE I — THE MERGER Section 1.1 — The Merger Upon the terms and subject to the conditio",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "merger_agreement_v2_final#2",
+   "file": "merger_agreement_v2_final.txt",
+   "chunk_index": 2,
+   "sha1": "44ba4e972ef731e28791aba818a7648ed7e8e8db",
+   "preview": "Section 1.2 — Consideration Each share of Company Common Stock issued and outstanding imme",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "merger_agreement_v2_final#3",
+   "file": "merger_agreement_v2_final.txt",
+   "chunk_index": 3,
+   "sha1": "8023bac0e6963eedcd14c31b77ff2e96bbbbe5e6",
+   "preview": "Section 1.3 — Treatment of Company Stock Options and RSUs All outstanding unvested Company",
+   "split": "test",
+   "labels": [],
+   "borderline": [
+    "change_of_control"
+   ],
+   "note": "equity acceleration at the effective time"
+  },
+  {
+   "id": "merger_agreement_v2_final#4",
+   "file": "merger_agreement_v2_final.txt",
+   "chunk_index": 4,
+   "sha1": "94a72e3989bca346daa19a8bce1abb7e567bbd8d",
+   "preview": "ARTICLE III — REPRESENTATIONS AND WARRANTIES OF THE COMPANY Section 3.5 — Financial Statem",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "merger_agreement_v2_final#5",
+   "file": "merger_agreement_v2_final.txt",
+   "chunk_index": 5,
+   "sha1": "6fe5e8a50e4199754bebad76b04d31a04383e758",
+   "preview": "Section 3.8 — Material Contracts Schedule 3.8 sets forth a complete list of all Material C",
+   "split": "test",
+   "labels": [],
+   "borderline": [],
+   "note": "HARD NEGATIVE: 'not in breach or default'"
+  },
+  {
+   "id": "merger_agreement_v2_final#6",
+   "file": "merger_agreement_v2_final.txt",
+   "chunk_index": 6,
+   "sha1": "4e4fd57dd1b4fcd0008aebb5631e52ee7de144d2",
+   "preview": "Section 3.12 — Intellectual Property The Company owns or has valid licenses to all Intelle",
+   "split": "test",
+   "labels": [],
+   "borderline": [],
+   "note": "HARD NEGATIVE: 'No claims are pending or threatened alleging infringement'"
+  },
+  {
+   "id": "merger_agreement_v2_final#7",
+   "file": "merger_agreement_v2_final.txt",
+   "chunk_index": 7,
+   "sha1": "0906ecbca203d70b9b865d04987d4672b8ab8b71",
+   "preview": "Section 3.15 — Litigation Except as set forth in Schedule 3.15: (a) There is no Action pen",
+   "split": "test",
+   "labels": [
+    "litigation",
+    "ip_risk"
+   ],
+   "borderline": []
+  },
+  {
+   "id": "merger_agreement_v2_final#8",
+   "file": "merger_agreement_v2_final.txt",
+   "chunk_index": 8,
+   "sha1": "232217701349ded65d61003511cf4299a8538904",
+   "preview": "ARTICLE V — COVENANTS Section 5.1 — Conduct of Business Pending the Merger During the peri",
+   "split": "test",
+   "labels": [],
+   "borderline": [],
+   "note": "covenant not to settle litigation > $1.0M - no litigation disclosed"
+  },
+  {
+   "id": "merger_agreement_v2_final#9",
+   "file": "merger_agreement_v2_final.txt",
+   "chunk_index": 9,
+   "sha1": "fa0da3027fcc8bb59fd2dfbc81c19ff50e12101d",
+   "preview": "Section 5.3 — No-Shop Provision From the date of this Agreement until the earlier of the E",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "merger_agreement_v2_final#10",
+   "file": "merger_agreement_v2_final.txt",
+   "chunk_index": 10,
+   "sha1": "71ea4f84fe811771596f523bb53413ddca943520",
+   "preview": "ARTICLE VII — TERMINATION Section 7.1 — Termination This Agreement may be terminated at an",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "merger_agreement_v2_final#11",
+   "file": "merger_agreement_v2_final.txt",
+   "chunk_index": 11,
+   "sha1": "b2d5baeb714d7508061cb48225059dc22127ea21",
+   "preview": "Section 7.2 — Termination Fee If this Agreement is terminated pursuant to Section 7.1(d) (",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "merger_agreement_v2_final#12",
+   "file": "merger_agreement_v2_final.txt",
+   "chunk_index": 12,
+   "sha1": "5c06a1f8da5d5eed0909a0278de0cd4894865df1",
+   "preview": "ARTICLE VIII — INDEMNIFICATION Section 8.1 — Survival of Representations The representatio",
+   "split": "test",
+   "labels": [
+    "indemnification"
+   ],
+   "borderline": []
+  },
+  {
+   "id": "merger_agreement_v2_final#13",
+   "file": "merger_agreement_v2_final.txt",
+   "chunk_index": 13,
+   "sha1": "09923aff1b06620d90b03fcc61aeee9a2bb02e6c",
+   "preview": "Section 8.2 — Indemnification Cap The aggregate liability of the Company's stockholders fo",
+   "split": "test",
+   "labels": [
+    "indemnification"
+   ],
+   "borderline": []
+  },
+  {
+   "id": "merger_agreement_v2_final#14",
+   "file": "merger_agreement_v2_final.txt",
+   "chunk_index": 14,
+   "sha1": "cefde6c486badda7385dd3a9eb35280f644624c6",
+   "preview": "Section 8.3 — Deductible The Company's stockholders shall not be liable for indemnificatio",
+   "split": "test",
+   "labels": [
+    "indemnification"
+   ],
+   "borderline": []
+  },
+  {
+   "id": "merger_agreement_v2_final#15",
+   "file": "merger_agreement_v2_final.txt",
+   "chunk_index": 15,
+   "sha1": "ceb3636e62f437c92f16e41bc1cccb621a5b5d20",
+   "preview": "ARTICLE IX — CHANGE OF CONTROL PROVISIONS Section 9.1 — Change of Control Definition For p",
+   "split": "test",
+   "labels": [
+    "change_of_control"
+   ],
+   "borderline": []
+  },
+  {
+   "id": "merger_agreement_v2_final#16",
+   "file": "merger_agreement_v2_final.txt",
+   "chunk_index": 16,
+   "sha1": "47c4c9c019eeb2ef27bd69606f9275047dc4d787",
+   "preview": "Section 9.2 — Effect on Material Contracts The Company has identified the following Materi",
+   "split": "test",
+   "labels": [
+    "change_of_control"
+   ],
+   "borderline": []
+  },
+  {
+   "id": "quality_of_earnings_report_fy2023#0",
+   "file": "quality_of_earnings_report_fy2023.txt",
+   "chunk_index": 0,
+   "sha1": "98d6b9e81d3b3f5b009624132f5110e7148925f1",
+   "preview": "AURORA TECHNOLOGIES INC. QUALITY OF EARNINGS REPORT Prepared for: Vertex Capital Partners ",
+   "split": "dev",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "quality_of_earnings_report_fy2023#1",
+   "file": "quality_of_earnings_report_fy2023.txt",
+   "chunk_index": 1,
+   "sha1": "b21a6f85df6c0454e06ccf29caa0e4f1fc551bc4",
+   "preview": "CONFIDENTIAL - PREPARED SOLELY FOR THE BUYER SECTION 1: SCOPE AND BASIS OF PRESENTATION Th",
+   "split": "dev",
+   "labels": [],
+   "borderline": [],
+   "note": "HARD NEGATIVE: 'unqualified opinion'"
+  },
+  {
+   "id": "quality_of_earnings_report_fy2023#2",
+   "file": "quality_of_earnings_report_fy2023.txt",
+   "chunk_index": 2,
+   "sha1": "764f6157571ff5cb5af3019d327882d7302b2a57",
+   "preview": "SECTION 2: ADJUSTED EBITDA BRIDGE (in millions of USD) FY2023 FY2022 ------ ------ Net Inc",
+   "split": "dev",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "quality_of_earnings_report_fy2023#3",
+   "file": "quality_of_earnings_report_fy2023.txt",
+   "chunk_index": 3,
+   "sha1": "fbc17619d676ff7174c3a0a849c436775195b60e",
+   "preview": "SECTION 3: NOTES TO NORMALIZATION ADJUSTMENTS Note 1 - Restructuring Charges ($4.5M, FY202",
+   "split": "dev",
+   "labels": [
+    "litigation",
+    "ip_risk"
+   ],
+   "borderline": [],
+   "note": "Note 2: DataFlow patent litigation unresolved"
+  },
+  {
+   "id": "quality_of_earnings_report_fy2023#4",
+   "file": "quality_of_earnings_report_fy2023.txt",
+   "chunk_index": 4,
+   "sha1": "48856136690d4a1f84fc0c08564eecef6bca5f6a",
+   "preview": "SECTION 4: REVENUE QUALITY Recurring vs Non-recurring Revenue (FY2023):",
+   "split": "dev",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "quality_of_earnings_report_fy2023#5",
+   "file": "quality_of_earnings_report_fy2023.txt",
+   "chunk_index": 5,
+   "sha1": "84bf514810321a52423e78b05860467b0f93ff82",
+   "preview": "SECTION 4: REVENUE QUALITY SaaS Subscriptions (recurring) $189.6 41.9% Software Licenses -",
+   "split": "dev",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "quality_of_earnings_report_fy2023#6",
+   "file": "quality_of_earnings_report_fy2023.txt",
+   "chunk_index": 6,
+   "sha1": "1862772986d5213b6172dae288654449efa42ad0",
+   "preview": "Net Revenue Retention (NRR) was 118% in FY2023 and 114% in FY2022. Gross revenue retention",
+   "split": "dev",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "quality_of_earnings_report_fy2023#7",
+   "file": "quality_of_earnings_report_fy2023.txt",
+   "chunk_index": 7,
+   "sha1": "2e5b17529300b774d6d6c97d885efbe6c45a8118",
+   "preview": "SECTION 5: WORKING CAPITAL Normalized Net Working Capital (excluding cash and debt):",
+   "split": "dev",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "quality_of_earnings_report_fy2023#8",
+   "file": "quality_of_earnings_report_fy2023.txt",
+   "chunk_index": 8,
+   "sha1": "d19d35889b313906d343173bce87632cda3a88e6",
+   "preview": "SECTION 5: WORKING CAPITAL FY2023 FY2022 ------ ------ Accounts Receivable $78.4 $69.1 Pre",
+   "split": "dev",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "quality_of_earnings_report_fy2023#9",
+   "file": "quality_of_earnings_report_fy2023.txt",
+   "chunk_index": 9,
+   "sha1": "0b78fa3a20bdffa048fdc841f086d25ec9444b57",
+   "preview": "Twelve-month average NWC was ($55.8) million. We recommend a working capital peg of ($55.8",
+   "split": "dev",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "quality_of_earnings_report_fy2023#10",
+   "file": "quality_of_earnings_report_fy2023.txt",
+   "chunk_index": 10,
+   "sha1": "ef69db81410e9900e14921cebe6d23b3b7c5ae05",
+   "preview": "SECTION 6: KEY OBSERVATIONS FOR THE BUYER 1. Adjusted EBITDA of $99.0 million exceeds repo",
+   "split": "dev",
+   "labels": [
+    "litigation",
+    "key_person_dependency"
+   ],
+   "borderline": [
+    "ip_risk"
+   ],
+   "note": "litigation continuing; founder departure risk"
+  },
+  {
+   "id": "regulatory_and_data_privacy_memo#0",
+   "file": "regulatory_and_data_privacy_memo.txt",
+   "chunk_index": 0,
+   "sha1": "25e3b4dbd74a846de062b1cd5fcd507e66a098ec",
+   "preview": "AURORA TECHNOLOGIES INC. REGULATORY APPROVALS AND DATA PRIVACY DILIGENCE MEMORANDUM Prepar",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "regulatory_and_data_privacy_memo#1",
+   "file": "regulatory_and_data_privacy_memo.txt",
+   "chunk_index": 1,
+   "sha1": "cec4106f287e12f3ccf69f0dca5678cf422bddcb",
+   "preview": "CONFIDENTIAL - ATTORNEY CLIENT PRIVILEGED SECTION 1: ANTITRUST AND MERGER CONTROL HART-SCO",
+   "split": "test",
+   "labels": [
+    "regulatory_risk"
+   ],
+   "borderline": [],
+   "note": "HSR reportable"
+  },
+  {
+   "id": "regulatory_and_data_privacy_memo#2",
+   "file": "regulatory_and_data_privacy_memo.txt",
+   "chunk_index": 2,
+   "sha1": "8969e8c60c850390f2d2089fdd5d8895810248d4",
+   "preview": "HART-SCOTT-RODINO (UNITED STATES) Filing fee (transactions $500M to $1B tier) $260,000 Fil",
+   "split": "test",
+   "labels": [
+    "regulatory_risk"
+   ],
+   "borderline": [],
+   "note": "HSR fee and waiting period"
+  },
+  {
+   "id": "regulatory_and_data_privacy_memo#3",
+   "file": "regulatory_and_data_privacy_memo.txt",
+   "chunk_index": 3,
+   "sha1": "6fe00aaebdd5c4193f225246e43c5ae6ee96cef6",
+   "preview": "Filing was submitted on March 20, 2024. The initial waiting period expires on April 19, 20",
+   "split": "test",
+   "labels": [
+    "regulatory_risk"
+   ],
+   "borderline": [],
+   "note": "HSR filed; Second Request probability low"
+  },
+  {
+   "id": "regulatory_and_data_privacy_memo#4",
+   "file": "regulatory_and_data_privacy_memo.txt",
+   "chunk_index": 4,
+   "sha1": "57d09a3f0430cd9a8091c5b8851840423b61925e",
+   "preview": "FOREIGN MERGER CONTROL Germany Not reportable. Aurora's German turnover of EUR 14.2 millio",
+   "split": "test",
+   "labels": [],
+   "borderline": [],
+   "note": "HARD NEGATIVE: not reportable in foreign jurisdictions"
+  },
+  {
+   "id": "regulatory_and_data_privacy_memo#5",
+   "file": "regulatory_and_data_privacy_memo.txt",
+   "chunk_index": 5,
+   "sha1": "a2ae344fd1024517a8b3c0970b0c96012a843228",
+   "preview": "No foreign investment or national security filing is required. Aurora holds no government ",
+   "split": "test",
+   "labels": [],
+   "borderline": [],
+   "note": "HARD NEGATIVE: no FDI filing required"
+  },
+  {
+   "id": "regulatory_and_data_privacy_memo#6",
+   "file": "regulatory_and_data_privacy_memo.txt",
+   "chunk_index": 6,
+   "sha1": "9f482d8c693d96f50a505ceb6d21bd95351668ae",
+   "preview": "SECTION 2: DATA PRIVACY POSTURE GDPR (EUROPEAN UNION) Aurora processes personal data of EU",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "regulatory_and_data_privacy_memo#7",
+   "file": "regulatory_and_data_privacy_memo.txt",
+   "chunk_index": 7,
+   "sha1": "692ea44f4624f272194d1e4fc61a140306a73e37",
+   "preview": "GDPR (EUROPEAN UNION) Standard Contractual Clauses in place Yes, 2021 SCCs Records of proc",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "regulatory_and_data_privacy_memo#8",
+   "file": "regulatory_and_data_privacy_memo.txt",
+   "chunk_index": 8,
+   "sha1": "96b5c8e4dc19f5c3fbb33e2db6c1cb03b86cd03a",
+   "preview": "A transfer impact assessment was completed in November 2023 following the EU-US Data Priva",
+   "split": "test",
+   "labels": [],
+   "borderline": [
+    "regulatory_risk"
+   ],
+   "note": "not DPF self-certified, relies on SCCs"
+  },
+  {
+   "id": "regulatory_and_data_privacy_memo#9",
+   "file": "regulatory_and_data_privacy_memo.txt",
+   "chunk_index": 9,
+   "sha1": "e6aa245869f65cf074ca93eba8d7a1a7039ba39d",
+   "preview": "CALIFORNIA (CCPA/CPRA) Aurora qualifies as a \"service provider\" for customer data. Its sta",
+   "split": "test",
+   "labels": [],
+   "borderline": []
+  },
+  {
+   "id": "regulatory_and_data_privacy_memo#10",
+   "file": "regulatory_and_data_privacy_memo.txt",
+   "chunk_index": 10,
+   "sha1": "fe1ef5894b865593a290c13e94783d00d2f7f81a",
+   "preview": "HIPAA One customer, Meridian Health Networks, is a covered entity. Aurora executed a Busin",
+   "split": "test",
+   "labels": [],
+   "borderline": [],
+   "note": "HARD NEGATIVE: HIPAA no gaps; BAA survives a change of control"
+  },
+  {
+   "id": "regulatory_and_data_privacy_memo#11",
+   "file": "regulatory_and_data_privacy_memo.txt",
+   "chunk_index": 11,
+   "sha1": "ca0d4f3012e02dfd71254fb8aacfcad0aeecf642",
+   "preview": "SECTION 3: SECURITY CERTIFICATIONS AND INCIDENTS SOC 2 Type II FY2023 examination issued w",
+   "split": "test",
+   "labels": [],
+   "borderline": [
+    "regulatory_risk"
+   ],
+   "note": "past SOC 2 gaps, remediated"
+  },
+  {
+   "id": "regulatory_and_data_privacy_memo#12",
+   "file": "regulatory_and_data_privacy_memo.txt",
+   "chunk_index": 12,
+   "sha1": "36679b1e885154325ccc03bac5d0d553a3a98059",
+   "preview": "SECURITY INCIDENTS One security incident occurred during the review period. In August 2023",
+   "split": "test",
+   "labels": [],
+   "borderline": [
+    "regulatory_risk"
+   ],
+   "note": "security incident, no notification obligation"
+  },
+  {
+   "id": "regulatory_and_data_privacy_memo#13",
+   "file": "regulatory_and_data_privacy_memo.txt",
+   "chunk_index": 13,
+   "sha1": "56855064645f9268530220e25e06de1c24f2b191",
+   "preview": "SECTION 4: CONDITIONS TO CLOSING The regulatory conditions to closing under Article VI of ",
+   "split": "test",
+   "labels": [
+    "regulatory_risk",
+    "change_of_control",
+    "customer_concentration"
+   ],
+   "borderline": [
+    "indemnification"
+   ],
+   "note": "HSR condition; consent-based termination rights on 20.5% of revenue"
+  },
+  {
+   "id": "regulatory_and_data_privacy_memo#14",
+   "file": "regulatory_and_data_privacy_memo.txt",
+   "chunk_index": 14,
+   "sha1": "8c8dc54435a0d6fcabd5d7d2dcd9a3ee3b227809",
+   "preview": "SECTION 5: OUTSIDE DATE AND TERMINATION The outside date under Section 7.1(b) is December ",
+   "split": "test",
+   "labels": [
+    "regulatory_risk"
+   ],
+   "borderline": [],
+   "note": "outside date vs HSR Second Request timeline"
+  }
+ ],
+ "synthetic": [
+  {
+   "id": "syn-risk-00",
+   "text": "The Company is not a party to any pending or, to its knowledge, threatened litigation, arbitration or governmental proceeding.",
+   "labels": [],
+   "note": "negation",
+   "split": "dev",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-01",
+   "text": "On March 3, 2024, Helix Corp filed suit against the Company in the U.S. District Court for the District of Delaware alleging breach of a supply agreement and seeking damages of $12 million.",
+   "labels": [
+    "litigation"
+   ],
+   "split": "test",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-02",
+   "text": "Since the Balance Sheet Date, no Material Adverse Effect has occurred and no event has occurred that would reasonably be expected to have a Material Adverse Effect.",
+   "labels": [],
+   "note": "negation (clean MAE rep)",
+   "split": "dev",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-03",
+   "text": "\"Material Adverse Effect\" means any event, change or effect that is materially adverse to the business, financial condition or results of operations of the Company, excluding changes in general economic conditions.",
+   "labels": [
+    "material_adverse_change"
+   ],
+   "note": "MAE definition",
+   "split": "test",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-04",
+   "text": "Buyer's obligation to close is conditioned on no MAC having occurred with respect to the Company between signing and closing; Buyer may terminate if a MAC occurs.",
+   "labels": [
+    "material_adverse_change"
+   ],
+   "note": "MAC closing condition",
+   "split": "dev",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-05",
+   "text": "The sales team is equipped with Mac laptops running macOS, and IT support is outsourced to a managed service provider.",
+   "labels": [],
+   "note": "'Mac' false positive",
+   "split": "test",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-06",
+   "text": "Administrators can change the default settings of the analytics dashboard; by default, usage data is retained for 90 days.",
+   "labels": [],
+   "note": "'by default' false positive",
+   "split": "dev",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-07",
+   "text": "The Company received a notice of default from its lenders on January 12 after breaching the minimum liquidity covenant, and has entered into a 60-day forbearance agreement.",
+   "labels": [
+    "financial_distress"
+   ],
+   "split": "test",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-08",
+   "text": "The auditors' report includes an explanatory paragraph expressing substantial doubt about the Company's ability to continue as a going concern.",
+   "labels": [
+    "financial_distress"
+   ],
+   "split": "dev",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-09",
+   "text": "The auditors issued an unqualified opinion on the FY2023 financial statements and did not identify any material weakness in internal control over financial reporting.",
+   "labels": [],
+   "note": "negation",
+   "split": "test",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-10",
+   "text": "Customer concentration: the largest customer represents 38% of revenue and the top three customers together account for 61%.",
+   "labels": [
+    "customer_concentration"
+   ],
+   "split": "dev",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-11",
+   "text": "Our largest customer, Orion Retail, accounted for 41% of FY2023 revenue, and its contract is terminable for convenience on 90 days' notice.",
+   "labels": [
+    "customer_concentration"
+   ],
+   "split": "test",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-12",
+   "text": "Revenue is highly diversified: no single customer accounts for more than 2% of annual revenue and the top twenty customers account for 14%.",
+   "labels": [],
+   "note": "negation",
+   "split": "dev",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-13",
+   "text": "The lease for the Reno distribution centre expires in June 2025; the Company expects to renew on similar terms.",
+   "labels": [],
+   "note": "lease expiry - not a listed risk category",
+   "split": "test",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-14",
+   "text": "Patent expiry: U.S. Patent No. 8,112,334, which covers the compression method in the flagship product, expires in March 2025, after which competitors may freely use the technique.",
+   "labels": [
+    "ip_risk"
+   ],
+   "note": "regex 'expir' + word boundary misses 'expires'",
+   "split": "dev",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-15",
+   "text": "The Phase I environmental site assessment identified soil contamination from historical petroleum storage at the Gary, Indiana plant; estimated remediation cost is $2.1 million.",
+   "labels": [
+    "environmental_liability"
+   ],
+   "split": "test",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-16",
+   "text": "The Company's operations are office-based; it holds no environmental permits, handles no hazardous materials, and no environmental claims have been asserted against it.",
+   "labels": [],
+   "note": "negation",
+   "split": "dev",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-17",
+   "text": "The Elkhart facility is on the EPA National Priorities List and the Company has been named a potentially responsible party under CERCLA for groundwater cleanup.",
+   "labels": [
+    "environmental_liability"
+   ],
+   "borderline": [
+    "regulatory_risk"
+   ],
+   "split": "test"
+  },
+  {
+   "id": "syn-risk-18",
+   "text": "The FTC issued a civil investigative demand in November 2023 concerning the Company's subscription auto-renewal practices; the investigation is ongoing.",
+   "labels": [
+    "regulatory_risk"
+   ],
+   "split": "dev",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-19",
+   "text": "No governmental authority has commenced or, to the Company's knowledge, threatened any investigation, inquiry or enforcement action against the Company.",
+   "labels": [],
+   "note": "negation",
+   "split": "test",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-20",
+   "text": "The acquisition requires clearance from the European Commission; given a combined share of about 35% in the EEA, counsel expects an in-depth Phase II review.",
+   "labels": [
+    "regulatory_risk"
+   ],
+   "split": "dev",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-21",
+   "text": "The founder and CEO personally manages the three largest customer relationships and has neither an employment agreement nor a non-compete.",
+   "labels": [
+    "key_person_dependency"
+   ],
+   "split": "test",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-22",
+   "text": "The Company has a deep management bench, and documented succession plans exist for every executive role.",
+   "labels": [],
+   "note": "negation",
+   "split": "dev",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-23",
+   "text": "Upon a change of control of the licensee, the licensor may terminate this licence on 30 days' written notice.",
+   "labels": [
+    "change_of_control"
+   ],
+   "split": "test",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-24",
+   "text": "None of the Company's material contracts contains a change of control, anti-assignment or similar provision that would be triggered by the Merger.",
+   "labels": [],
+   "note": "negation",
+   "split": "dev",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-25",
+   "text": "If the Company undergoes a Change in Control, all unvested options held by the Chief Financial Officer accelerate and vest in full.",
+   "labels": [
+    "change_of_control"
+   ],
+   "split": "test",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-26",
+   "text": "Seller shall indemnify and hold harmless Buyer from any Losses arising from pre-Closing taxes, subject to a cap equal to 10% of the Purchase Price.",
+   "labels": [
+    "indemnification"
+   ],
+   "split": "dev",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-27",
+   "text": "The escrow agent shall hold $5 million of the Purchase Price for 18 months as security for Seller's indemnification obligations under Article IX.",
+   "labels": [
+    "indemnification"
+   ],
+   "split": "test",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-28",
+   "text": "Shoppers can add items to a basket and check out using saved payment methods; the average basket size grew 8% in FY2023.",
+   "labels": [],
+   "note": "'basket' false positive",
+   "split": "dev",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-29",
+   "text": "Headcount grew to 420 employees during the year, and the Company has no collective bargaining agreements.",
+   "labels": [],
+   "split": "test",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-30",
+   "text": "A former distributor has threatened to commence arbitration over approximately $800,000 of unpaid commissions; no claim has yet been filed.",
+   "labels": [
+    "litigation"
+   ],
+   "note": "threatened claim",
+   "split": "dev",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-31",
+   "text": "The settlement agreement with Quantel was fully performed in 2021, all claims were released, and no obligations remain outstanding.",
+   "labels": [],
+   "note": "concluded matter",
+   "split": "test",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-32",
+   "text": "The on-premise product distributed to customers links a GPL-licensed library, and the Company has not complied with the licence's source-code disclosure obligations.",
+   "labels": [
+    "ip_risk"
+   ],
+   "split": "dev",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-33",
+   "text": "A competitor has sent a letter alleging that the flagship product infringes three of its patents and demanding a royalty of 5% of net sales.",
+   "labels": [
+    "ip_risk",
+    "litigation"
+   ],
+   "split": "test",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-34",
+   "text": "All current and former employees and contractors have signed invention assignment agreements, and the Company owns all intellectual property used in its business.",
+   "labels": [],
+   "note": "negation",
+   "split": "dev",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-35",
+   "text": "Covenant compliance: net leverage was 4.8x at Q4 against a 4.5x maximum; the Company obtained a one-time waiver from its lenders.",
+   "labels": [
+    "financial_distress"
+   ],
+   "note": "covenant breach, waived",
+   "split": "test",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-36",
+   "text": "The Company prepaid $40 million of its term loan in FY2023 and has no debt maturities before 2029.",
+   "labels": [],
+   "split": "dev",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-37",
+   "text": "The pricing algorithm is maintained by a single data scientist, and no other employee has access to or understands the model code.",
+   "labels": [
+    "key_person_dependency"
+   ],
+   "split": "test",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-38",
+   "text": "Buyer's acquisition of more than 50% of the voting shares will be a Change of Control under the Indenture, requiring the Company to offer to repurchase the notes at 101%.",
+   "labels": [
+    "change_of_control"
+   ],
+   "split": "dev",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-39",
+   "text": "The merger or consolidation of two wholly owned subsidiaries in 2022 was an internal reorganisation with no effect on third-party contracts.",
+   "labels": [],
+   "note": "'merger or consolidation' false positive",
+   "split": "test",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-40",
+   "text": "The top 5 customer contracts were renegotiated in 2023 at higher prices, with no change to their terms.",
+   "labels": [],
+   "note": "'top N customer' without concentration",
+   "split": "dev",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-41",
+   "text": "At the current burn rate the Company has approximately four months of cash runway, and management is seeking bridge financing from existing investors.",
+   "labels": [
+    "financial_distress"
+   ],
+   "split": "test",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-42",
+   "text": "Mac Duffie, Vice President of Sales, relocated to the Austin office in the second quarter.",
+   "labels": [],
+   "note": "'Mac' as a name",
+   "split": "dev",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-43",
+   "text": "The CEO's and CFO's employment agreements provide for severance of twice base salary on a termination without cause within 12 months following a change of control.",
+   "labels": [
+    "change_of_control"
+   ],
+   "split": "test",
+   "borderline": []
+  },
+  {
+   "id": "syn-risk-44",
+   "text": "Environmental matters: the Company leases office space only and does not store, handle or dispose of hazardous materials.",
+   "labels": [],
+   "note": "negation",
+   "split": "dev",
+   "borderline": []
+  }
+ ]
+}

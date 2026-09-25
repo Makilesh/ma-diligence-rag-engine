@@ -37,6 +37,9 @@ jobs:
       GEMINI_API_KEY: ""
       # Never load the embedding/reranker weights at API startup in tests.
       WARM_MODELS: "0"
+      # Laya decisions are stubbed in the offline suite; this makes an unstubbed
+      # path fall back to the rule-based behaviour instead of downloading 1.7GB.
+      LAYA_ENABLED: "0"
       # The Streamlit UI tests run with the API deliberately down; point them at
       # a port that refuses immediately instead of relying on localhost:8000.
       API_URL: "http://127.0.0.1:9"

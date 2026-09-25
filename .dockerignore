@@ -66,3 +66,5 @@ auric*
 # stays out even if web/ is ever re-included for a frontend image.)
 web/
 web/node_modules/
+
+*.local.md

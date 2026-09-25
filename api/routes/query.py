@@ -24,6 +24,8 @@ from api.security import (
     public_error_detail,
     query_rate_limit,
 )
+from src.decisions.laya_client import LayaUnavailable
+from src.decisions.query_guard import BLOCKED_MESSAGE, check_query, query_guard_enabled
 from src.workflow.orchestrator import run_query, stream_query
 from src.utils.logger import setup_logger
 
@@ -110,6 +112,38 @@ def _audit(request: QueryRequest, response: QueryResponse, transport: str) -> No
     )
 
 
+async def _guard_public_query(request: QueryRequest, client: ClientContext) -> None:
+    """
+    Refuses off-topic, jailbreak and injection queries from public callers.
+
+    Runs before a pipeline slot is taken, so a blocked query spends no Gemini
+    call and no share of the daily cap. Admin callers are never judged. Fails
+    open: if Laya is unavailable the query runs as it would have without the
+    guard.
+
+    Raises:
+        HTTPException: 422 with a plain explanation when the query is blocked.
+    """
+    if client.is_admin or not query_guard_enabled():
+        return
+    try:
+        verdict = await check_query(request.query)
+    except LayaUnavailable as e:
+        logger.warning("Query guard unavailable, allowing query", extra={"error": str(e)})
+        return
+    if verdict.blocked:
+        logger.info(
+            "Query blocked by guard",
+            extra={
+                "deal_id": request.deal_id,
+                "reasons": verdict.reasons,
+                "scores": verdict.scores,
+                "request_id": client.request_id,
+            },
+        )
+        raise HTTPException(status_code=422, detail=BLOCKED_MESSAGE)
+
+
 def _require_graph():
     """Returns the compiled graph, or raises 503 if startup has not finished."""
     from api.main import get_graph
@@ -150,6 +184,7 @@ async def query_endpoint(
     graph = _require_graph()
     session_id = request.session_id or str(uuid.uuid4())
     _enforce_pii_policy(request, client)
+    await _guard_public_query(request, client)
 
     logger.info(
         "Query received",
@@ -233,6 +268,7 @@ async def query_stream_endpoint(
     graph = _require_graph()
     session_id = request.session_id or str(uuid.uuid4())
     _enforce_pii_policy(request, client)
+    await _guard_public_query(request, client)
     # Taken before the response starts, so a saturated engine is a real 503
     # status rather than an in-band error event.
     slot = acquire_pipeline_slot(client)

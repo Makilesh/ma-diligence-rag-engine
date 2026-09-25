@@ -2,17 +2,30 @@
 Agent 5 — Quality Assessor Agent.
 
 Primary: heuristics (no LLM)
+Check: Laya answerability (src/decisions/answerability.py), local, no LLM
 Fallback: the agent ladder's current model, only for the narrow ambiguous band
 
 When heuristic signals are clear (high reranker scores, good coverage),
 skip the LLM entirely. Only invoke the LLM when quality is borderline
 and heuristics disagree.
+
+The heuristic reads reranker scores, which measure relevance, not whether the
+asked-for fact is present. Laya covers that gap in one direction only: it can
+VETO context the heuristic would admit, or refuse in the ambiguous band without
+an LLM call, when it is confident no facet of the question is stated. It never
+admits context the heuristic refuses.
 """
 
 import json
 
 import numpy as np
 
+from src.decisions.answerability import (
+    Answerability,
+    assess_answerability,
+    laya_gate_enabled,
+)
+from src.decisions.laya_client import LayaUnavailable
 from src.llm.litellm_wrapper import call_structured_agent
 from src.llm.budget_tracker import BudgetTracker
 from src.llm.prompt_templates.quality_assessor import (
@@ -62,6 +75,26 @@ EXPECTED_EVIDENCE_COUNT: dict[str, int] = {
     "summary": 3,
     "multi_hop": 3,
 }
+
+
+def _evidence_dimensions(state: AgentState, scores: list[float]) -> tuple[int, float, float, float]:
+    """
+    Precision, completeness and the weighted overall score over usable evidence.
+
+    Args:
+        state: AgentState (for query_type).
+        scores: Reranker scores of the retrieved chunks (non-empty).
+
+    Returns:
+        (expected evidence count, precision, completeness, overall).
+    """
+    usable = [s for s in scores if s >= RELEVANCE_FLOOR]
+    relevance = max(scores)
+    expected = EXPECTED_EVIDENCE_COUNT.get(state.get("query_type", ""), 2)
+    precision = float(np.mean(usable)) if usable else 0.0
+    completeness = min(len(usable) / expected, 1.0)
+    overall = relevance * 0.4 + completeness * 0.3 + precision * 0.3
+    return expected, precision, completeness, overall
 
 
 def _heuristic_assessment(state: AgentState) -> dict | None:
@@ -125,10 +158,7 @@ def _heuristic_assessment(state: AgentState) -> dict | None:
             "force_refusal": True,
         }
 
-    expected = EXPECTED_EVIDENCE_COUNT.get(state.get("query_type", ""), 2)
-    precision = float(np.mean(usable)) if usable else 0.0
-    completeness = min(len(usable) / expected, 1.0)
-    overall = relevance * 0.4 + completeness * 0.3 + precision * 0.3
+    expected, precision, completeness, overall = _evidence_dimensions(state, scores)
 
     # Confident enough to skip the LLM assessor entirely.
     if relevance >= CONFIDENT_PASS_FLOOR and usable:
@@ -154,11 +184,113 @@ def _heuristic_assessment(state: AgentState) -> dict | None:
     return None
 
 
+async def check_answerability(state: AgentState) -> Answerability | None:
+    """
+    Laya's answerability verdict for the current context, or None to skip it.
+
+    Judges the ORIGINAL question (and Agent 1's sub-questions), not a rewrite:
+    the gate asks whether what the user asked is answered.
+
+    Args:
+        state: AgentState with reranked_results.
+
+    Returns:
+        Answerability, or None when disabled, unavailable, or nothing to score.
+    """
+    if not laya_gate_enabled():
+        return None
+    try:
+        return await assess_answerability(
+            state.get("original_query") or state.get("current_query", ""),
+            state.get("sub_questions") or [],
+            state.get("reranked_results") or [],
+        )
+    except LayaUnavailable as e:
+        logger.warning(f"Agent 5: Laya answerability unavailable, heuristic only: {e}")
+        return None
+
+
+def _unanswered_aspects(verdict: Answerability) -> list[str]:
+    return [f"Not stated in the retrieved passages: {facet}" for facet in verdict.unanswered]
+
+
+def combine_with_answerability(
+    state: AgentState, heuristic: dict | None, verdict: Answerability | None
+) -> dict | None:
+    """
+    Folds Laya's verdict into the heuristic assessment.
+
+    Laya only ever takes admission away:
+      heuristic refused   -> unchanged (Laya is not consulted)
+      heuristic admitted  -> vetoed if no facet is stated; the rewrite loop then
+                             runs with the unstated facets as missing_aspects
+      ambiguous band      -> refused without the LLM if vetoed, else still None
+                             (the LLM decides, as before)
+
+    Args:
+        state: AgentState with reranked_results.
+        heuristic: _heuristic_assessment output (None = ambiguous band).
+        verdict: check_answerability output (None = not available).
+
+    Returns:
+        The combined assessment, or None when the LLM must still decide.
+    """
+    if verdict is None or (heuristic is not None and heuristic["force_refusal"]):
+        return heuristic
+
+    laya_fields = verdict.as_breakdown()
+    if heuristic is not None:
+        combined = {
+            **heuristic,
+            "quality_breakdown": {**heuristic["quality_breakdown"], **laya_fields},
+            "quality_method": "heuristic+laya",
+            "answerability_veto": verdict.vetoed,
+        }
+        if verdict.vetoed:
+            combined["missing_aspects"] = (
+                _unanswered_aspects(verdict) + heuristic["missing_aspects"]
+            )
+            combined["force_refusal"] = True
+        return combined
+
+    if not verdict.vetoed:
+        return None
+
+    scores = [float(c.get("reranker_score", 0.0)) for c in state.get("reranked_results", [])]
+    relevance = max(scores) if scores else 0.0
+    _, precision, completeness, overall = (
+        _evidence_dimensions(state, scores) if scores else (0, 0.0, 0.0, 0.0)
+    )
+    return {
+        "context_quality_score": round(overall, 3),
+        "quality_breakdown": {
+            "relevance": round(relevance, 3),
+            "completeness": round(completeness, 3),
+            "precision": round(precision, 3),
+            **laya_fields,
+        },
+        "missing_aspects": _unanswered_aspects(verdict),
+        "quality_method": "laya",
+        "force_refusal": True,
+        "answerability_veto": True,
+    }
+
+
+def _laya_trace(verdict: Answerability | None) -> dict:
+    if verdict is None:
+        return {}
+    return {
+        "answerability": round(verdict.score, 3),
+        "answerability_veto": verdict.vetoed,
+        "laya_ms": verdict.latency_ms,
+    }
+
+
 async def quality_assessor_node(state: AgentState) -> dict:
     """
     LangGraph node — assesses retrieved context quality.
     Populates: context_quality_score, quality_breakdown, quality_method,
-    missing_aspects, force_refusal, agent_trace.
+    missing_aspects, force_refusal, answerability_veto, agent_trace.
 
     Args:
         state: Current AgentState with reranked_results.
@@ -170,21 +302,32 @@ async def quality_assessor_node(state: AgentState) -> dict:
 
     # Try heuristics first (~60% of queries)
     heuristic_result = _heuristic_assessment(state)
-    if heuristic_result is not None:
+
+    # Laya is skipped when the heuristic already refuses: it may only veto.
+    verdict = None
+    if heuristic_result is None or not heuristic_result["force_refusal"]:
+        verdict = await check_answerability(state)
+    result = combine_with_answerability(state, heuristic_result, verdict)
+
+    if result is not None:
+        method = result["quality_method"]
         logger.info(
-            "Agent 5: Heuristic assessment sufficient",
+            "Agent 5: Assessment without LLM",
             extra={
-                "score": heuristic_result["context_quality_score"],
-                "method": "heuristic",
+                "score": result["context_quality_score"],
+                "method": method,
+                "answerability_veto": result.get("answerability_veto", False),
             },
         )
         return {
-            **heuristic_result,
+            "answerability_veto": False,
+            **result,
             "agent_trace": [
                 {
                     "agent": "quality_assessor",
-                    "method": "heuristic",
-                    "score": heuristic_result["context_quality_score"],
+                    "method": method,
+                    "score": result["context_quality_score"],
+                    **_laya_trace(verdict),
                 }
             ],
         }
@@ -233,18 +376,24 @@ async def quality_assessor_node(state: AgentState) -> dict:
         },
     )
 
+    breakdown = result.get("quality_breakdown", {})
+    if verdict is not None and isinstance(breakdown, dict):
+        breakdown = {**breakdown, **verdict.as_breakdown()}
+
     return {
         "context_quality_score": result.get("context_quality_score", 0.0),
-        "quality_breakdown": result.get("quality_breakdown", {}),
+        "quality_breakdown": breakdown,
         "quality_method": "llm",
         "missing_aspects": result.get("missing_aspects", []),
         "force_refusal": result.get("force_refusal", False),
+        "answerability_veto": False,
         "agent_trace": [
             {
                 "agent": "quality_assessor",
                 "method": "llm",
                 "model": model,
                 "score": result.get("context_quality_score", 0),
+                **_laya_trace(verdict),
             }
         ],
     }
