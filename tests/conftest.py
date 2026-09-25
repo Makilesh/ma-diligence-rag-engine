@@ -7,6 +7,12 @@ from dataclasses import dataclass
 
 import pytest
 
+# Decision-model (Laya) paths are stubbed in unit tests. Without this default an
+# unstubbed path — the API's query guard, say — loads the real 1.7GB checkpoint
+# on a developer machine, which is slow and differs from CI. Tests that want the
+# real model set LAYA_ENABLED=1 themselves and are marked `models`.
+os.environ.setdefault("LAYA_ENABLED", "0")
+
 
 # Scripts that live in tests/ but are not test modules. test_pipeline_offline.py
 # matches the test_*.py glob yet defines no tests — it is a CLI validation run

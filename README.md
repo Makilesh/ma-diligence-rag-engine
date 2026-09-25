@@ -140,7 +140,7 @@ Every use was measured against the method it would replace on a labelled set bui
 | **Risk signals** at ingest (10 categories) | regex, F1 0.583 (P 0.81 / R 0.46) — negations such as "no pending litigation" flagged as risks | regex + Laya hybrid, **F1 0.658 (P 0.89 / R 0.52)** on GPU; on CPU a confirm-only mode, P 1.00 / R 0.46, to keep ingest fast | **On** |
 | **Document category** at ingest | filename/keyword rules, accuracy 0.77 | **0.95** | **On** |
 | **Public query guard** before any LLM call | none — off-topic and jailbreak prompts spent 2–3 Gemini calls each | blocked **23/27** junk prompts with **0/124** false blocks on genuine questions | **On** (public callers only) |
-| **Answerability gate** (does any retrieved passage *state* the answer?) | reranker-score heuristic: measures relevance, so on-topic questions whose figure is absent get through | dev set: unanswerable refused **1/28 → 10/28**, **0/26** answerable wrongly refused; 0 LLM calls, ~60 ms | **Off** until confirmed on the golden test set (`LAYA_GATE=1`) |
+| **Answerability gate** (does any retrieved passage *state* the answer?) | reranker-score heuristic: measures relevance, so on-topic questions whose figure is absent get through | golden test set: unanswerable controls refused **2 → 4 of 6** (none left to the LLM), answerables admitted unchanged (33/35); dev set 1/28 → 10/28 refused with 0/26 wrongly vetoed; 0 LLM calls, ~60 ms on GPU | **On** (GPU); off on the 2-core CPU server, where it costs 7–30 s per query |
 | **PII** at ingest | regex (fixed: bare 9-digit numbers and pay pools no longer count) | lower precision, and hid a chunk the golden set needs | **Not adopted** |
 
 The labelled sets are small and single-annotator, so a chunk or two moves F1 by a few points; the details, confusions and sweeps are in [`eval/decisions/results.md`](eval/decisions/results.md), [`eval/results/query_guard.md`](eval/results/query_guard.md) and [`eval/results/answerability_dev.md`](eval/results/answerability_dev.md). Fine-tuning Laya on domain labels is the next step for PII and for risk recall.
@@ -343,7 +343,7 @@ A few decisions driven by measurement rather than intuition. The full record —
 - **Verification is conservative.** The small NLI model cannot confirm many paraphrased, non-numeric claims, so most answers land at *warning* rather than *passed*. Warnings never trigger a retry; only a confirmed contradiction or an ungrounded figure does.
 - **Arithmetic across documents is model-dependent.** Retrieval supplies the inputs for an implied multiple; whether the model combines them correctly varies by rung. The validator marks such figures as derived or unverified rather than pretending to check them.
 - **PII detection is rule-based.** The decision model did not beat it on the labelled set, so PII stays regex-only, and PII-flagged chunks are excluded from retrieval. Risk-signal recall is still modest (0.52), and `regulatory_risk` is rarely caught.
-- **The answerability gate is off by default.** It is measured on a dev set only; turning it on waits for the golden test-set comparison.
+- **The answerability gate's margin is thin.** The lowest-scoring answerable golden question sits at 0.39 against a 0.35 veto threshold, and two controls (ctrl_04, ctrl_05) are still admitted because the data room partly answers them. On a CPU-only host it is too slow to run per query and is disabled there.
 - **Agents 1, 5 and 6 don't descend the model ladder** on a 429 — they retry the same key, then fail the query. Synthesis and verification do descend. Quota is debited at selection, so a 503 still spends a daily unit.
 - **Structured LLM output is JSON-mode, not schema-validated.**
 - **Rate limits and cooldowns are in-process.** The daily quota counters are shared through Postgres; per-minute limits assume a single API worker.
@@ -358,7 +358,7 @@ A few decisions driven by measurement rather than intuition. The full record —
 - [ ] Recalibrate the Quality Assessor floors per reranker model (the Space runs MiniLM)
 - [ ] Qdrant Query API (server-side prefetch + fusion) and BM25 with the IDF modifier
 - [ ] Rerun the end-to-end golden set on the reworked pipeline
-- [ ] Confirm the Laya answerability gate on the golden test set, then enable it by default
+- [ ] Make the answerability gate cheap enough for CPU hosting (fewer facet × passage pairs, ONNX / int8)
 - [ ] Fine-tune Laya on due-diligence labels (PII, risk recall) and calibrate it
 - [ ] A larger corpus with real PDF and XLSX documents, to stress table handling and multi-hop retrieval
 

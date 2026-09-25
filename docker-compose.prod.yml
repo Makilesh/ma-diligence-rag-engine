@@ -58,6 +58,10 @@ services:
       - TRUST_PROXY_HEADERS=1
       - CORS_ORIGINS=${CORS_ORIGINS:?set CORS_ORIGINS to the Vercel URL}
       - WARM_MODELS=1
+      # The Laya answerability gate measured 6.6 s per facet on 2 CPU threads —
+      # up to ~30 s added per query. Off here by default; set LAYA_GATE=1 in .env
+      # on a host with a GPU or more cores. The query guard (~1.3 s) stays on.
+      - LAYA_GATE=${LAYA_GATE:-0}
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:7860/health"]
       interval: 30s
