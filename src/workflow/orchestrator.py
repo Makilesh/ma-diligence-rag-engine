@@ -286,6 +286,7 @@ def _build_initial_state(
         "quality_breakdown": {},
         "quality_method": "heuristic",
         "missing_aspects": [],
+        "answerability_veto": False,
         "rewrite_iteration": 0,
         "rewrite_history": [],
         "agent_trace": [],

@@ -32,6 +32,7 @@ No single passage states all of this. The exposure figure, the affected executiv
 - [Ingestion](#ingestion)
 - [Retrieval](#retrieval)
 - [Answer verification](#answer-verification)
+- [Decision layer (Laya)](#decision-layer-laya)
 - [Model routing & quota engineering](#model-routing--quota-engineering)
 - [Evaluation](#evaluation)
 - [Public demo guardrails](#public-demo-guardrails)
@@ -101,7 +102,7 @@ Every advertised format has a fixture test that builds a real file and runs it t
 
 **Ingest is idempotent.** `doc_id` is derived from the deal and the file's SHA-256, point IDs from the chunk ID, so re-uploading identical bytes replaces rather than duplicates. A failed upsert rolls back every point already written for that document. Uploads are size-capped, filenames sanitised, Office archives checked for zip bombs, and parsing runs off the event loop.
 
-PII (SSNs, account numbers, compensation data) and risk signals (change of control, MAC clauses, litigation…) are detected at ingestion. PII-flagged chunks are excluded from retrieval by default; the detectors are regex-based and tuned for recall — see [Limitations](#limitations).
+PII (SSNs, account numbers, compensation data) and risk signals (change of control, MAC clauses, litigation…) are detected at ingestion, and each document is categorised. Risk signals and categories are decided with a local decision model on top of the rules — see [Decision layer](#decision-layer-laya); PII stays rule-based. PII-flagged chunks are excluded from retrieval by default.
 
 ---
 
@@ -125,6 +126,24 @@ A validator that is itself an LLM grading another LLM tells you what one model t
 An answer **fails** on any confirmed contradiction or any figure not found in the context, and gets **one** re-synthesis that is told exactly which claims failed. It is a **warning** when non-numeric claims can't be confirmed. **Confidence is computed, not self-reported**: the share of supported claims, averaged with the share of grounded figures when there are any. Per-claim results are returned as `claim_checks`.
 
 Document text is wrapped in escaped `<document>` tags and both prompts treat it as untrusted data — in M&A the data room comes from the counterparty, so prompt injection is adversarial input by design, not a hypothetical.
+
+---
+
+## Decision layer (Laya)
+
+**LLMs generate, code computes, a decision model judges.** Many of the pipeline's steps are not generation at all but typed judgments — *does this passage disclose litigation?*, *what kind of document is this?*, *is this question about the deal?* — and they were being made by regexes or by spending an LLM call. [Laya](https://huggingface.co/convaiinnovations/laya) (Apache-2.0, 421M parameters) answers typed questions in one encoder forward pass with a probability instead of prose: ~30 ms per question on a GPU, runs locally, costs nothing, and cannot hallucinate text. The authors' fine-tuned `typed-decisions` checkpoint is used as-is; nothing here is fine-tuned yet.
+
+Every use was measured against the method it would replace on a labelled set built for it — thresholds chosen on a dev split, results reported on a held-out split — and adopted **only where it won**. Every use falls back to the previous rule-based path when Laya is unavailable ([`src/decisions/`](src/decisions)).
+
+| Decision | Before | With Laya | Status |
+|---|---|---|---|
+| **Risk signals** at ingest (10 categories) | regex, F1 0.583 (P 0.81 / R 0.46) — negations such as "no pending litigation" flagged as risks | regex + Laya hybrid, **F1 0.658 (P 0.89 / R 0.52)** on GPU; on CPU a confirm-only mode, P 1.00 / R 0.46, to keep ingest fast | **On** |
+| **Document category** at ingest | filename/keyword rules, accuracy 0.77 | **0.95** | **On** |
+| **Public query guard** before any LLM call | none — off-topic and jailbreak prompts spent 2–3 Gemini calls each | blocked **23/27** junk prompts with **0/124** false blocks on genuine questions | **On** (public callers only) |
+| **Answerability gate** (does any retrieved passage *state* the answer?) | reranker-score heuristic: measures relevance, so on-topic questions whose figure is absent get through | dev set: unanswerable refused **1/28 → 10/28**, **0/26** answerable wrongly refused; 0 LLM calls, ~60 ms | **Off** until confirmed on the golden test set (`LAYA_GATE=1`) |
+| **PII** at ingest | regex (fixed: bare 9-digit numbers and pay pools no longer count) | lower precision, and hid a chunk the golden set needs | **Not adopted** |
+
+The labelled sets are small and single-annotator, so a chunk or two moves F1 by a few points; the details, confusions and sweeps are in [`eval/decisions/results.md`](eval/decisions/results.md), [`eval/results/query_guard.md`](eval/results/query_guard.md) and [`eval/results/answerability_dev.md`](eval/results/answerability_dev.md). Fine-tuning Laya on domain labels is the next step for PII and for risk recall.
 
 ---
 
@@ -210,6 +229,7 @@ The hosted demo runs on free tiers and is open to anyone, so the API assumes it 
 
 - **Per-IP rate limits** on queries (5/min, 50/day) and uploads, a **concurrency cap** that answers 503 immediately instead of queueing, and a **global daily query cap** as the last guard on the shared Gemini quota.
 - **Visitor sandboxes.** Uploads go to a per-visitor sandbox deal with a TTL; sandboxes are hidden from other visitors, and their creation time is encoded in the ID so the sweeper reclaims orphans even after a restart. The demo deal cannot be written to or deleted without the admin key.
+- **Query guard.** A local decision model screens public questions for off-topic, jailbreak and prompt-injection content before any LLM call is made — measured at 0 false blocks on 124 genuine questions.
 - **Compliance override is server-side.** `include_pii` is forced off for public callers.
 - **No internal errors leak.** Clients get a generic message and a request ID; the detail goes to the log.
 
@@ -226,6 +246,7 @@ The hosted demo runs on free tiers and is open to anyone, so the API assumes it 
 | **Embeddings** | BAAI/bge-m3 | 1024-dim dense + FastEmbed BM25 sparse |
 | **Reranker** | BAAI/bge-reranker-v2-m3 | Cross-encoder, sigmoid-normalised |
 | **Verification** | nli-deberta-v3 (small/xsmall) | Local claim-level entailment |
+| **Decisions** | Laya `typed-decisions` | Local typed yes/no and choice judgments with probabilities |
 | **API** | FastAPI | SSE streaming, structured JSON logging, rate limiting |
 | **Frontend** | Next.js (hosted) · Streamlit (local console) | Streamed pipeline timeline, citations, sandbox uploads |
 | **Database** | PostgreSQL | Quota tracking, LangGraph checkpoints |
@@ -321,7 +342,8 @@ A few decisions driven by measurement rather than intuition. The full record —
 - **The end-to-end numbers predate the September rework** and move with quota state; the retrieval harness is the reliable signal.
 - **Verification is conservative.** The small NLI model cannot confirm many paraphrased, non-numeric claims, so most answers land at *warning* rather than *passed*. Warnings never trigger a retry; only a confirmed contradiction or an ungrounded figure does.
 - **Arithmetic across documents is model-dependent.** Retrieval supplies the inputs for an implied multiple; whether the model combines them correctly varies by rung. The validator marks such figures as derived or unverified rather than pretending to check them.
-- **PII and risk detection are regex-based** and tuned for recall, so they produce false positives (and PII-flagged chunks are excluded from retrieval).
+- **PII detection is rule-based.** The decision model did not beat it on the labelled set, so PII stays regex-only, and PII-flagged chunks are excluded from retrieval. Risk-signal recall is still modest (0.52), and `regulatory_risk` is rarely caught.
+- **The answerability gate is off by default.** It is measured on a dev set only; turning it on waits for the golden test-set comparison.
 - **Agents 1, 5 and 6 don't descend the model ladder** on a 429 — they retry the same key, then fail the query. Synthesis and verification do descend. Quota is debited at selection, so a 503 still spends a daily unit.
 - **Structured LLM output is JSON-mode, not schema-validated.**
 - **Rate limits and cooldowns are in-process.** The daily quota counters are shared through Postgres; per-minute limits assume a single API worker.
@@ -336,6 +358,8 @@ A few decisions driven by measurement rather than intuition. The full record —
 - [ ] Recalibrate the Quality Assessor floors per reranker model (the Space runs MiniLM)
 - [ ] Qdrant Query API (server-side prefetch + fusion) and BM25 with the IDF modifier
 - [ ] Rerun the end-to-end golden set on the reworked pipeline
+- [ ] Confirm the Laya answerability gate on the golden test set, then enable it by default
+- [ ] Fine-tune Laya on due-diligence labels (PII, risk recall) and calibrate it
 - [ ] A larger corpus with real PDF and XLSX documents, to stress table handling and multi-hop retrieval
 
 ---
@@ -352,11 +376,12 @@ src/
   agents/             LangGraph nodes + deterministic retrieval strategy
   data_processing/    Format processors, chunkers, table converter, idempotent ingest pipeline
   verification/       Numeric grounding, claim splitting, local NLI, claim checker
+  decisions/          Laya decision layer: risk/category at ingest, query guard, answerability
   llm/                LiteLLM wrapper, budget tracker, rate limiter, prompt templates
   vector_db/          Qdrant client, hybrid search, RRF fusion, reranker, expansion
   workflow/           LangGraph state machine, orchestrator, conditional edges
   utils/              Logging, token counting, numerical registry
-eval/                 Deterministic retrieval harness, cached sub-questions, baseline
+eval/                 Deterministic retrieval harness, decision-model evals, labelled sets, baselines
 tests/                Offline test suite + golden Q&A set + live E2E runner
 data/sample_deal/     The 9-document synthetic data room
 config/               Qdrant, LiteLLM, and chunking YAML configs

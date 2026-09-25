@@ -9,15 +9,14 @@ synthesis call on an answer that ends up declining. This module asks the other
 question — does any passage STATE what was asked — with one Laya `noul` per
 (facet, passage) pair.
 
-Design, and why (measured on eval/answerability_dev.json, 29 answerable + 28
-unanswerable questions; tests/golden_qa_set.json is the held-out test set — see
-eval/README.md):
+Design, and why (chosen on eval/answerability_dev.json; tests/golden_qa_set.json
+is the held-out test set — see eval/README.md and eval/results/):
 
   * Facets are the user's question plus Agent 1's sub-questions. A facet's
     score is the max P over the passages; the question's score is the max over
     facets. The gate only VETOES — "Laya is confident that no facet is stated
     anywhere" — because zero-shot Laya separates answerable from unanswerable
-    context only moderately (dev AUC ~0.78): it is trustworthy at the bottom of
+    context only moderately (dev AUC 0.80): it is trustworthy at the bottom of
     its range and not above it. "All facets covered" was not adopted: several
     decomposed golden questions have a sub-question that is legitimately
     unanswered (e.g. "if applicable" facets), so it would refuse good context.
@@ -30,6 +29,11 @@ eval/README.md):
     truncates at 1024, so the part of a parent that answers could be cut off.
   * VETO_THRESHOLD sits below the lowest answerable question on the dev set
     (0.409), not at it, so one unlucky phrasing does not flip a good answer.
+    On the golden test set the lowest answerable question scored 0.392 — the
+    margin is real but thin, which is why this only ever vetoes.
+
+Measured (golden, held out): controls refused 2 -> 4 of 6 (ctrl_02 vetoed,
+ctrl_03 refused without the LLM call), answerables admitted unchanged.
 
 Env:
     LAYA_GATE   "0" disables the answerability check (default on). LAYA_ENABLED=0

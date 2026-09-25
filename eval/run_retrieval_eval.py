@@ -111,9 +111,30 @@ async def gate_decision(state: dict, reranked: list[dict], laya: bool = True) ->
     Calls _heuristic_assessment exactly as quality_assessor_node does before it
     ever considers the LLM. None from the heuristic means the ambiguous band,
     where the node would ask an LLM — reported as such, not guessed. With `laya`,
-    it also runs the node's answerability check (combine_with_answerability) and
-    reports that decision alongside, regardless of LAYA_GATE, so the heuristic
-    and the Laya-augmented gate are measured on the same context.
+    it also runs the node's answerability check (see add_laya_gate).
+    """
+    from src.agents.quality_assessor import _heuristic_assessment
+
+    verdict = _heuristic_assessment({**state, "reranked_results": reranked})
+    scores = [float(c.get("reranker_score", 0.0)) for c in reranked]
+    out = {
+        "decision": _decision(verdict),
+        "max_reranker_score": round(max(scores), 4) if scores else None,
+        "context_quality_score": None if verdict is None else verdict["context_quality_score"],
+    }
+    if laya:
+        await add_laya_gate(out, state, reranked)
+    return out
+
+
+async def add_laya_gate(gate: dict, state: dict, reranked: list[dict]) -> None:
+    """
+    Adds gate["laya"]: the node's combine_with_answerability decision.
+
+    Runs regardless of LAYA_GATE, so the heuristic and the Laya-augmented gate
+    are measured on the same context. Separate from gate_decision so a run can
+    finish retrieval, release the retrieval models, and only then load Laya —
+    on a memory-tight host the three models together do not fit.
     """
     from src.agents.quality_assessor import _heuristic_assessment, combine_with_answerability
     from src.decisions.answerability import assess_answerability
@@ -121,26 +142,18 @@ async def gate_decision(state: dict, reranked: list[dict], laya: bool = True) ->
 
     full_state = {**state, "reranked_results": reranked}
     verdict = _heuristic_assessment(full_state)
-    scores = [float(c.get("reranker_score", 0.0)) for c in reranked]
-    out = {
-        "decision": _decision(verdict),
-        "max_reranker_score": round(max(scores), 4) if scores else None,
-        "context_quality_score": None if verdict is None else verdict["context_quality_score"],
-    }
-    if not laya:
-        return out
     if verdict is not None and verdict.get("force_refusal"):
         # The node never consults Laya on a heuristic refusal.
-        out["laya"] = {"decision": "refused", "consulted": False}
-        return out
+        gate["laya"] = {"decision": "refused", "consulted": False}
+        return
     try:
         answerability = await assess_answerability(
             state["original_query"], state.get("sub_questions") or [], reranked)
     except LayaUnavailable as e:
-        out["laya"] = {"decision": None, "unavailable": str(e)}
-        return out
+        gate["laya"] = {"decision": None, "unavailable": str(e)}
+        return
     combined = combine_with_answerability(full_state, verdict, answerability)
-    out["laya"] = {
+    gate["laya"] = {
         "decision": _decision(combined),
         "consulted": True,
         "vetoed": bool(answerability and answerability.vetoed),
@@ -149,7 +162,21 @@ async def gate_decision(state: dict, reranked: list[dict], laya: bool = True) ->
             f: round(p, 4) for f, p in answerability.facet_scores.items()},
         "latency_ms": None if answerability is None else answerability.latency_ms,
     }
-    return out
+
+
+def release_retrieval_models() -> None:
+    """Drops the embedding and reranker models so Laya can load in their place."""
+    import gc
+
+    import torch
+
+    from src.vector_db import reranker
+
+    reranker._embedding_model = None
+    reranker._reranker_model = None
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
 
 async def _candidate_runs(question: dict, config: dict) -> dict:
@@ -202,8 +229,8 @@ async def _candidate_runs(question: dict, config: dict) -> dict:
     }
 
 
-async def _node_run(question: dict, sub_questions: list[str], laya: bool = True) -> dict:
-    """One call of the real retrieval_executor_node, plus the refusal gate."""
+async def _node_run(question: dict, sub_questions: list[str]) -> dict:
+    """One call of the real retrieval_executor_node, plus the heuristic refusal gate."""
     from src.agents.retrieval_executor import retrieval_executor_node
 
     state = _node_state(question, sub_questions)
@@ -214,7 +241,8 @@ async def _node_run(question: dict, sub_questions: list[str], laya: bool = True)
         "ranking": out["reranked_results"],
         "context": out["expanded_context"],
         "latency_ms": latency_ms,
-        "gate": await gate_decision(state, out["reranked_results"], laya=laya),
+        "gate": await gate_decision(state, out["reranked_results"], laya=False),
+        "state": state,
         "sub_questions": list(sub_questions),
     }
 
@@ -674,6 +702,7 @@ async def run(args: argparse.Namespace) -> dict:
     retrievable = [c for c in chunks if is_retrievable(c)]
 
     report_questions = []
+    pending_laya: list[dict] = []
     with use_client(client):
         await warm_models()
         for n, question in enumerate(pairs, start=1):
@@ -690,7 +719,7 @@ async def run(args: argparse.Namespace) -> dict:
                 candidate_runs = await _candidate_runs(question, config)
                 runs.update({a: r for a, r in candidate_runs.items() if a in ablations})
             if "production" in ablations or "production_decomp" in ablations:
-                production = await _node_run(question, [], laya=args.laya)
+                production = await _node_run(question, [])
                 if "production" in ablations:
                     runs["production"] = production
                 if "production_decomp" in ablations:
@@ -698,10 +727,15 @@ async def run(args: argparse.Namespace) -> dict:
                     # An undecomposed question takes the identical path; re-running
                     # it would only re-measure latency noise.
                     runs["production_decomp"] = (
-                        await _node_run(question, question_subs, laya=args.laya) if question_subs
+                        await _node_run(question, question_subs) if question_subs
                         else production
                     )
 
+            if args.laya:
+                # Scored after retrieval ends; see add_laya_gate. Identity check:
+                # an undecomposed question shares its production run.
+                for run_ in {id(r): r for a, r in runs.items() if a in NODE_ABLATIONS}.values():
+                    pending_laya.append(run_)
             report_questions.append({
                 "id": question["id"],
                 "query": question["query"],
@@ -717,6 +751,13 @@ async def run(args: argparse.Namespace) -> dict:
                 "runs": {a: score_run(r, question, qrels, args.k) for a, r in runs.items()},
             })
             print(f"[eval] {n}/{len(pairs)} {question['id']}", file=sys.stderr)
+
+    if pending_laya:
+        print(f"[eval] Laya answerability gate on {len(pending_laya)} contexts ...",
+              file=sys.stderr)
+        release_retrieval_models()
+        for run_ in pending_laya:
+            await add_laya_gate(run_["gate"], run_["state"], run_["ranking"])
 
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),

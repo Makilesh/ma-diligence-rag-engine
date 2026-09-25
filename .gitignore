@@ -39,3 +39,6 @@ auric*
 
 # Personal, never-committed notes (e.g. DEPLOY_HELP.local.md)
 *.local.md
+
+# Agents' and ad-hoc scratch work
+.scratch*/

@@ -36,7 +36,13 @@ from pathlib import Path
 
 from eval import metrics as m
 from eval.corpus import PROJECT_ROOT, build_index, use_client
-from eval.run_retrieval_eval import RESULTS_DIR, _node_state, gate_decision
+from eval.run_retrieval_eval import (
+    RESULTS_DIR,
+    _node_state,
+    add_laya_gate,
+    gate_decision,
+    release_retrieval_models,
+)
 
 DEV_SET_PATH = PROJECT_ROOT / "eval" / "answerability_dev.json"
 
@@ -138,28 +144,35 @@ async def run(args: argparse.Namespace) -> dict:
     started = time.perf_counter()
     client, _ = await build_index()
     rows: list[dict] = []
+    contexts: list[tuple[dict, list[dict]]] = []
     with use_client(client):
         await warm_models()
-        for n, q in enumerate(questions, start=1):
+        for q in questions:
             state = _node_state({"query": q["query"], "query_type": q["query_type"]}, [])
             reranked = (await retrieval_executor_node(state))["reranked_results"]
-            row = {"id": q["id"], "query": q["query"], "label": label(q, reranked)}
-            for name, instruction in phrasings.items():
-                ans.ANSWERABILITY_INSTRUCTION = instruction
-                gate = await gate_decision(state, reranked, laya=True)
-                laya = gate.get("laya") or {}
-                if "unavailable" in laya:
-                    raise RuntimeError(f"Laya unavailable: {laya['unavailable']}")
-                row["heuristic"] = gate["decision"]
-                row["max_reranker_score"] = gate["max_reranker_score"]
-                suffix = "" if name == "P1" else f"_{name}"
-                row[f"laya{suffix}"] = laya.get("decision")
-                row[f"answerability{suffix}"] = laya.get("answerability")
-                row[f"laya_ms{suffix}"] = laya.get("latency_ms")
-            ans.ANSWERABILITY_INSTRUCTION = PHRASINGS["P1"]
-            rows.append(row)
-            print(f"[dev] {n}/{len(questions)} {q['id']} {row['label']} heuristic={row['heuristic']} "
-                  f"laya={row['laya']} P={row['answerability']}", file=sys.stderr)
+            gate = await gate_decision(state, reranked, laya=False)
+            rows.append({"id": q["id"], "query": q["query"], "label": label(q, reranked),
+                         "heuristic": gate["decision"],
+                         "max_reranker_score": gate["max_reranker_score"]})
+            contexts.append((state, reranked))
+
+    # Retrieval is done: free its models before Laya loads (memory-tight hosts).
+    release_retrieval_models()
+    for n, (row, (state, reranked)) in enumerate(zip(rows, contexts), start=1):
+        for name, instruction in phrasings.items():
+            ans.ANSWERABILITY_INSTRUCTION = instruction
+            gate: dict = {}
+            await add_laya_gate(gate, state, reranked)
+            laya = gate["laya"]
+            if "unavailable" in laya:
+                raise RuntimeError(f"Laya unavailable: {laya['unavailable']}")
+            suffix = "" if name == "P1" else f"_{name}"
+            row[f"laya{suffix}"] = laya.get("decision")
+            row[f"answerability{suffix}"] = laya.get("answerability")
+            row[f"laya_ms{suffix}"] = laya.get("latency_ms")
+        ans.ANSWERABILITY_INSTRUCTION = PHRASINGS["P1"]
+        print(f"[dev] {n}/{len(rows)} {row['id']} {row['label']} heuristic={row['heuristic']} "
+              f"laya={row['laya']} P={row['answerability']}", file=sys.stderr)
 
     laya_ms = [r["laya_ms"] for r in rows if r["laya_ms"] is not None]
     report = {
